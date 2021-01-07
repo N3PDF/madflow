@@ -23,7 +23,7 @@ import madgraph.iolibs.helas_call_writers as helas_call_writers
 import madgraph.iolibs.files as files
 import aloha.create_aloha as create_aloha
 import aloha.aloha_writers as aloha_writers
-import PyOut_create_aloha as pyout_create_aloha
+from . import PyOut_create_aloha as pyout_create_aloha
 
 import models.check_param_card as check_param_card
 

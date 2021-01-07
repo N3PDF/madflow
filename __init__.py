@@ -13,7 +13,7 @@ import sys
 root_path = os.path.split(os.path.dirname(os.path.realpath( __file__ )))[0]
 sys.path.insert(0, root_path)
 
-import PyOut.PyOut_exporter as PyOut_exporter
+from . import PyOut_exporter
 ##import Resummation.resummation_exporters as resummation_exporters
 
 # Three types of functionality are allowed in a plugin
