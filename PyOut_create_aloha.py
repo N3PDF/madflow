@@ -12,7 +12,7 @@ import madgraph.iolibs.file_writers as file_writers
 import aloha
 import aloha.create_aloha as create_aloha
 import aloha.aloha_writers as aloha_writers
-import PyOut.PyOut_PythonFileWriter as PythonFileWriter
+from . import PyOut_PythonFileWriter as PythonFileWriter
 
 
 class ALOHAWriterForPyOut(aloha_writers.ALOHAWriterForPython):
