@@ -119,4 +119,4 @@ if __name__ == "__main__":
                [100.,-100., 0., 0.]]
 
     mymatrix = Matrix_%(process_string)s()
-    print 'RESULT', mymatrix.smatrix(momenta, model)
+    print('RESULT', mymatrix.smatrix(momenta, model))
