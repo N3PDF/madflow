@@ -16,8 +16,12 @@
 """
 matrix_elm_folder = "../../mg5amcnlo/bin/vegasflow_example/"
 
+import os
 import numpy as np
 import vegasflow
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+vegasflow.run_eager(True) # so we don't have to worry for now abut tf 
+import tensorflow as tf
 
 ######### Import the matrix elements and the necessary models
 all_matrices = []
@@ -55,11 +59,33 @@ for matrix_file in glob.glob(f"{matrix_elm_folder}/matrix_*.py"):
 # Clean the path
 sys.path = original_path
 # Uncomment loop below to run a test over the loaded matrix elements
-for matrix, model in zip(all_matrices, all_models):
-    # Generate a random momentum according to the number of external particles
-    # (likely unphysical!)
-    momenta = np.random.rand(matrix.nexternal,4)*100
-    print(f"Result: {matrix.smatrix(momenta, model):.5f}")
+# for matrix, model in zip(all_matrices, all_models):
+#     # Generate a random momentum according to the number of external particles
+#     # (likely unphysical!)
+#     momenta = np.random.rand(matrix.nexternal,4)*100
+#     print(f"Result: {matrix.smatrix(momenta, model):.5f}")
 #######################################################
 
+# Very complicated function that generates phase space momenta from the input random points
+# the number of particles in the system and their masses
+def phasespace_generator(xrand, nparticles):
+    """ Takes as input an array of nevent x ndim random points and outputs
+    an array of momenta (nevents x nparticles x 4)
+    """
+    return vegasflow.float_me(tf.random.uniform((xrand.shape[0],nparticles, 4))*1e4)
+
 # Minimal working exaple of cross section calculation with vegasflow
+def cross_section(xrand, **kwargs):
+    # IRL we would be gruping matrices by nparticles
+    res = 0.0
+    for matrix, model in zip(all_matrices, all_models):
+        all_ps = phasespace_generator(xrand, matrix.nexternal)
+        for ps in all_ps.numpy(): # when in eager mode, better to loop over numpy
+            # TODO the matrix element should be made to take values in parallel!
+            res += matrix.smatrix(ps, model)
+    return vegasflow.float_me(res/tf.reduce_sum(xrand))
+
+n_dim = 2
+n_iter = 5
+n_events = 1000
+result = vegasflow.vegas_wrapper(cross_section, n_dim, n_iter, n_events)
