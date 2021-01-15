@@ -15,6 +15,7 @@ import models.import_ufo as import_ufo
 
 
 class Matrix_%(process_string)s(object):
+    nexternal = %(nexternal)d
 
     def __init__(self):
         """define the object"""
@@ -75,7 +76,7 @@ class Matrix_%(process_string)s(object):
         # Process parameters
         #  
         ngraphs = %(ngraphs)d
-        nexternal = %(nexternal)d
+        nexternal = self.nexternal
         nwavefuncs = %(nwavefuncs)d
         ncolor = %(ncolor)d
         ZERO = 0.
