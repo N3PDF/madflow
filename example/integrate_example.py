@@ -23,6 +23,10 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 vegasflow.run_eager(True) # so we don't have to worry for now abut tf 
 import tensorflow as tf
 
+from parallel_rambo import parallel_rambo
+
+COM_SQRTS = 7e3
+
 ######### Import the matrix elements and the necessary models
 all_matrices = []
 model = None
@@ -70,20 +74,23 @@ def phasespace_generator(xrand, nparticles):
     """ Takes as input an array of nevent x ndim random points and outputs
     an array of momenta (nevents x nparticles x 4)
     """
-    return vegasflow.float_me(tf.random.uniform((xrand.shape[0],nparticles, 4))*1e4)
+    return parallel_rambo(xrand, 4, COM_SQRTS)
+
 
 # Minimal working exaple of cross section calculation with vegasflow
 def cross_section(xrand, **kwargs):
     # IRL we would be gruping matrices by nparticles
     res = 0.0
     for matrix in all_matrices:
-        all_ps = phasespace_generator(xrand, matrix.nexternal)
+        all_ps, wt = phasespace_generator(xrand, matrix.nexternal)
         for ps in all_ps.numpy(): # when in eager mode, better to loop over numpy
             # TODO the matrix element should be made to take values in parallel!
-            res += matrix.smatrix(ps, model)
-    return vegasflow.float_me(res/tf.reduce_sum(xrand))
+            res += matrix.smatrix(ps**2/1e4, model)
+    return wt*vegasflow.float_me(res/tf.reduce_sum(xrand))
 
-n_dim = 2
+n_dim = 16 
+# For now we have (4 particles -> 16 random numbers)
+# they are also massless so results will be unphysical anyway
 n_iter = 5
 n_events = 1000
 result = vegasflow.vegas_wrapper(cross_section, n_dim, n_iter, n_events)
