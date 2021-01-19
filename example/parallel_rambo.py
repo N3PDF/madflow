@@ -123,9 +123,10 @@ if __name__ == "__main__":
     p2 = np.array(p2r).T
 
     print("Checking first ps point...")
-    np.testing.assert_allclose(p[0], p1, rtol=1e-4)
+    fortran_axis = [1,2,3,0]
+    np.testing.assert_allclose(p[0].numpy()[:, fortran_axis], p1, rtol=1e-4)
     print("Checking second ps point...")
-    np.testing.assert_allclose(p[1], p2, rtol=1e-4)
+    np.testing.assert_allclose(p[1].numpy()[:, fortran_axis], p2, rtol=1e-4)
     print("Checking weight...")
     assert wt1==wt2==wt
     print("All good!")
