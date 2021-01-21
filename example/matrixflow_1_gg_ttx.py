@@ -223,7 +223,7 @@ if __name__ == "__main__":
 
     import numpy as np
     COM_SQRTS = 7e3
-    nevt = 1000
+    nevt = 100000
     ndim = 4*matrixflow.nexternal
     xrand = float_me(np.random.rand(nevt,ndim)*100)
     from parallel_rambo import parallel_rambo
@@ -234,12 +234,13 @@ if __name__ == "__main__":
         return parallel_rambo(xrand, 4, COM_SQRTS)
     all_momenta, _ = phasespace_generator(xrand, 4)
     print("Tracing TGraph ...")
+    print(f"Evaluating smatrix for {nevt} events")
     start = tm()
     matrixflow.smatrix(all_momenta[:1], *model_params)
-    print(f"TGraph traced in {tm()-start}")
+    print(f"TGraph traced in {tm()-start} s")
     start = tm()
     resflow = matrixflow.smatrix(all_momenta, *model_params)
-    print(f"Mg5Flow computed smatrix in: {tm()-start}")
+    print(f"Mg5Flow computed smatrix in: {tm()-start} s")
     start = tm()
     res = []
     for momenta in all_momenta.numpy():
