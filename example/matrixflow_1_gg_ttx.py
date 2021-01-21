@@ -1,4 +1,4 @@
-from vegasflow.configflow import float_me, DTYPE, DTYPEINT
+from vegasflow.configflow import int_me, float_me, DTYPE, DTYPEINT
 import tensorflow as tf
 import collections
 ModelParamTuple = collections.namedtuple("Model", ["mdl_MT", "mdl_WT", "GC_10", "GC_11"])
@@ -17,7 +17,7 @@ def get_model_param(model):
 
 class Matrixflow_1_gg_ttx:
     # TODO: not sure if to use class attributes like this or instance attributes
-    nexternal = float_me(4)
+    nexternal = int_me(4)
     ndiags = float_me(3)
     ncomb = float_me(16)
     helicities = float_me([
@@ -194,8 +194,17 @@ if __name__ == "__main__":
     sys.path = original_path
 
     import numpy as np
+    COM_SQRTS = 7e3
     nevt = 1000
-    all_momenta = float_me(np.random.rand(nevt,matrix.nexternal,4)*100)
+    ndim = 4*matrixflow.nexternal
+    xrand = float_me(np.random.rand(nevt,ndim)*100)
+    from parallel_rambo import parallel_rambo
+    def phasespace_generator(xrand, nparticles):
+        """ Takes as input an array of nevent x ndim random points and outputs
+        an array of momenta (nevents x nparticles x 4)
+        """
+        return parallel_rambo(xrand, 4, COM_SQRTS)
+    all_momenta, _ = phasespace_generator(xrand, 4)
     resflow = matrixflow.smatrix(all_momenta, *model_params)
     res = []
     for momenta in all_momenta.numpy():
