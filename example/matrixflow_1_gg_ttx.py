@@ -132,13 +132,15 @@ class Matrixflow_1_gg_ttx:
         w = tf.zeros([nwavefuncs], dtype=DTYPECOMPLEX)
 
         # all_ps[:,i] selects the particle and is a [nevt,4] tensor
+        w0 = vxxxxx(all_ps[:,0],ZERO,hel[0],-1) # [nevt,6]
+        w1 = vxxxxx(all_ps[:,1],ZERO,hel[1],-1)
+        w2 = oxxxxx(all_ps[:,2],mdl_MT,hel[2],+1)
         w3 = ixxxxx(all_ps[:,3],mdl_MT,hel[3],-1)
-        print("w3", w3.shape)
+        print("vxxxxx shape", w1.shape)
+        print("oxxxxx shape", w2.shape)
+        print("ixxxxx shape", w3.shape)
         exit()
-        w[0] = vxxxxx(all_ps[:,0],ZERO,hel[0],-1) # [nevt,6]
-        w[1] = vxxxxx(all_ps[:,1],ZERO,hel[1],-1)
-        w[2] = oxxxxx(all_ps[:,2],mdl_MT,hel[2],+1)
-        w[4]= VVV1P0_1(w[0],w[1],GC_10,ZERO,ZERO)
+        w4= VVV1P0_1(w[0],w[1],GC_10,ZERO,ZERO)
         # Amplitude(s) for diagram number 1
         amp[0]= FFV1_0(w[3],w[2],w[4],GC_11)
         w[4]= FFV1_1(w[2],w[0],GC_11,mdl_MT,mdl_WT)
@@ -176,3 +178,4 @@ if __name__ == "__main__":
 
     mymatrix = MatrixFlow_1_gg_ttx()
     print('RESULT', mymatrix.smatrix(momenta, model))
+    
