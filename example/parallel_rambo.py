@@ -108,7 +108,7 @@ if __name__ == "__main__":
     p, wt = parallel_rambo(xrand, n, sqrts)
 
     # Add here the madgraph rambo module for comparison
-    mad_rambo = "../../mg5amcnlo/madgraph/various/rambo.py"
+    mad_rambo = "../../madgraph/various/rambo.py"
     import importlib.util
     rambo_spec = importlib.util.spec_from_file_location("rambo", mad_rambo)
     rambo_modu = importlib.util.module_from_spec(rambo_spec)

@@ -16,7 +16,7 @@ def get_model_param(model):
 
 
 class Matrixflow_1_gg_ttx:
-    # not sure if to use class attributes like this or instance attributes
+    # TODO: not sure if to use class attributes like this or instance attributes
     nexternal = float_me(4)
     ndiags = float_me(3)
     ncomb = float_me(16)
@@ -46,7 +46,6 @@ class Matrixflow_1_gg_ttx:
         
     def clean(self):
         pass
-        # self.jamp = []
 
     def smatrix(self, all_ps, mdl_MT, mdl_WT, GC_10, GC_11):
         """
@@ -78,8 +77,8 @@ class Matrixflow_1_gg_ttx:
             tf.tensor of shape [None]
                 tensor of smatrix real parts
         """
-        # self.amp2 = [0.] * ndiags
-        # self.helEvals = []
+        # TODO: is it possible to skip the helicity for and parallelize it ?
+        # TODO: check if the cast
         ans = complex_tf(0., 0.)
         for hel in self.helicities:
             t = self.matrix(all_ps, hel, mdl_MT, mdl_WT, GC_10, GC_11)
@@ -134,9 +133,6 @@ class Matrixflow_1_gg_ttx:
         # ----------
         # Begin code
         # ----------
-        amp = tf.zeros([ngraphs], dtype=DTYPECOMPLEX)
-        w = tf.zeros([nwavefuncs], dtype=DTYPECOMPLEX)
-
         # all_ps[:,i] selects the particle and is a [nevt,4] tensor
         # wavefunctions output a [None,nevt] tensor based on spine
         # amplitudes are [nevt] tensors
@@ -155,7 +151,7 @@ class Matrixflow_1_gg_ttx:
         amp2= FFV1_0(w4,w2,w1,GC_11)
 
         jamp0 = complex_tf(0,1)*amp0-amp1
-        jamp1 = -complex_tf(0,1)*amp0-amp1
+        jamp1 = -complex_tf(0,1)*amp0-amp2
         jamp = tf.stack([jamp0,jamp1], axis=0)
 
         matrix = complex_tf(0,0)
@@ -168,16 +164,44 @@ class Matrixflow_1_gg_ttx:
 
 
 if __name__ == "__main__":
-    # TODO: to make this test as __main__, mg5 main folder must be set in PYTHONPATH
-    # in order to make the following import 
-    # import models.import_ufo as import_ufo
-    model = import_ufo.import_model("/home/marco/PhD/unimi/MG5_aMC/MG5_aMC_v2_8_2/models/sm")
-    model_params = get_model_param(model)
-    momenta = float_me([[100., 0., 0., 100.],
-                        [100., 0., 0.,-100.],
-                        [100., 100., 0., 0.],
-                        [100.,-100., 0., 0.]])
+    matrix_elm_folder = "../../vegasflow_example/"
+    model = None
+    base_model = "models/sm"
 
-    mymatrix = MatrixFlow_1_gg_ttx()
-    print('RESULT', mymatrix.smatrix(momenta, *model_params))
+    import sys
+    import glob
+    import copy
+    import importlib.util
+    import re
+    re_name = re.compile("\w{3,}")
+    original_path = copy.copy(sys.path)
+    sys.path.insert(0, matrix_elm_folder)
+    matrix_file = f"{matrix_elm_folder}/matrix_1_gg_ttx.py"
+    matrix_name = re_name.findall(matrix_file)[-1]
+    class_name = matrix_name.capitalize()
+    module_spec = importlib.util.spec_from_file_location(matrix_name, matrix_file)
+    module = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
     
+    matrix = getattr(module, class_name)()
+    matrixflow = Matrixflow_1_gg_ttx()
+    root_path = getattr(module, "root_path")
+    import_ufo = getattr(module, "import_ufo")
+    model = import_ufo.import_model(f"{root_path}/{base_model}")
+    model_params = get_model_param(model)
+
+    # Clean the path
+    sys.path = original_path
+
+    import numpy as np
+    nevt = 1000
+    all_momenta = float_me(np.random.rand(nevt,matrix.nexternal,4)*100)
+    resflow = matrixflow.smatrix(all_momenta, *model_params)
+    res = []
+    for momenta in all_momenta.numpy():
+        res.append(matrix.smatrix(momenta, model))
+    res = np.stack(res) # [nevt,]
+
+    print("Checking smatrix results...")
+    np.testing.assert_allclose(res, resflow, rtol=1e-4)
+    print("All good!")

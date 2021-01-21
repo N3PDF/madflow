@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.math import sqrt, abs, minimum, maximum
 from vegasflow.configflow import DTYPE, DTYPEINT, int_me, float_me
 from config import DTYPECOMPLEX
 from config import complex_tf, complex_me
@@ -34,9 +35,9 @@ def ixxxxx(p,fmass,nhel,nsf):
     ip = (1+nh)//2
     im = (1-nh)//2
     if tf.constant(fmass != 0.):
-        pp = tf.math.minimum(p[:,0], tf.math.sqrt(p[:,1]**2 + p[:,2]**2 + p[:,3]**2 )) # [nevt,]
+        pp = minimum(p[:,0], sqrt(p[:,1]**2 + p[:,2]**2 + p[:,3]**2 )) # [nevt,]
         def true_fn():
-            sqm = tf.math.sqrt(tf.math.abs(fmass))
+            sqm = sqrt(abs(fmass))
             sqm = tf.stack([sqm, sign(sqm,fmass)]) # [fmass, fmass] ---> TODO: why calling sign on the result of a sqrt ????
             v2 = complex_tf(ip*sqm[int_me(ip)],0.) # just a complex number
             v3 = complex_tf(im*nsf*sqm[int_me(ip)],0.)
@@ -46,11 +47,11 @@ def ixxxxx(p,fmass,nhel,nsf):
             return tf.reshape(v, [4,1])
         def false_fn():
             sf = tf.concat([(1+nsf+(1-nsf)*nh)*0.5,(1+nsf-(1-nsf)*nh)*0.5], axis=0) # [2,]
-            omega = tf.stack([tf.math.sqrt(p[:,0]+pp),fmass/(tf.math.sqrt(p[:,0]+pp))], axis=0) # [2, nevt]
+            omega = tf.stack([sqrt(p[:,0]+pp),fmass/(sqrt(p[:,0]+pp))], axis=0) # [2, nevt]
             sfomeg = tf.stack([sf[0]*omega[int_me(ip)],sf[1]*omega[int_me(im)]], axis=0) # [2,nevt]
-            pp3 = tf.math.maximum(pp+p[:,3],0.) # [nevt,]
-            chi1 = tf.where(pp3==0, complex_tf(-nh,0), complex_tf(nh*p[:,1], p[:,2]/tf.math.sqrt(2.*pp*pp3))) # [nevt,] complex
-            chi2 = tf.complex(tf.math.sqrt(pp3*0.5/pp),float_me(0.)) # [nevt,] complex 
+            pp3 = maximum(pp+p[:,3],0.) # [nevt,]
+            chi1 = tf.where(pp3==0, complex_tf(-nh,0), complex_tf(nh*p[:,1]/sqrt(2.*pp*pp3), p[:,2]/sqrt(2.*pp*pp3))) # [nevt,] complex
+            chi2 = complex_tf(sqrt(pp3*0.5/pp),0.) # [nevt,] complex 
             chi = tf.stack([chi2, chi1], axis=0) # [2, nevt] complex
             v2 = complex_tf(sfomeg[0], 0.)*chi[int_me(im)] # [nevt,] complex
             v3 = complex_tf(sfomeg[0], 0.)*chi[int_me(ip)]
@@ -62,7 +63,7 @@ def ixxxxx(p,fmass,nhel,nsf):
     else: 
         sqp0p3 = sqrt(max(p[:,0]+p[:,3],0.))*nsf # [nevt,]
         def true_fn():
-            return complex_tf(-nhel*tf.math.sqrt(2.*p[:,0]),0.) # [nevt,] complex
+            return complex_tf(-nhel*sqrt(2.*p[:,0]),0.) # [nevt,] complex
         def false_fn():
             return complex_fn(nh*p[:,1]/sqp0p3,p[:,2]/sqp0p3) # [nevt,] complex
         chi1 = tf.where(sqp0p3, true_fn(), false_fn())
@@ -90,38 +91,40 @@ def oxxxxx(p,fmass,nhel,nsf):
     v0 = tf.expand_dims(complex_tf(p[:,0]*nsf,p[:,3]*nsf), 0) # [nevt,] complex
     v1 = tf.expand_dims(complex_tf(p[:,1]*nsf,p[:,2]*nsf), 0) # [nevt,] complex
     nh = nhel*nsf # either +1 or -1
-    ip = -((1-nh)//2) * nhel
-    im = (1+nh)//2 * nhel
     if tf.constant(fmass != 0.):
-        pp = tf.math.minimum(p[:,0], tf.math.sqrt(p[:,1]**2 + p[:,2]**2 + p[:,3]**2 )) # [nevt,]
+        pp = minimum(p[:,0], sqrt(p[:,1]**2 + p[:,2]**2 + p[:,3]**2 )) # [nevt,]
         def true_fn():
-            sqm = tf.math.sqrt(tf.math.abs(fmass))
+            sqm = sqrt(abs(fmass))
             sqm = tf.stack([sqm, sign(sqm,fmass)]) # [fmass, fmass] ---> why calling sign on the result of a sqrt ????
-            v2 = complex_tf(im*sqm[int_me(tf.math.abs(im))],0.) # just a complex number
-            v3 = complex_tf(ip*nsf*sqm[int_me(tf.math.abs(im))],0.)
-            v4 = complex_tf(im*nsf*sqm[int_me(tf.math.abs(ip))],0.)
-            v5 = complex_tf(ip*sqm[int_me(tf.math.abs(ip))],0.)
+            ip = -((1-nh)//2) * nhel
+            im = (1+nh)//2 * nhel
+            v2 = complex_tf(im*sqm[int_me(abs(im))],0.) # just a complex number
+            v3 = complex_tf(ip*nsf*sqm[int_me(abs(im))],0.)
+            v4 = complex_tf(im*nsf*sqm[int_me(abs(ip))],0.)
+            v5 = complex_tf(ip*sqm[int_me(abs(ip))],0.)
             v = tf.stack([v2,v3,v4,v5]) # [4,] complex
             return tf.reshape(v, [4,1])
         def false_fn():
             sf = tf.concat([(1+nsf+(1-nsf)*nh)*0.5,(1+nsf-(1-nsf)*nh)*0.5], axis=0) # [2,]
-            omega = tf.stack([tf.math.sqrt(p[:,0]+pp),fmass/(tf.math.sqrt(p[:,0]+pp))], axis=0) # [2, nevt]
+            omega = tf.stack([sqrt(p[:,0]+pp),fmass/(sqrt(p[:,0]+pp))], axis=0) # [2, nevt]
+            ip = (1+nh)//2
+            im = (1-nh)//2
             sfomeg = tf.stack([sf[0]*omega[int_me(ip)],sf[1]*omega[int_me(im)]], axis=0) # [2,nevt]
-            pp3 = tf.math.maximum(pp+p[:,3],0.) # [nevt,]
-            chi1 = tf.where(pp3==0, complex_tf(-nh,0), complex_tf(nh*p[:,1], -p[:,2]/tf.math.sqrt(2.*pp*pp3))) # [nevt,] complex
-            chi2 = tf.complex(tf.math.sqrt(pp3*0.5/pp),float_me(0.)) # [nevt,] complex 
+            pp3 = maximum(pp+p[:,3],0.) # [nevt,]
+            chi1 = tf.where(pp3==0, complex_tf(-nh,0), complex_tf(nh*p[:,1]/sqrt(2.*pp*pp3), -p[:,2]/sqrt(2.*pp*pp3))) # [nevt,] complex
+            chi2 = complex_tf(sqrt(pp3*0.5/pp),0.) # [nevt,] complex 
             chi = tf.stack([chi2, chi1], axis=0) # [2, nevt] complex
-            v2 = complex_tf(sfomeg[0], 0.)*chi[int_me(im)] # [nevt,] complex
-            v3 = complex_tf(sfomeg[0], 0.)*chi[int_me(ip)]
-            v4 = complex_tf(sfomeg[1], 0.)*chi[int_me(im)]
-            v5 = complex_tf(sfomeg[1], 0.)*chi[int_me(ip)]
+            v2 = complex_tf(sfomeg[1], 0.)*chi[int_me(im)] # [nevt,] complex
+            v3 = complex_tf(sfomeg[1], 0.)*chi[int_me(ip)]
+            v4 = complex_tf(sfomeg[0], 0.)*chi[int_me(im)]
+            v5 = complex_tf(sfomeg[0], 0.)*chi[int_me(ip)]
             return tf.stack([v2,v3,v4,v5], axis=0) # [4, nevt] complex
         cond = tf.expand_dims(pp==0, 0)
         v = tf.where(cond, true_fn(), false_fn()) # [4, nevt] complex
-    else: 
-        sqp0p3 = sqrt(max(p[:,0]+p[:,3],0.))*nsf # [nevt,]
+    else:
+        sqp0p3 = sqrt(maximum(p[:,0]+p[:,3],0.))*nsf # [nevt,]
         def true_fn():
-            return complex_tf(-nhel*tf.math.sqrt(2.*p[:,0]),0.) # [nevt,] complex
+            return complex_tf(-nhel*sqrt(2.*p[:,0]),0.) # [nevt,] complex
         def false_fn():
             return complex_fn(nh*p[:,1]/sqp0p3, -p[:,2]/sqp0p3) # [nevt,] complex
         chi1 = tf.where(sqp0p3, true_fn(), false_fn())
@@ -147,11 +150,11 @@ def vxxxxx(p,vmass,nhel,nsv):
     """ initialize a vector wavefunction. nhel=4 is for checking BRST"""
     nevts = tf.shape(p, out_type=DTYPEINT)[0]
 
-    sqh = float_me(tf.math.sqrt(0.5))
-    nsvahl = nsv*tf.math.abs(nhel)
+    sqh = float_me(sqrt(0.5))
+    nsvahl = nsv*abs(nhel)
     pt2 = p[:,1]**2 + p[:,2]**2 
-    pp = tf.math.minimum(p[:,0],tf.math.sqrt(pt2 + p[:,3]**2))
-    pt = tf.math.minimum(pp,tf.math.sqrt(pt2))
+    pp = minimum(p[:,0],sqrt(pt2 + p[:,3]**2))
+    pt = minimum(pp,sqrt(pt2))
 
     v0 = tf.expand_dims(complex_tf(p[:,0]*nsv,p[:,3]*nsv), 0) # [1,nevts] complex
     v1 = tf.expand_dims(complex_tf(p[:,1]*nsv,p[:,2]*nsv), 0)
@@ -171,9 +174,9 @@ def vxxxxx(p,vmass,nhel,nsv):
         return tf.stack([vc0,vc1,vc2,vc3,vc4,v5], axis=0) # [6,nevts] complex 
 
     if (vmass != 0.):
-        hel0 = 1.-tf.math.abs(nhel)
+        hel0 = 1.-abs(nhel)
         def true_fn():
-            hel0 = 1.-tf.math.abs(nhel)
+            hel0 = 1.-abs(nhel)
             v2 = tf.ones(nevts, dtype=DTYPECOMPLEX)
             v3 = tf.ones_like(v2)*complex_tf(-nhel*sqh,0.)
             v4 = tf.ones_like(v2)*complex_tf(0.,nsvahl*sqh)
@@ -201,7 +204,7 @@ def vxxxxx(p,vmass,nhel,nsv):
         v = tf.where(cond, true_fn(), false_fn())
     else:
         pp = p[:,0]
-        pt = tf.math.sqrt(p[:,1]**2 + p[:,2]**2)
+        pt = sqrt(p[:,1]**2 + p[:,2]**2)
         v2 = tf.ones([1,nevts], dtype=DTYPECOMPLEX)*complex_tf(0.,0.)
         v5 = tf.expand_dims(complex_tf(nhel*pt/pp*sqh, 0.), 0)
         def true_fn():

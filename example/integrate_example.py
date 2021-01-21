@@ -61,7 +61,6 @@ import_ufo = getattr(module, "import_ufo")
 model = import_ufo.import_model(f"{root_path}/{base_model}")
 # import parameters useful for smatrix calculation
 for matrix_file in glob.glob(f"example/matrix*.py"):
-    print("This is going to be loaded ", matrix_file)
     matrix_name = re_name.findall(matrix_file)[-1]
     class_name = matrix_name.capitalize()
     # This seems unnecesarily complicated to load a class from a file by anyway
@@ -91,7 +90,6 @@ def phasespace_generator(xrand, nparticles):
     an array of momenta (nevents x nparticles x 4)
     """
     return parallel_rambo(xrand, 4, COM_SQRTS)
-
 
 # Minimal working exaple of cross section calculation with vegasflow
 def cross_section(xrand, **kwargs):

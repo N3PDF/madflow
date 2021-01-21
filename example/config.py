@@ -16,4 +16,4 @@ def complex_tf(real, imag):
 # TODO: check if this is really needed
 def complex_me(cmp):
     """ Cast the input to complex type """
-    return tf.complex(cmp.real, cmp.imag)
+    return tf.cast(cmp, dtype=DTYPECOMPLEX)

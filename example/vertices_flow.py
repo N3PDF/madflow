@@ -1,5 +1,5 @@
 import tensorflow as tf
-from config import complex_tf
+from config import complex_tf, complex_me
 
 def FFV1_0(F1,F2,V3,COUP):
     """
@@ -26,7 +26,7 @@ def FFV1_0(F1,F2,V3,COUP):
             vertex contribution ( =dim[nevt,])
         
     """
-    COUP = complex_tf(COUP, 0.)
+    COUP = complex_me(COUP)
     im = complex_tf(0,1)
     TMP0 = (F1[2]*(F2[4]*(V3[2]+V3[5])+F2[5]*(V3[3]+im*(V3[4])))+(F1[3]*(F2[4]*(V3[3]-im*(V3[4]))+F2[5]*(V3[2]-V3[5]))+(F1[4]*(F2[2]*(V3[2]-V3[5])-F2[3]*(V3[3]+im*(V3[4])))+F1[5]*(F2[2]*(-V3[3]+im*(V3[4]))+F2[3]*(V3[2]+V3[5])))))
     vertex = COUP*-im * TMP0
@@ -57,15 +57,16 @@ def FFV1_1(F2,V3,COUP,M1,W1):
         vertex: tf.tensor
             vertex contribution ( =dim[6,nevt])        
     """
-    COUP = complex_tf(COUP, 0.)
-    M1 = complex_tf(M1, 0.)
-    W1 = complex_tf(W1, 0.)
+    COUP = complex_me(COUP)
+    M1 = complex_me(M1)
+    W1 = complex_me(W1)
     im = complex_tf(0,1)
     F10 = F2[0]+V3[0]
     F11 = F2[1]+V3[1]
     P1 = [-tf.math.real(F10), -tf.math.real(F11), -tf.math.imag(F11), -tf.math.imag(F10)]
     P1 = complex_tf(tf.stack(P1, axis=0), 0.)
     denom = COUP/(P1[0]**2-P1[1]**2-P1[2]**2-P1[3]**2 - M1 * (M1 -im* W1))
+    
     # TODO: look here because writing ..(im..) raises bad operand type for unary +
     # this could be a problem for the automation process
     F12= denom*im*(F2[2]*(P1[0]*(-V3[2]+V3[5])+(P1[1]*(V3[3]-im*(V3[4]))+(P1[2]*(im*(V3[3])+V3[4])+P1[3]*(-V3[2]+V3[5]))))+(F2[3]*(P1[0]*(V3[3]+im*(V3[4]))+(P1[1]*(-1)*(V3[2]+V3[5])+(P1[2]*(-1)*(im*(V3[2]+V3[5]))+P1[3]*(V3[3]+im*(V3[4])))))+M1*(F2[4]*(V3[2]+V3[5])+F2[5]*(V3[3]+im*(V3[4])))))
@@ -99,9 +100,9 @@ def FFV1_2(F1,V3,COUP,M2,W2):
         vertex: tf.tensor
             vertex contribution ( =dim[6,nevt])        
     """
-    COUP = complex_tf(COUP, 0.)
-    M2 = complex_tf(M2, 0.)
-    W2 = complex_tf(W2, 0.)
+    COUP = complex_me(COUP)
+    M2 = complex_me(M2)
+    W2 = complex_me(W2)
     im = complex_tf(0,1)
     F20 = F1[0]+V3[0]
     F21 = F1[1]+V3[1]
@@ -136,9 +137,9 @@ def VVV1P0_1(V2,V3,COUP,M1,W1):
         vertex: tf.tensor
             vertex contribution ( =dim[6,nevt])  
     """
-    COUP = complex_tf(COUP, 0.)
-    M1 = complex_tf(M1, 0.)
-    W1 = complex_tf(W1, 0.)
+    COUP = complex_me(COUP)
+    M1 = complex_me(M1)
+    W1 = complex_me(W1)
     im = complex_tf(0,1)
     P2 = [tf.math.real(V2[0]), tf.math.real(V2[1]), tf.math.imag(V2[1]), tf.math.imag(V2[0])]
     P2 = complex_tf(tf.stack(P2, axis=0), 0.)
