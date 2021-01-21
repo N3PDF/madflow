@@ -80,13 +80,11 @@ class Matrixflow_1_gg_ttx:
         """
         # self.amp2 = [0.] * ndiags
         # self.helEvals = []
-        ans = complex_tf([0.], [0.])
+        ans = complex_tf(0., 0.)
         for hel in self.helicities:
             t = self.matrix(all_ps, hel, mdl_MT, mdl_WT, GC_10, GC_11)
             ans += t
-            # self.helEvals.append([hel, t.real / denominator ])
-        ans /= self.denominator
-        return tf.math.real(ans)
+        return tf.math.real(ans)/self.denominator
 
     def matrix(self, all_ps, hel, mdl_MT, mdl_WT, GC_10, GC_11):
         """
@@ -114,6 +112,14 @@ class Matrixflow_1_gg_ttx:
                 tensor of amplitudes squared
         
         """
+        # TODO: check if replacing all the lists elements with single tensors is
+        # good or not for the automation. For example:
+        # jamp = [None] * color
+        # jamp[0] = ...
+        # has been replaced by
+        # jamp0 = ...
+        # Problem is that tf doesn't support tensor item assignment. Look into 
+        # TensorArrays could be a way out ?
         ngraphs = 3
         nexternal = self.nexternal
         nwavefuncs = 5
@@ -122,9 +128,9 @@ class Matrixflow_1_gg_ttx:
         #  
         # Color matrix
         #  
-        denom = tf.constant([3,3], dtype=DTYPEINT)
+        denom = tf.constant([3,3], dtype=DTYPECOMPLEX)
         cf = tf.constant([[16,-2],
-                          [-2,16]], dtype=DTYPEINT)
+                          [-2,16]], dtype=DTYPECOMPLEX)
         # ----------
         # Begin code
         # ----------
@@ -132,50 +138,46 @@ class Matrixflow_1_gg_ttx:
         w = tf.zeros([nwavefuncs], dtype=DTYPECOMPLEX)
 
         # all_ps[:,i] selects the particle and is a [nevt,4] tensor
-        w0 = vxxxxx(all_ps[:,0],ZERO,hel[0],-1) # [nevt,6]
+        # wavefunctions output a [None,nevt] tensor based on spine
+        # amplitudes are [nevt] tensors
+        w0 = vxxxxx(all_ps[:,0],ZERO,hel[0],-1)
         w1 = vxxxxx(all_ps[:,1],ZERO,hel[1],-1)
         w2 = oxxxxx(all_ps[:,2],mdl_MT,hel[2],+1)
         w3 = ixxxxx(all_ps[:,3],mdl_MT,hel[3],-1)
-        print("vxxxxx shape", w1.shape)
-        print("oxxxxx shape", w2.shape)
-        print("ixxxxx shape", w3.shape)
-        exit()
-        w4= VVV1P0_1(w[0],w[1],GC_10,ZERO,ZERO)
+        w4= VVV1P0_1(w0,w1,GC_10,ZERO,ZERO)
         # Amplitude(s) for diagram number 1
-        amp[0]= FFV1_0(w[3],w[2],w[4],GC_11)
-        w[4]= FFV1_1(w[2],w[0],GC_11,mdl_MT,mdl_WT)
+        amp0= FFV1_0(w3,w2,w4,GC_11)
+        w4= FFV1_1(w2,w0,GC_11,mdl_MT,mdl_WT)
         # Amplitude(s) for diagram number 2
-        amp[1]= FFV1_0(w[3],w[4],w[1],GC_11)
-        w[4]= FFV1_2(w[3],w[0],GC_11,mdl_MT,mdl_WT)
+        amp1= FFV1_0(w3,w4,w1,GC_11)
+        w4= FFV1_2(w3,w0,GC_11,mdl_MT,mdl_WT)
         # Amplitude(s) for diagram number 3
-        amp[2]= FFV1_0(w[4],w[2],w[1],GC_11)
+        amp2= FFV1_0(w4,w2,w1,GC_11)
 
-        jamp = [None] * ncolor
+        jamp0 = complex_tf(0,1)*amp0-amp1
+        jamp1 = -complex_tf(0,1)*amp0-amp1
+        jamp = tf.stack([jamp0,jamp1], axis=0)
 
-        jamp[0] = +complex(0,1)*amp[0]-amp[1]
-        jamp[1] = -complex(0,1)*amp[0]-amp[2]
-
-        self.amp2[0]+=abs(amp[0]*amp[0].conjugate())
-        self.amp2[1]+=abs(amp[1]*amp[1].conjugate())
-        self.amp2[2]+=abs(amp[2]*amp[2].conjugate())
-        matrix = 0.
-        for i in range(ncolor):
-            ztemp = 0
-            for j in range(ncolor):
-                ztemp = ztemp + cf[i][j]*jamp[j]
-            matrix = matrix + ztemp * jamp[i].conjugate()/denom[i]   
-        self.jamp.append(jamp)
-
+        matrix = complex_tf(0,0)
+        for i in tf.range(ncolor):
+            ztemp = complex_tf(0,0)
+            for j in tf.range(ncolor):
+                ztemp = ztemp + cf[i,j]*jamp[j]
+            matrix = matrix + ztemp * tf.math.conj(jamp[i])/denom[i]   
         return matrix
 
 
 if __name__ == "__main__":
-    # model = import_ufo.import_model("/home/marco/PhD/unimi/MG5_aMC/MG5_aMC_v2_8_2/models/sm") 
-    momenta = [[100., 0., 0., 100.],
-               [100., 0., 0.,-100.],
-               [100., 100., 0., 0.],
-               [100.,-100., 0., 0.]]
+    # TODO: to make this test as __main__, mg5 main folder must be set in PYTHONPATH
+    # in order to make the following import 
+    # import models.import_ufo as import_ufo
+    model = import_ufo.import_model("/home/marco/PhD/unimi/MG5_aMC/MG5_aMC_v2_8_2/models/sm")
+    model_params = get_model_param(model)
+    momenta = float_me([[100., 0., 0., 100.],
+                        [100., 0., 0.,-100.],
+                        [100., 100., 0., 0.],
+                        [100.,-100., 0., 0.]])
 
     mymatrix = MatrixFlow_1_gg_ttx()
-    print('RESULT', mymatrix.smatrix(momenta, model))
+    print('RESULT', mymatrix.smatrix(momenta, *model_params))
     

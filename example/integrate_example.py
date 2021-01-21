@@ -100,7 +100,6 @@ def cross_section(xrand, **kwargs):
     for matrix in all_matrices:
         all_ps, wt = phasespace_generator(xrand, matrix.nexternal)
         for ps in all_ps.numpy(): # when in eager mode, better to loop over numpy
-            # TODO the matrix element should be made to take values in parallel!
             res += matrix.smatrix(ps**2/1e4, model)
     return wt*vegasflow.float_me(res/tf.reduce_sum(xrand))
 
@@ -120,10 +119,12 @@ n_dim = 16
 # they are also massless so results will be unphysical anyway
 n_iter = 5
 n_events = 1000
-# start = tm()
-# result = vegasflow.vegas_wrapper(cross_section, n_dim, n_iter, n_events)
-# print(f"Vegasflow integration with original mg5 smatrix function done in: {tm()-start} s")
 
+start = tm()
+result = vegasflow.vegas_wrapper(cross_section, n_dim, n_iter, n_events)
+print(f"Vegasflow integration with original mg5 smatrix function done in: {tm()-start} s")
+
+# TODO: check that the vectorized smatrix gives the same results as the original approach
 start = tm()
 result = vegasflow.vegas_wrapper(cross_section_flow, n_dim, n_iter, n_events)
 print(f"Vegasflow integration with tf vectorized smatrix function done in: {tm()-start} s")
