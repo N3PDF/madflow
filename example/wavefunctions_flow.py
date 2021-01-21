@@ -184,64 +184,70 @@ def vxxxxx(p,vmass,nhel,nsv):
     v0 = tf.expand_dims(complex_tf(p[:,0]*nsv,p[:,3]*nsv), 0) # [1,nevts] complex
     v1 = tf.expand_dims(complex_tf(p[:,1]*nsv,p[:,2]*nsv), 0)
 
-    if nhel == 4:
-        if (vmass == 0.):
+    def true_branch():
+        def true_f():
             vc2 = tf.ones(nevts, dtype=DTYPE)
             vc3= p[:,1]/p[:,0]
             vc4= p[:,2]/p[:,0]
             vc5= p[:,3]/p[:,0]
-        else:
+            return complex_me(tf.stack([vc2,vc3,vc4,vc5], axis=0))
+        def false_f():
             vc2 = p[:,0]/vmass
             vc3 = p[:,1]/vmass
             vc4 = p[:,2]/vmass
             vc5 = p[:,3]/vmass
-        v = complex_me(tf.stack([vc2,vc3,vc4,vc5], axis=0, ))
-        
-        return tf.concat([v0,v1,v], axis=0) # [6,nevts] complex 
-
-    if vmass != 0.:
+            return complex_me(tf.stack([vc2,vc3,vc4,vc5], axis=0))
+        massless = vmass == 0
+        v = tf.where(massless, true_f(), false_f())        
+        return tf.concat([v0,v1,v], axis=0) # [6,nevts] complex
+    def false_branch():
         def true_fn():
-            hel0 = 1.-abs(nhel)
-            v2 = tf.ones(nevts, dtype=DTYPECOMPLEX)
-            v3 = tf.ones_like(v2)*complex_tf(-nhel*sqh,0.)
-            v4 = tf.ones_like(v2)*complex_tf(0.,nsvahl*sqh)
-            v5 = tf.ones_like(v2)*complex_tf(hel0,0.)
-            return tf.stack([v2,v3,v4,v5], axis=0) # [4,nevts] complex
+            def true_fn():
+                hel0 = 1.-abs(nhel)
+                v2 = tf.ones(nevts, dtype=DTYPECOMPLEX)
+                v3 = tf.ones_like(v2)*complex_tf(-nhel*sqh,0.)
+                v4 = tf.ones_like(v2)*complex_tf(0.,nsvahl*sqh)
+                v5 = tf.ones_like(v2)*complex_tf(hel0,0.)
+                return tf.stack([v2,v3,v4,v5], axis=0) # [4,nevts] complex
+            def false_fn():
+                emp = p[:,0]/(vmass*pp)
+                v2 = tf.expand_dims(complex_tf(hel0*pp/vmass,0.), 0)
+                v5 = tf.expand_dims(complex_tf(hel0*p[:,3]*emp+nhel*pt/pp*sqh, 0), 0)
+                def true_f():
+                    pzpt = p[:,3]/(pp*pt)*sqh*nhel
+                    v3 = complex_tf(hel0*p[:,1]*emp-p[:,1]*pzpt, \
+                        -nsvahl*p[:,2]/pt*sqh)
+                    v4 = complex_tf(hel0*p[:,2]*emp-p[:,2]*pzpt, \
+                        nsvahl*p[:,1]/pt*sqh) 
+                    return tf.stack([v3,v4], axis=0)
+                def false_f():
+                    v3 = tf.ones(nevts, dtype=DTYPECOMPLEX)*complex_tf(-nhel*sqh,0.)
+                    v4 = complex_tf(0.,nsvahl*signvec(sqh,p[:,3])) # <------ this enters the sign operation with y as a real vector
+                    return tf.stack([v3,v4], axis=0)
+                condition = tf.expand_dims(pt!=0, 0)
+                v34 = tf.where(condition, true_f(), false_f())            
+                return tf.concat([v2,v34,v5], axis=0) # [4,nevts] complex
+            cond = tf.expand_dims(pp==0, 0)
+            return tf.where(cond, true_fn(), false_fn())
         def false_fn():
-            emp = p[:,0]/(vmass*pp)
-            v2 = tf.expand_dims(complex_tf(hel0*pp/vmass,0.), 0)
-            v5 = tf.expand_dims(complex_tf(hel0*p[:,3]*emp+nhel*pt/pp*sqh, 0), 0)
-            def true_f():
+            pp = p[:,0]
+            pt = sqrt(p[:,1]**2 + p[:,2]**2)
+            v2 = tf.ones([1,nevts], dtype=DTYPECOMPLEX)*complex_tf(0.,0.)
+            v5 = tf.expand_dims(complex_tf(nhel*pt/pp*sqh, 0.), 0)
+            def true_fn():
                 pzpt = p[:,3]/(pp*pt)*sqh*nhel
-                v3 = complex_tf(hel0*p[:,1]*emp-p[:,1]*pzpt, \
-                    -nsvahl*p[:,2]/pt*sqh)
-                v4 = complex_tf(hel0*p[:,2]*emp-p[:,2]*pzpt, \
-                    nsvahl*p[:,1]/pt*sqh) 
+                v3 = complex_tf(-p[:,1]*pzpt,-nsv*p[:,2]/pt*sqh)
+                v4 = complex_tf(-p[:,2]*pzpt,nsv*p[:,1]/pt*sqh)
                 return tf.stack([v3,v4], axis=0)
-            def false_f():
+            def false_fn():
                 v3 = tf.ones(nevts, dtype=DTYPECOMPLEX)*complex_tf(-nhel*sqh,0.)
-                v4 = complex_tf(0.,nsvahl*signvec(sqh,p[:,3])) # <------ this enters the sign operation with y as a real vector
+                v4 = complex_tf(0.,nsv*signvec(sqh,p[:,3])) # <------ this enters the sign operation with y as a real vector
                 return tf.stack([v3,v4], axis=0)
-            condition = tf.expand_dims(pt!=0, 0)
-            v34 = tf.where(condition, true_f(), false_f())            
-            return tf.concat([v2,v34,v5], axis=0) # [4,nevts] complex
-        cond = tf.expand_dims(pp==0, 0)
-        v = tf.where(cond, true_fn(), false_fn())
-    else:
-        pp = p[:,0]
-        pt = sqrt(p[:,1]**2 + p[:,2]**2)
-        v2 = tf.ones([1,nevts], dtype=DTYPECOMPLEX)*complex_tf(0.,0.)
-        v5 = tf.expand_dims(complex_tf(nhel*pt/pp*sqh, 0.), 0)
-        def true_fn():
-            pzpt = p[:,3]/(pp*pt)*sqh*nhel
-            v3 = complex_tf(-p[:,1]*pzpt,-nsv*p[:,2]/pt*sqh)
-            v4 = complex_tf(-p[:,2]*pzpt,nsv*p[:,1]/pt*sqh)
-            return tf.stack([v3,v4], axis=0)
-        def false_fn():
-            v3 = tf.ones(nevts, dtype=DTYPECOMPLEX)*complex_tf(-nhel*sqh,0.)
-            v4 = complex_tf(0.,nsv*signvec(sqh,p[:,3])) # <------ this enters the sign operation with y as a real vector
-            return tf.stack([v3,v4], axis=0)
-        cond = tf.expand_dims(pt!=0, 0)
-        v34 = tf.where(cond, true_fn(), false_fn())
-        v = tf.concat([v2,v34,v5], axis=0)
-    return tf.concat([v0,v1,v], axis=0)
+            cond = tf.expand_dims(pt!=0, 0)
+            v34 = tf.where(cond, true_fn(), false_fn())
+            return tf.concat([v2,v34,v5], axis=0)
+        massive = vmass != 0
+        v =  tf.where(massive, true_fn(), false_fn())
+        return tf.concat([v0,v1,v], axis=0)
+    BRST = nhel == 4
+    return tf.where(BRST, true_branch(), false_branch())
