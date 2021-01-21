@@ -1,6 +1,23 @@
 import tensorflow as tf
-from config import complex_tf, complex_me
+from vegasflow.configflow import DTYPE, DTYPEINT
+from config import complex_tf, complex_me, DTYPECOMPLEX
 
+vertex_signature = [
+    tf.TensorSpec(shape=[None,None], dtype=DTYPECOMPLEX),
+    tf.TensorSpec(shape=[None,None], dtype=DTYPECOMPLEX),
+    tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX),
+    tf.TensorSpec(shape=[], dtype=DTYPE),
+    tf.TensorSpec(shape=[], dtype=DTYPE)
+]
+
+ffv1_signature = [
+    tf.TensorSpec(shape=[None,None], dtype=DTYPECOMPLEX),
+    tf.TensorSpec(shape=[None,None], dtype=DTYPECOMPLEX),
+    tf.TensorSpec(shape=[None,None], dtype=DTYPECOMPLEX),
+    tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX),
+]
+
+@tf.function(input_signature=ffv1_signature)
 def FFV1_0(F1,F2,V3,COUP):
     """
     Fermion fermion gluon vertex
@@ -15,10 +32,6 @@ def FFV1_0(F1,F2,V3,COUP):
             gluon wavefunction ( =dim[6,nevt]), DTYPECOMPLEX dtype
         COUP: tf.tensor
             coupling, ( =dim[]), DTYPE dtype
-        M1: tf.tensor
-            coupling, ( =dim[]), DTYPE dtype
-        W1: tf.tensor
-            coupling, ( =dim[]), DTYPE dtype
     
     Returns
     -------
@@ -26,13 +39,14 @@ def FFV1_0(F1,F2,V3,COUP):
             vertex contribution ( =dim[nevt,])
         
     """
+    # print("ffv10")
     COUP = complex_me(COUP)
     im = complex_tf(0,1)
     TMP0 = (F1[2]*(F2[4]*(V3[2]+V3[5])+F2[5]*(V3[3]+im*(V3[4])))+(F1[3]*(F2[4]*(V3[3]-im*(V3[4]))+F2[5]*(V3[2]-V3[5]))+(F1[4]*(F2[2]*(V3[2]-V3[5])-F2[3]*(V3[3]+im*(V3[4])))+F1[5]*(F2[2]*(-V3[3]+im*(V3[4]))+F2[3]*(V3[2]+V3[5])))))
     vertex = COUP*-im * TMP0
     return vertex
 
-
+@tf.function(input_signature=vertex_signature)
 def FFV1_1(F2,V3,COUP,M1,W1):
     """
     Fermion fermion gluon vertex
@@ -57,6 +71,7 @@ def FFV1_1(F2,V3,COUP,M1,W1):
         vertex: tf.tensor
             vertex contribution ( =dim[6,nevt])        
     """
+    # print("ffv11")
     COUP = complex_me(COUP)
     M1 = complex_me(M1)
     W1 = complex_me(W1)
@@ -75,7 +90,7 @@ def FFV1_1(F2,V3,COUP,M1,W1):
     F15= denom*im*(F2[4]*(P1[0]*(-V3[3]+im*(V3[4]))+(P1[1]*(V3[2]+V3[5])+(P1[2]*(-1)*(im*(V3[2]+V3[5]))+P1[3]*(-V3[3]+im*(V3[4])))))+(F2[5]*(P1[0]*(-V3[2]+V3[5])+(P1[1]*(V3[3]+im*(V3[4]))+(P1[2]*(-im*(V3[3])+V3[4])+P1[3]*(-V3[2]+V3[5]))))+M1*(F2[2]*(-V3[3]+im*(V3[4]))+F2[3]*(V3[2]+V3[5]))))
     return tf.stack([F10,F11,F12,F13,F14,F15], axis=0) 
 
-
+@tf.function(input_signature=vertex_signature)
 def FFV1_2(F1,V3,COUP,M2,W2):
     """
     Fermion fermion gluon vertex
@@ -100,6 +115,7 @@ def FFV1_2(F1,V3,COUP,M2,W2):
         vertex: tf.tensor
             vertex contribution ( =dim[6,nevt])        
     """
+    # print("ffv12")
     COUP = complex_me(COUP)
     M2 = complex_me(M2)
     W2 = complex_me(W2)
@@ -115,7 +131,7 @@ def FFV1_2(F1,V3,COUP,M2,W2):
     F25= denom*im*(F1[4]*(P2[0]*(-1)*(V3[3]+im*(V3[4]))+(P2[1]*(V3[2]-V3[5])+(P2[2]*(im*(V3[2])-im*(V3[5]))+P2[3]*(V3[3]+im*(V3[4])))))+(F1[5]*(P2[0]*(V3[2]+V3[5])+(P2[1]*(-V3[3]+im*(V3[4]))+(P2[2]*(-1)*(im*(V3[3])+V3[4])-P2[3]*(V3[2]+V3[5]))))+M2*(F1[2]*(V3[3]+im*(V3[4]))+F1[3]*(V3[2]-V3[5]))))
     return tf.stack([F20,F21,F22,F23,F24,F25], axis=0) 
 
-
+@tf.function(input_signature=vertex_signature)
 def VVV1P0_1(V2,V3,COUP,M1,W1):
     """
     Triple gluon vertex
@@ -137,6 +153,7 @@ def VVV1P0_1(V2,V3,COUP,M1,W1):
         vertex: tf.tensor
             vertex contribution ( =dim[6,nevt])  
     """
+    # print("vvv1p01")
     COUP = complex_me(COUP)
     M1 = complex_me(M1)
     W1 = complex_me(W1)

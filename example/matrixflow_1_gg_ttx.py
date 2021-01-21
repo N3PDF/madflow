@@ -1,4 +1,5 @@
 from vegasflow.configflow import int_me, float_me, DTYPE, DTYPEINT
+from vegasflow import run_eager
 import tensorflow as tf
 import collections
 ModelParamTuple = collections.namedtuple("Model", ["mdl_MT", "mdl_WT", "GC_10", "GC_11"])
@@ -13,6 +14,25 @@ def get_model_param(model):
     GC_11 = model.get('coupling_dict')["GC_11"]
     return ModelParamTuple(float_me(mdl_MT), float_me(mdl_WT),
                            complex_me(GC_10), complex_me(GC_11))
+
+smatrix_signature = [
+        tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
+        tf.TensorSpec(shape=[], dtype=DTYPE),
+        tf.TensorSpec(shape=[], dtype=DTYPE),
+        tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX),
+        tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)
+        ]
+
+
+matrix_signature = [
+        tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
+        tf.TensorSpec(shape=[4], dtype=DTYPE),
+        tf.TensorSpec(shape=[], dtype=DTYPE),
+        tf.TensorSpec(shape=[], dtype=DTYPE),
+        tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX),
+        tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)
+        ]
+
 
 
 class Matrixflow_1_gg_ttx:
@@ -47,6 +67,7 @@ class Matrixflow_1_gg_ttx:
     def clean(self):
         pass
 
+    @tf.function(input_signature=smatrix_signature)
     def smatrix(self, all_ps, mdl_MT, mdl_WT, GC_10, GC_11):
         """
         Given the vector of all phase space points and the relevant model
@@ -77,14 +98,17 @@ class Matrixflow_1_gg_ttx:
             tf.tensor of shape [None]
                 tensor of smatrix real parts
         """
+        # print("smatrix")
         # TODO: is it possible to skip the helicity for and parallelize it ?
         # TODO: check if the cast
-        ans = complex_tf(0., 0.)
+        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
+        ans = tf.zeros(nevts, dtype=DTYPECOMPLEX)
         for hel in self.helicities:
             t = self.matrix(all_ps, hel, mdl_MT, mdl_WT, GC_10, GC_11)
             ans += t
         return tf.math.real(ans)/self.denominator
 
+    @tf.function(input_signature=matrix_signature)
     def matrix(self, all_ps, hel, mdl_MT, mdl_WT, GC_10, GC_11):
         """
         Returns amplitude squared summed/avg over colors for given phase space
@@ -111,6 +135,7 @@ class Matrixflow_1_gg_ttx:
                 tensor of amplitudes squared
         
         """
+        # print("matrix")
         # TODO: check if replacing all the lists elements with single tensors is
         # good or not for the automation. For example:
         # jamp = [None] * color
@@ -124,6 +149,7 @@ class Matrixflow_1_gg_ttx:
         nwavefuncs = 5
         ncolor = 2
         ZERO = float_me(0.)
+        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
         #  
         # Color matrix
         #  
@@ -136,10 +162,10 @@ class Matrixflow_1_gg_ttx:
         # all_ps[:,i] selects the particle and is a [nevt,4] tensor
         # wavefunctions output a [None,nevt] tensor based on spine
         # amplitudes are [nevt] tensors
-        w0 = vxxxxx(all_ps[:,0],ZERO,hel[0],-1)
-        w1 = vxxxxx(all_ps[:,1],ZERO,hel[1],-1)
-        w2 = oxxxxx(all_ps[:,2],mdl_MT,hel[2],+1)
-        w3 = ixxxxx(all_ps[:,3],mdl_MT,hel[3],-1)
+        w0 = vxxxxx(all_ps[:,0],ZERO,hel[0],float_me(-1))
+        w1 = vxxxxx(all_ps[:,1],ZERO,hel[1],float_me(-1))
+        w2 = oxxxxx(all_ps[:,2],mdl_MT,hel[2],float_me(+1))
+        w3 = ixxxxx(all_ps[:,3],mdl_MT,hel[3],float_me(-1))
         w4= VVV1P0_1(w0,w1,GC_10,ZERO,ZERO)
         # Amplitude(s) for diagram number 1
         amp0= FFV1_0(w3,w2,w4,GC_11)
@@ -154,12 +180,12 @@ class Matrixflow_1_gg_ttx:
         jamp1 = -complex_tf(0,1)*amp0-amp2
         jamp = tf.stack([jamp0,jamp1], axis=0)
 
-        matrix = complex_tf(0,0)
+        matrix = tf.zeros(nevts, dtype=DTYPECOMPLEX)
         for i in tf.range(ncolor):
-            ztemp = complex_tf(0,0)
+            ztemp = tf.zeros(nevts, dtype=DTYPECOMPLEX)
             for j in tf.range(ncolor):
-                ztemp = ztemp + cf[i,j]*jamp[j]
-            matrix = matrix + ztemp * tf.math.conj(jamp[i])/denom[i]   
+                ztemp += cf[i,j]*jamp[j]
+            matrix += ztemp * tf.math.conj(jamp[i])/denom[i]   
         return matrix
 
 
@@ -173,6 +199,7 @@ if __name__ == "__main__":
     import copy
     import importlib.util
     import re
+    from time import time as tm
     re_name = re.compile("\w{3,}")
     original_path = copy.copy(sys.path)
     sys.path.insert(0, matrix_elm_folder)
@@ -192,6 +219,7 @@ if __name__ == "__main__":
 
     # Clean the path
     sys.path = original_path
+    # run_eager(True)
 
     import numpy as np
     COM_SQRTS = 7e3
@@ -205,11 +233,19 @@ if __name__ == "__main__":
         """
         return parallel_rambo(xrand, 4, COM_SQRTS)
     all_momenta, _ = phasespace_generator(xrand, 4)
+    print("Tracing TGraph ...")
+    start = tm()
+    matrixflow.smatrix(all_momenta[:1], *model_params)
+    print(f"TGraph traced in {tm()-start}")
+    start = tm()
     resflow = matrixflow.smatrix(all_momenta, *model_params)
+    print(f"Mg5Flow computed smatrix in: {tm()-start}")
+    start = tm()
     res = []
     for momenta in all_momenta.numpy():
         res.append(matrix.smatrix(momenta, model))
     res = np.stack(res) # [nevt,]
+    print(f"Mg5 computed smatrix in: {tm()-start}")
 
     print("Checking smatrix results...")
     np.testing.assert_allclose(res, resflow, rtol=1e-4)
