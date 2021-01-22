@@ -7,9 +7,6 @@ import os
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 from vegasflow import float_me, run_eager
-
-run_eager(True)
-
 import numpy as np
 import tensorflow as tf
 
@@ -33,7 +30,7 @@ def gen_unconstrained_momenta(xrand):
 
 ACC = float_me(1e-8)
 
-
+@tf.function
 def massive_xfactor(sqrts, masses, massless_energies):
     """
     Takes as input the total energy of the system
@@ -58,6 +55,7 @@ def massive_xfactor(sqrts, masses, massless_energies):
     e2 = tf.square(massless_energies)
     masses2 = tf.square(masses)
 
+    @tf.function
     def while_body(_, xfactor, *arg):
         """Computation of the xfactor.
         As the computation converges for different events the xfactor
@@ -90,7 +88,7 @@ def massive_xfactor(sqrts, masses, massless_energies):
 
     return xfactor, new_E
 
-
+@tf.function
 def mul(a, b):
     """Multiply tensors a and b where rank(a) > 1, rank(b) = 1
     and the first dimension has a size equal to the only dimension of b
@@ -99,6 +97,7 @@ def mul(a, b):
     return tf.transpose(tmp)
 
 
+@tf.function
 def parallel_rambo(xrand, n, sqrts, masses=None, check_physical=False):
     """********************************************************************
     *                       RAMBO                                         *
@@ -131,7 +130,7 @@ def parallel_rambo(xrand, n, sqrts, masses=None, check_physical=False):
     for i in range(n):
         q = gen_unconstrained_momenta(xrand[:, i * 4 : (i + 1) * 4])
         all_q.append(q)
-    all_q = tf.stack(all_q)  # (nparticles, nevents, 4:{x,y,z,E})
+    # all_q: (nparticles, nevents, 4:{x,y,z,E})
 
     # Compute the parameters for the conformal transformation
     sum_q = tf.reduce_sum(all_q, axis=0)  # (nevents, 4)

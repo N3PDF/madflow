@@ -181,9 +181,9 @@ class Matrixflow_1_gg_ttx:
         jamp = tf.stack([jamp0,jamp1], axis=0)
 
         matrix = tf.zeros(nevts, dtype=DTYPECOMPLEX)
-        for i in tf.range(ncolor):
+        for i in range(ncolor):
             ztemp = tf.zeros(nevts, dtype=DTYPECOMPLEX)
-            for j in tf.range(ncolor):
+            for j in range(ncolor):
                 ztemp += cf[i,j]*jamp[j]
             matrix += ztemp * tf.math.conj(jamp[i])/denom[i]   
         return matrix

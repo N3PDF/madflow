@@ -14,14 +14,14 @@
     which will generate a vegasflow_example folder with all the required files.
     Link that folder to this script in the first line below (`matrix_elm_folder`).
 """
-matrix_elm_folder = "../../vegasflow_example/"
+# matrix_elm_folder = "../../vegasflow_example/"
+matrix_elm_folder = "../../mg5amcnlo/bin/vegasflow_example"
 
-import os
+import os, argparse
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import numpy as np
 from time import time as tm
-import vegasflow
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
-vegasflow.run_eager(True) # so we don't have to worry for now abut tf 
+from vegasflow import VegasFlow, float_me, run_eager
 import tensorflow as tf
 
 from parallel_rambo import parallel_rambo
@@ -59,28 +59,20 @@ for matrix_file in glob.glob(f"{matrix_elm_folder}/matrix_*.py"):
 root_path = getattr(module, "root_path")
 import_ufo = getattr(module, "import_ufo")
 model = import_ufo.import_model(f"{root_path}/{base_model}")
-# import parameters useful for smatrix calculation
-for matrix_file in glob.glob(f"example/matrix*.py"):
-    matrix_name = re_name.findall(matrix_file)[-1]
-    class_name = matrix_name.capitalize()
-    # This seems unnecesarily complicated to load a class from a file by anyway
-    module_spec = importlib.util.spec_from_file_location(matrix_name, matrix_file)
-    module = importlib.util.module_from_spec(module_spec)
-    module_spec.loader.exec_module(module)
-    # Now with access to the module, fill the list of matrices (with the object instantiated)
-    all_matrices_flow.append(getattr(module, class_name)())
-from matrixflow_1_gg_ttx import get_model_param
-model_params = get_model_param(model)
 
+# Import the parallel matrix
+from matrixflow_1_gg_ttx import Matrixflow_1_gg_ttx, get_model_param
+all_matrices_flow = [Matrixflow_1_gg_ttx()]
+model_params = get_model_param(model)
 
 # Clean the path
 sys.path = original_path
 # Uncomment loop below to run a test over the loaded matrix elements
-for matrix in all_matrices:
-    # Generate a random momentum according to the number of external particles
-    # (likely unphysical!)
-    momenta = np.random.rand(matrix.nexternal,4)*100
-    print(f"Result: {matrix.smatrix(momenta, model):.5f}")
+# for matrix in all_matrices:
+#     # Generate a random momentum according to the number of external particles
+#     # (likely unphysical!)
+#     momenta = np.random.rand(matrix.nexternal,4)*100
+#     print(f"Result: {matrix.smatrix(momenta, model):.5f}")
 #######################################################
 
 # Very complicated function that generates phase space momenta from the input random points
@@ -96,33 +88,70 @@ def cross_section(xrand, **kwargs):
     # IRL we would be gruping matrices by nparticles
     res = 0.0
     for matrix in all_matrices:
-        all_ps, wt = phasespace_generator(xrand, matrix.nexternal)
-        for ps in all_ps.numpy(): # when in eager mode, better to loop over numpy
-            res += matrix.smatrix(ps**2/1e4, model)
-    return wt*vegasflow.float_me(res/tf.reduce_sum(xrand))
+        all_ps, wts = phasespace_generator(xrand, matrix.nexternal)
+        for ps, wt in zip(all_ps.numpy(), wts.numpy()): # when in eager mode, better to loop over numpy
+            res += matrix.smatrix(ps, model)*wt
+    return float_me(res/tf.reduce_sum(xrand))
 
 
 # Minimal working example of tf vectorized cross section function
 def cross_section_flow(xrand, **kwargs):
-    # IRL we would be gruping matrices by nparticles
-    res = vegasflow.float_me([0.0])
+    res = 0.0
     for matrixflow in all_matrices_flow:
-        all_ps, wt = phasespace_generator(xrand, matrix.nexternal)
-        smatrices = matrixflow.smatrix(all_ps**2/1e4, *model_params)
+        all_ps, wts = phasespace_generator(xrand, matrixflow.nexternal)
+        smatrices = matrixflow.smatrix(all_ps, *model_params)*wts
         res += tf.reduce_sum(smatrices)
-    return wt*vegasflow.float_me(res/tf.reduce_sum(xrand))
+    return float_me(res/tf.reduce_sum(xrand))
 
-n_dim = 16 
-# For now we have (4 particles -> 16 random numbers)
-# they are also massless so results will be unphysical anyway
-n_iter = 5
-n_events = 1000
 
-start = tm()
-result = vegasflow.vegas_wrapper(cross_section, n_dim, n_iter, n_events)
-print(f"Vegasflow integration with original mg5 smatrix function done in: {tm()-start} s")
+if __name__ == "__main__":
 
-# TODO: check that the vectorized smatrix gives the same results as the original approach
-start = tm()
-result = vegasflow.vegas_wrapper(cross_section_flow, n_dim, n_iter, n_events)
-print(f"Vegasflow integration with tf vectorized smatrix function done in: {tm()-start} s")
+    arger = argparse.ArgumentParser("""
+    Example script to integrate Madgraph generated matrix element.
+
+    By default first it the original mg5 matrix element will be run (which is not compiled)
+    and then the vegasflow-compatible one (compiled).
+
+    In order to generate comparable results it is necessary to set the seed (-s) and not compile the integrand
+        ~$ ./integrate_example.py -s 4 -r
+    results are expected to be equal.
+
+    It is also possible to run both at the same time and get equal results by setting eager mode
+    so that both runs are truly independent.
+        ~$ ./integrate_example.py -s 4 -e
+
+    """)
+    arger.add_argument("-n", "--nevents", help="Number of events to be run", type=int, default=int(1e4))
+    arger.add_argument("-s", "--set_seed", help="Set the seed of the calculation", type=int, default=0)
+    arger.add_argument("-i", "--iterations", help="Number of iterations to be run", type=int, default=4)
+    arger.add_argument("-r", "--reproducible", help="Run in reproducible mode", action="store_true")
+    arger.add_argument("-e", "--eager", help="Run eager", action="store_true")
+    args = arger.parse_args()
+
+    if args.eager:
+        run_eager(True)
+
+    n_dim = 16 
+    # For now we have (4 particles -> 16 random numbers)
+    # they are also massless so results will be unphysical anyway
+    n_iter = args.iterations
+    n_events = args.nevents
+
+
+    seed = args.set_seed
+
+    # Run the Madgraph ME
+    vegas_integrator = VegasFlow(n_dim, n_events)
+    vegas_integrator.set_seed(seed)
+    vegas_integrator.compile(cross_section, compilable=False)
+    start = tm()
+    vegas_integrator.run_integration(n_iter)
+    print(f"Vegasflow integration with original mg5 smatrix function done in: {tm()-start} s")
+
+    # Run the Parallel ME
+    new_vegas = VegasFlow(n_dim, n_events)
+    new_vegas.set_seed(seed)
+    new_vegas.compile(cross_section_flow, compilable=not args.reproducible)
+    start = tm()
+    new_vegas.run_integration(n_iter)
+    print(f"Vegasflow integration with tf vectorized smatrix function done in: {tm()-start} s")
