@@ -81,7 +81,7 @@ def phasespace_generator(xrand, nparticles):
     """ Takes as input an array of nevent x ndim random points and outputs
     an array of momenta (nevents x nparticles x 4)
     """
-    return parallel_rambo(xrand, 4, COM_SQRTS)
+    return parallel_rambo(xrand, 4, COM_SQRTS, masses=[0.0,0.0,173.0,173.0])
 
 # Minimal working exaple of cross section calculation with vegasflow
 def cross_section(xrand, **kwargs):

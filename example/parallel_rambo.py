@@ -74,7 +74,7 @@ def massive_xfactor(sqrts, masses, massless_energies):
         xfactor = tf.where(has_converged, next_xfactor, xfactor)
         return tf.reduce_all(has_converged), xfactor, new_E
 
-    xfactor = tf.sqrt(1 - (total_mass / sqrts) ** 2)
+    xfactor = tf.sqrt(1 - (total_mass / sqrts) ** 2)*tf.ones_like(e2[:,0])
     f0 = 2.0 * ACC
     new_E = massless_energies
 
