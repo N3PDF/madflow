@@ -125,6 +125,9 @@ def parallel_rambo(xrand, n, sqrts, masses=None, check_physical=False):
         if masses is not None and tf.reduce_sum(masses) > sqrts:
             raise ValueError(f"Not enough energy ({sqrts}) to generate particles of mass: {masses}")
 
+    # Ensure the com energy has the correct type
+    sqrts = float_me(sqrts)
+
     # Generate the unconstrained momenta Q
     all_q = []
     for i in range(n):
@@ -156,11 +159,10 @@ def parallel_rambo(xrand, n, sqrts, masses=None, check_physical=False):
 
     # Compute the weight of the phase space point
     # (for n > 2)
-    # can be done a la numpy since it is a constant
-    wt = np.log(np.pi / 2)
+    wt = tf.math.log(PI / 2)
     for i in range(2, n):
-        wt += np.log(np.pi / 2) - 2.0 * np.log(i - 1) - np.log(i)
-    wt += (2 * n - 4) * np.log(sqrts)
+        wt += tf.math.log(PI / 2) - 2.0 * tf.math.log(i - 1) - tf.math.log(i)
+    wt += (2 * n - 4) * tf.math.log(sqrts)
 
     if masses is None:
         return all_p, tf.ones_like(x) * wt
@@ -191,9 +193,13 @@ def parallel_rambo(xrand, n, sqrts, masses=None, check_physical=False):
 
 
 if __name__ == "__main__":
-    import random
+    import random, argparse
 
-    n = 4
+    arger = argparse.ArgumentParser()
+    arger.add_argument("-n", "--nparticles", help="Number of particles to be run", type=int, default=4)
+    args = arger.parse_args()
+
+    n = args.nparticles
     seed = 4
     sqrts = 7e3
     random.seed(seed)
@@ -204,7 +210,9 @@ if __name__ == "__main__":
     xrand = float_me(all_rand)
     p, wt = parallel_rambo(xrand, n, sqrts)
 
-    tf_masses = [0, 0, 173, 173]
+    tf_masses = [173, 173]
+    for i in range(n-2):
+        tf_masses.insert(0,0)
 
     pmass = wtmass = None
     pmass, wtmass = parallel_rambo(xrand, n, sqrts, masses=tf_masses)
@@ -223,7 +231,7 @@ if __name__ == "__main__":
     flist = getattr(rambo_modu, "FortranList")
     #####
 
-    masses = flist(4)
+    masses = flist(n)
 
     for i, mode in enumerate(["massless", "massive"]):
         random.seed(seed)
