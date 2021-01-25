@@ -18,11 +18,12 @@
 matrix_elm_folder = "../../mg5amcnlo/bin/vegasflow_example"
 
 import os, argparse
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+# os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import numpy as np
 from time import time as tm
 from vegasflow import VegasFlow, float_me, run_eager, int_me
 from pdfflow import mkPDF
+from pdfflow.functions import _condition_to_idx
 
 import tensorflow as tf
 
@@ -159,6 +160,10 @@ def phasespace_generator(xrand, nparticles):
 
     total_wt = out_wt*wgt
     total_p = tf.concat([pab, lab_p], axis=1)
+
+    # Remove anything pathological (TODO: discover why these pathological points exist!)
+    total_wt = tf.maximum(total_wt, zeros)
+
     return total_p, total_wt, x1, x2
 ###############################################################################
 
@@ -174,24 +179,25 @@ def luminosity(x1, x2, q2array):
 # Minimal working exaple of cross section calculation with vegasflow
 def cross_section(xrand, **kwargs):
     # IRL we would be gruping matrices by nparticles
-    res = 0.0
+    res = []
     for matrix in all_matrices:
         all_ps, wts, x1, x2 = phasespace_generator(xrand, matrix.nexternal)
         pdf = luminosity(x1, x2, tf.ones_like(x1)*Q2)
         for ps, wt, ff in zip(all_ps.numpy(), wts.numpy(), pdf.numpy()): # when in eager mode, better to loop over numpy
-            res += matrix.smatrix(ps, model)*wt*ff
-    return float_me(res/tf.reduce_sum(xrand))
+            res.append(matrix.smatrix(ps, model)*wt*ff)
+    return float_me(res)
 
 
 # Minimal working example of tf vectorized cross section function
 def cross_section_flow(xrand, **kwargs):
     res = 0.0
+    xrand = float_me(1e-3) + xrand*(1-1e-3)
     for matrixflow in all_matrices_flow:
         all_ps, wts, x1, x2 = phasespace_generator(xrand, matrixflow.nexternal)
         pdf = luminosity(x1, x2, tf.ones_like(x1)*Q2)
         smatrices = matrixflow.smatrix(all_ps, *model_params)*wts
-        res += tf.reduce_sum(smatrices*pdf)
-    return float_me(res/tf.reduce_sum(xrand))
+        res += smatrices*pdf
+    return res
 
 
 if __name__ == "__main__":
@@ -222,9 +228,8 @@ if __name__ == "__main__":
     if args.eager:
         run_eager(True)
 
-    n_dim = 16 
-    # For now we have (4 particles -> 16 random numbers)
-    # they are also massless so results will be unphysical anyway
+    nparticles = 4
+    n_dim = (nparticles-2)*4 + 2
     n_iter = args.iterations
     n_events = args.nevents
 

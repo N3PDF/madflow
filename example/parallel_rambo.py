@@ -7,6 +7,7 @@ import os
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 from vegasflow import float_me, run_eager
+run_eager(True)
 import numpy as np
 import tensorflow as tf
 
@@ -161,7 +162,7 @@ def parallel_rambo(xrand, n, sqrts, masses=None, check_physical=False):
     # (for n > 2)
     wt = tf.math.log(PI / 2)
     for i in range(2, n):
-        wt += tf.math.log(PI / 2) - 2.0 * tf.math.log(i - 1) - tf.math.log(i)
+        wt += tf.math.log(PI / 2) - 2.0 * tf.math.log(float_me(i - 1)) - tf.math.log(float_me(i))
     wt += (2 * n - 4) * tf.math.log(sqrts)
 
     if masses is None:
@@ -197,28 +198,16 @@ if __name__ == "__main__":
 
     arger = argparse.ArgumentParser()
     arger.add_argument("-n", "--nparticles", help="Number of particles to be run", type=int, default=4)
+    arger.add_argument("-s", "--seed", help="Seed", type=int, default=4)
+    arger.add_argument("-t", "--trials", help="Trials with different seeds", type=int, default=1)
+    arger.add_argument("-e", "--tol", help="tolerance", type=float, default=1e-4)
     args = arger.parse_args()
 
     n = args.nparticles
-    seed = 4
+    tol = args.tol
     sqrts = 7e3
-    random.seed(seed)
     ndim = n * 4
-    all_rand = []
-    for _ in range(2):
-        all_rand.append([random.uniform(0, 1) for _ in range(ndim)])
-    xrand = float_me(all_rand)
-    p, wt = parallel_rambo(xrand, n, sqrts)
-
     tf_masses = [173, 173]
-    for i in range(n-2):
-        tf_masses.insert(0,0)
-
-    pmass = wtmass = None
-    pmass, wtmass = parallel_rambo(xrand, n, sqrts, masses=tf_masses)
-
-    all_p = [p, pmass]
-    all_w = [wt, wtmass]
 
     # Add here the madgraph rambo module for comparison
     mad_rambo = "../../mg5amcnlo/madgraph/various/rambo.py"
@@ -233,28 +222,48 @@ if __name__ == "__main__":
 
     masses = flist(n)
 
-    for i, mode in enumerate(["massless", "massive"]):
+    for i in range(n-2):
+        tf_masses.insert(0,0)
+
+    for i in range(args.trials):
+        seed = args.seed + i
+        print(f"Computing PS with seed {seed}")
         random.seed(seed)
+        all_rand = []
+        for _ in range(2):
+            all_rand.append([random.uniform(0, 1) for _ in range(ndim)])
+        xrand = float_me(all_rand)
+        p, wt = parallel_rambo(xrand, n, sqrts)
 
-        # For a check I want to reduce how much I mess with these fortran lists
-        for idx, mass in enumerate(tf_masses):
-            if mode == "massive":
-                masses[idx + 1] = mass
-            elif mode == "massless":
-                masses[idx + 1] = 0.0
+        pmass = wtmass = None
+        pmass, wtmass = parallel_rambo(xrand, n, sqrts, masses=tf_masses)
 
-        p1r, wt1 = rambo(n, sqrts, masses)
-        p1 = np.array(p1r).T
-        p2r, wt2 = rambo(n, sqrts, masses)
-        p2 = np.array(p2r).T
+        all_p = [p, pmass]
+        all_w = [wt, wtmass]
 
-        print(f"Checking first {mode} ps point...")
-        fortran_axis = [1, 2, 3, 0]
-        np.testing.assert_allclose(all_p[i][0].numpy()[:, fortran_axis], p1, rtol=1e-4)
-        print(f"Checking second {mode} ps point...")
-        np.testing.assert_allclose(all_p[i][1].numpy()[:, fortran_axis], p2, rtol=1e-4)
-        print("Checking weight...")
-        np.testing.assert_allclose([wt1, wt2], all_w[i], rtol=1e-4)
-        print("...")
 
-    print("All good!")
+        for i, mode in enumerate(["massless", "massive"]):
+            random.seed(seed)
+
+            # For a check I want to reduce how much I mess with these fortran lists
+            for idx, mass in enumerate(tf_masses):
+                if mode == "massive":
+                    masses[idx + 1] = mass
+                elif mode == "massless":
+                    masses[idx + 1] = 0.0
+
+            p1r, wt1 = rambo(n, sqrts, masses)
+            p1 = np.array(p1r).T
+            p2r, wt2 = rambo(n, sqrts, masses)
+            p2 = np.array(p2r).T
+
+            print(f"Checking first {mode} ps point...")
+            fortran_axis = [1, 2, 3, 0]
+            np.testing.assert_allclose(all_p[i][0].numpy()[:, fortran_axis], p1, rtol=tol)
+            print(f"Checking second {mode} ps point...")
+            np.testing.assert_allclose(all_p[i][1].numpy()[:, fortran_axis], p2, rtol=tol)
+            print("Checking weight...")
+            np.testing.assert_allclose([wt1, wt2], all_w[i], rtol=tol)
+            print("...")
+
+        print("All good!")
