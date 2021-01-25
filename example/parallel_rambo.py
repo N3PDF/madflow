@@ -7,7 +7,6 @@ import os
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 from vegasflow import float_me, run_eager
-run_eager(True)
 import numpy as np
 import tensorflow as tf
 
