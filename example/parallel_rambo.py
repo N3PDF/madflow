@@ -28,7 +28,7 @@ def gen_unconstrained_momenta(xrand):
     return tf.stack([qx, qy, qz, energy], axis=1)
 
 
-ACC = float_me(1e-8)
+ACC = float_me(1e-5)
 
 @tf.function
 def massive_xfactor(sqrts, masses, massless_energies):

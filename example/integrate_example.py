@@ -24,15 +24,19 @@ from time import time as tm
 from vegasflow import VegasFlow, float_me, run_eager, int_me
 from pdfflow import mkPDF
 from pdfflow.functions import _condition_to_idx
+from pdfflow.configflow import fzero, fone
 
 import tensorflow as tf
-
-from parallel_rambo import parallel_rambo
 
 COM_SQRTS = 7e3
 PDF = mkPDF("NNPDF31_nnlo_as_0118/0")
 Q2 = pow(80,2)
 TOP_MASS = 173
+
+costhmax = fone
+costhmin = float_me(-1.0) * fone
+phimin = fzero
+phimax = float_me(2.0*np.pi)
 
 ######### Import the matrix elements and the necessary models
 all_matrices = []
@@ -122,49 +126,88 @@ def get_x1x2(xarr, shat_min, s_in):
     shat = x1 * x2 * s_in
     return shat, wgt, x1, x2
 
+@tf.function
+def pick_within(r, valmin, valmax):
+    """ Get a random value between valmin and valmax
+    as given by the random number r (batch_size, 1)
+    the outputs are val (batch_size, 1) and jac (batch_size, 1)
+
+    Linear sampling
+
+    Parameters
+    ----------
+        r: random val
+        valmin: minimum value
+        valmax: maximum value
+    Returns
+    -------
+        val: chosen random value
+        jac: jacobian of the transformation
+    """
+    delta_val = valmax - valmin
+    val = valmin + r * delta_val
+    return val, delta_val
 
 def phasespace_generator(xrand, nparticles):
     """ Takes as input an array of nevent x ndim random points and outputs
     an array of momenta (nevents x nparticles x 4)
     """
     shat_min = float_me(4*TOP_MASS**2)
-    shat, wgt, x1, x2 = get_x1x2(xrand[:, -2:], shat_min, COM_SQRTS**2)
-    roots = tf.sqrt(shat)
-    # Consumes the last two random variables
-    out_p, out_wt = parallel_rambo(xrand, 2, roots, masses=[TOP_MASS, TOP_MASS])
+    shat, wgt, x1, x2 = get_x1x2(xrand[:, :2], shat_min, COM_SQRTS**2)
 
+    # Sample the phi and costh of the outgoing ttbar system
+    s1 = float_me(TOP_MASS**2)
+    s2 = float_me(TOP_MASS**2)
+    phi, jac = pick_within(xrand[:,2], phimin, phimax)
+    wgt *= jac
+    costh, jac = pick_within(xrand[:,3], costhmin, costhmax)
+    wgt *= jac
+
+    # Compute the value of the outgoing momenta in the COM
+    sinth = tf.sqrt(fone - tf.square(costh))
+    cosphi = tf.cos(phi)
+    sinphi = tf.sin(phi)
+
+    roots = tf.sqrt(shat)
+    E1 = (shat + s1 - s2) / 2.0 / roots
+    E2 = (shat + s2 - s1) / 2.0 / roots
+    roots1 = tf.sqrt(s1)
+    pp = tf.sqrt((E1 - roots1) * (E1 + roots1))
+
+    px = pp * sinth * cosphi
+    py = pp * sinth * sinphi
+    pz = pp * costh
+
+    p1 = tf.stack([E1, px, py, pz], axis=1)
+    p2 = tf.stack([E2, -px, -py, -pz], axis=1)
+
+    # Compute the value of the incoming momenta in the COM system
     zeros = tf.zeros_like(x1)
     ones = tf.ones_like(x1)
 
-    pa_z = x1*COM_SQRTS/2.0
-    pb_z = x2*COM_SQRTS/2.0
-
-    pa = tf.stack([pa_z, zeros, zeros, pa_z], axis=1)
-    pb = tf.stack([pb_z, zeros, zeros, -pb_z], axis=1)
-
-    pab = pa+pb
+    pin_z = roots/2.0
+    pa = tf.stack([pin_z, zeros, zeros, pin_z], axis=1)
+    pb = tf.stack([pin_z, zeros, zeros, -pin_z], axis=1)
+    out_p = tf.stack([pa, pb, p1, p2], axis=1)
     
-    # Boost out_pa back from the COM of pab
+    # Boost the momenta back from the COM of pa + pb
     eta = -0.5*tf.math.log(x1/x2)
     cth = tf.math.cosh(eta)
     sth = tf.math.sinh(eta)
     # Generate the boost matrix
-    bE = tf.stack([cth, zeros, zeros, sth], axis=1)
+    bE = tf.stack([cth, zeros, zeros, -sth], axis=1)
     bX = tf.stack([zeros, ones, zeros, zeros], axis=1)
     bY = tf.stack([zeros, zeros, ones, zeros], axis=1)
-    bZ = tf.stack([sth, zeros, zeros, cth], axis=1)
+    bZ = tf.stack([-sth, zeros, zeros, cth], axis=1)
 
     bmat = tf.stack([bE, bX, bY, bZ], axis=1)
-    lab_p = tf.keras.backend.batch_dot(out_p, bmat, axes=2)
-    pab = tf.stack([pa, pb], axis=1)
+    total_p = tf.keras.backend.batch_dot(out_p, bmat, axes=2)
 
-    total_wt = out_wt*wgt
-    total_p = tf.concat([pab, lab_p], axis=1)
+    # Include in the weight 1) flux factor 2) GeV to fb
+    wgt *= float_me(389379365600) # fb
+    wgt /= 2.0*shat
 
-    # Remove anything pathological (TODO: discover why these pathological points exist!)
-    total_wt = tf.maximum(total_wt, zeros)
-
-    return total_p, total_wt, x1, x2
+    return total_p, wgt, x1, x2
 ###############################################################################
 
 def luminosity(x1, x2, q2array):
@@ -173,13 +216,14 @@ def luminosity(x1, x2, q2array):
     # were to be explicitly compiled (as would be in general)
     gluon_1 = PDF.xfxQ2(int_me([0]), x1, q2array)
     gluon_2 = PDF.xfxQ2(int_me([0]), x2, q2array)
-    lumi = tf.reduce_sum(gluon_1*gluon_2, axis=-1)
+    lumi = gluon_1*gluon_2
     return lumi / x1 / x2
 
 # Minimal working exaple of cross section calculation with vegasflow
 def cross_section(xrand, **kwargs):
     # IRL we would be gruping matrices by nparticles
     res = []
+    xrand = float_me(1e-4) + xrand*(1-1e-4)
     for matrix in all_matrices:
         all_ps, wts, x1, x2 = phasespace_generator(xrand, matrix.nexternal)
         pdf = luminosity(x1, x2, tf.ones_like(x1)*Q2)
@@ -191,7 +235,7 @@ def cross_section(xrand, **kwargs):
 # Minimal working example of tf vectorized cross section function
 def cross_section_flow(xrand, **kwargs):
     res = 0.0
-    xrand = float_me(1e-3) + xrand*(1-1e-3)
+    xrand = float_me(1e-4) + xrand*(1-1e-4)
     for matrixflow in all_matrices_flow:
         all_ps, wts, x1, x2 = phasespace_generator(xrand, matrixflow.nexternal)
         pdf = luminosity(x1, x2, tf.ones_like(x1)*Q2)
@@ -229,7 +273,7 @@ if __name__ == "__main__":
         run_eager(True)
 
     nparticles = 4
-    n_dim = (nparticles-2)*4 + 2
+    n_dim = (nparticles-2)*3 - 2
     n_iter = args.iterations
     n_events = args.nevents
 
