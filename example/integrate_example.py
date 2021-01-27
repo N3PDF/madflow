@@ -18,6 +18,7 @@
 matrix_elm_folder = "../../mg5amcnlo/bin/vegasflow_example"
 
 import os, argparse
+
 # os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import numpy as np
 from time import time as tm
@@ -30,13 +31,13 @@ import tensorflow as tf
 
 COM_SQRTS = 7e3
 PDF = mkPDF("NNPDF31_nnlo_as_0118/0")
-Q2 = pow(80,2)
-TOP_MASS = 173
+Q2 = pow(91.46, 2)
+TOP_MASS = 173.0
 
 costhmax = fone
 costhmin = float_me(-1.0) * fone
 phimin = fzero
-phimax = float_me(2.0*np.pi)
+phimax = float_me(2.0 * np.pi)
 
 ######### Import the matrix elements and the necessary models
 all_matrices = []
@@ -52,6 +53,7 @@ import glob
 import copy
 import importlib.util
 import re
+
 re_name = re.compile("\w{3,}")
 original_path = copy.copy(sys.path)
 sys.path.insert(0, matrix_elm_folder)
@@ -72,6 +74,7 @@ model = import_ufo.import_model(f"{root_path}/{base_model}")
 
 # Import the parallel matrix
 from matrixflow_1_gg_ttx import Matrixflow_1_gg_ttx, get_model_param
+
 all_matrices_flow = [Matrixflow_1_gg_ttx()]
 model_params = get_model_param(model)
 
@@ -88,7 +91,7 @@ sys.path = original_path
 ################# Phase space
 @tf.function
 def log_pick(r, valmin, valmax):
-    """ Get a random value between valmin and valmax
+    """Get a random value between valmin and valmax
     as given by the random number r (batch_size, 1)
     the outputs are val (batch_size, 1) and jac (batch_size, 1)
     Logarithmic sampling
@@ -108,6 +111,7 @@ def log_pick(r, valmin, valmax):
     jac = val * tf.math.log(ratio_val)
     return val, jac
 
+
 def get_x1x2(xarr, shat_min, s_in):
     """Receives two random numbers and return the
     value of the invariant mass of the center of mass
@@ -126,9 +130,10 @@ def get_x1x2(xarr, shat_min, s_in):
     shat = x1 * x2 * s_in
     return shat, wgt, x1, x2
 
+
 @tf.function
 def pick_within(r, valmin, valmax):
-    """ Get a random value between valmin and valmax
+    """Get a random value between valmin and valmax
     as given by the random number r (batch_size, 1)
     the outputs are val (batch_size, 1) and jac (batch_size, 1)
 
@@ -148,50 +153,56 @@ def pick_within(r, valmin, valmax):
     val = valmin + r * delta_val
     return val, delta_val
 
+
 def phasespace_generator(xrand, nparticles):
-    """ Takes as input an array of nevent x ndim random points and outputs
+    """Takes as input an array of nevent x ndim random points and outputs
     an array of momenta (nevents x nparticles x 4)
     """
-    shat_min = float_me(4*TOP_MASS**2)
-    shat, wgt, x1, x2 = get_x1x2(xrand[:, :2], shat_min, COM_SQRTS**2)
-
-    # Sample the phi and costh of the outgoing ttbar system
-    s1 = float_me(TOP_MASS**2)
-    s2 = float_me(TOP_MASS**2)
-    phi, jac = pick_within(xrand[:,2], phimin, phimax)
-    wgt *= jac
-    costh, jac = pick_within(xrand[:,3], costhmin, costhmax)
-    wgt *= jac
-
-    # Compute the value of the outgoing momenta in the COM
-    sinth = tf.sqrt(fone - tf.square(costh))
-    cosphi = tf.cos(phi)
-    sinphi = tf.sin(phi)
-
+    shat_min = float_me(4 * TOP_MASS ** 2)
+    shat, wgt, x1, x2 = get_x1x2(xrand[:, :2], shat_min, COM_SQRTS ** 2)
     roots = tf.sqrt(shat)
-    E1 = (shat + s1 - s2) / 2.0 / roots
-    E2 = (shat + s2 - s1) / 2.0 / roots
-    roots1 = tf.sqrt(s1)
-    pp = tf.sqrt((E1 - roots1) * (E1 + roots1))
+    s1 = float_me(TOP_MASS ** 2)
+    s2 = float_me(TOP_MASS ** 2)
 
-    px = pp * sinth * cosphi
-    py = pp * sinth * sinphi
-    pz = pp * costh
-
-    p1 = tf.stack([E1, px, py, pz], axis=1)
-    p2 = tf.stack([E2, -px, -py, -pz], axis=1)
-
-    # Compute the value of the incoming momenta in the COM system
     zeros = tf.zeros_like(x1)
     ones = tf.ones_like(x1)
 
-    pin_z = roots/2.0
-    pa = tf.stack([pin_z, zeros, zeros, pin_z], axis=1)
-    pb = tf.stack([pin_z, zeros, zeros, -pin_z], axis=1)
+    # Get the energy and momenta of the outgoing particles
+    # which in the COM are the same...
+    ein = roots / 2.0
+    eout = (shat + s1 - s2) / 2.0 / roots
+    pout = tf.sqrt(eout ** 2 - TOP_MASS ** 2)
+
+    # Get min and max invariant masses s_inout to sample the angle
+    # massless input (so p_in == e_in)
+    tmin = s1 - roots * (eout + pout)
+    tmax = s1 - roots * (eout - pout)
+    t, jac = log_pick(xrand[:, 2], -tmax, -tmin)
+    costh = (-t - s1 + 2.0 * ein * eout) / (2.0 * ein * pout)
+    wgt *= jac
+    sinth = tf.sqrt(1.0 - costh ** 2)
+    wgt /= shat * 16.0 * np.pi ** 2
+
+    # The azimuthal angle can be set to 0 because of symmetry around the beam
+    wgt *= 2.0 * np.pi
+    cosphi = fone
+    sinphi = fzero
+
+    # Write down the outging momenta in the COM system
+    px = pout * sinth * cosphi
+    py = pout * sinth * sinphi
+    pz = pout * costh
+
+    p1 = tf.stack([eout, px, py, pz], axis=1)
+    p2 = tf.stack([eout, -px, -py, -pz], axis=1)
+
+    # And the incoming momenta
+    pa = tf.stack([ein, zeros, zeros, ein], axis=1)
+    pb = tf.stack([ein, zeros, zeros, -ein], axis=1)
     out_p = tf.stack([pa, pb, p1, p2], axis=1)
-    
+
     # Boost the momenta back from the COM of pa + pb
-    eta = -0.5*tf.math.log(x1/x2)
+    eta = -0.5 * tf.math.log(x1 / x2)
     cth = tf.math.cosh(eta)
     sth = tf.math.sinh(eta)
     # Generate the boost matrix
@@ -201,14 +212,18 @@ def phasespace_generator(xrand, nparticles):
     bZ = tf.stack([-sth, zeros, zeros, cth], axis=1)
 
     bmat = tf.stack([bE, bX, bY, bZ], axis=1)
+    # Apply boost
     total_p = tf.keras.backend.batch_dot(out_p, bmat, axes=2)
 
     # Include in the weight 1) flux factor 2) GeV to fb
-    wgt *= float_me(389379365600) # fb
-    wgt /= 2.0*shat
+    wgt *= float_me(389379365.6)  # pb
+    wgt /= 2 * shat
 
     return total_p, wgt, x1, x2
+
+
 ###############################################################################
+
 
 def luminosity(x1, x2, q2array):
     """ Returns f(x1)*f(x2) """
@@ -216,37 +231,39 @@ def luminosity(x1, x2, q2array):
     # were to be explicitly compiled (as would be in general)
     gluon_1 = PDF.xfxQ2(int_me([0]), x1, q2array)
     gluon_2 = PDF.xfxQ2(int_me([0]), x2, q2array)
-    lumi = gluon_1*gluon_2
+    lumi = gluon_1 * gluon_2
     return lumi / x1 / x2
+
 
 # Minimal working exaple of cross section calculation with vegasflow
 def cross_section(xrand, **kwargs):
     # IRL we would be gruping matrices by nparticles
     res = []
-    xrand = float_me(1e-4) + xrand*(1-1e-4)
     for matrix in all_matrices:
         all_ps, wts, x1, x2 = phasespace_generator(xrand, matrix.nexternal)
-        pdf = luminosity(x1, x2, tf.ones_like(x1)*Q2)
-        for ps, wt, ff in zip(all_ps.numpy(), wts.numpy(), pdf.numpy()): # when in eager mode, better to loop over numpy
-            res.append(matrix.smatrix(ps, model)*wt*ff)
+        pdf = luminosity(x1, x2, tf.ones_like(x1) * Q2)
+        for ps, wt, ff in zip(
+            all_ps.numpy(), wts.numpy(), pdf.numpy()
+        ):  # when in eager mode, better to loop over numpy
+            res.append(matrix.smatrix(ps, model) * wt * ff)
     return float_me(res)
 
 
 # Minimal working example of tf vectorized cross section function
 def cross_section_flow(xrand, **kwargs):
     res = 0.0
-    xrand = float_me(1e-4) + xrand*(1-1e-4)
     for matrixflow in all_matrices_flow:
         all_ps, wts, x1, x2 = phasespace_generator(xrand, matrixflow.nexternal)
-        pdf = luminosity(x1, x2, tf.ones_like(x1)*Q2)
-        smatrices = matrixflow.smatrix(all_ps, *model_params)*wts
-        res += smatrices*pdf
+        pdf = luminosity(x1, x2, tf.ones_like(x1) * Q2)
+        smatrices = matrixflow.smatrix(all_ps, *model_params) * wts
+        res += smatrices * pdf
     return res
 
 
 if __name__ == "__main__":
 
-    arger = argparse.ArgumentParser("""
+    arger = argparse.ArgumentParser(
+        """
     Example script to integrate Madgraph generated matrix element.
 
     By default first it the original mg5 matrix element will be run (which is not compiled)
@@ -260,23 +277,31 @@ if __name__ == "__main__":
     so that both runs are truly independent.
         ~$ ./integrate_example.py -s 4 -e
 
-    """)
-    arger.add_argument("-n", "--nevents", help="Number of events to be run", type=int, default=int(1e4))
-    arger.add_argument("-s", "--set_seed", help="Set the seed of the calculation", type=int, default=0)
-    arger.add_argument("-i", "--iterations", help="Number of iterations to be run", type=int, default=4)
+    """
+    )
+    arger.add_argument(
+        "-n", "--nevents", help="Number of events to be run", type=int, default=int(1e4)
+    )
+    arger.add_argument(
+        "-s", "--set_seed", help="Set the seed of the calculation", type=int, default=0
+    )
+    arger.add_argument(
+        "-i", "--iterations", help="Number of iterations to be run", type=int, default=4
+    )
     arger.add_argument("-r", "--reproducible", help="Run in reproducible mode", action="store_true")
     arger.add_argument("-e", "--eager", help="Run eager", action="store_true")
-    arger.add_argument("-v", "--only_vegasflow", help="Run only the Vegasflow ME", action="store_true")
+    arger.add_argument(
+        "-v", "--only_vegasflow", help="Run only the Vegasflow ME", action="store_true"
+    )
     args = arger.parse_args()
 
     if args.eager:
         run_eager(True)
 
     nparticles = 4
-    n_dim = (nparticles-2)*3 - 2
+    n_dim = (nparticles - 2) * 3 - 2
     n_iter = args.iterations
     n_events = args.nevents
-
 
     seed = args.set_seed
 
