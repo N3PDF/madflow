@@ -339,11 +339,9 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
                     
         for type, name in self.declaration.tolist():
             # skip P, V, etc... only Coup, masses, CI,
-            print ('TN', type, name)
             if type.startswith('list'): continue
             if type == '': continue
             if name.startswith('TMP'): continue
-            print ('OK', type, name)
             out.write('    %s = %s(%s)\n' % (name, self.type2def[type], name))               
 
         return out.getvalue()
