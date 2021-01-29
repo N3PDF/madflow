@@ -210,20 +210,32 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
 
         out.write('import tensorflow as tf\n')
         out.write('from vegasflow.configflow import DTYPE, DTYPEINT\n')
-        out.write('from config import complex_tf, complex_me, DTYPECOMPLEX\n')
+        out.write('from config import complex_tf, complex_me, DTYPECOMPLEX\n\n')
 
-        arguments = [arg for format, arg in self.define_argument_list(couplings)]       
+        arguments = self.define_argument_list(couplings) 
+
+        arguments_names = [arg[1] for arg in arguments]
 
         # the signature
+        shape_dict = {'list_complex' : '[None,None]',
+                      'complex' : '[]',
+                      'double' : '[]'}
+        type_dict = {'list_complex' : 'DTYPECOMPLEX',
+                      'complex' : 'DTYPECOMPLEX',
+                      'double' : 'DTYPE'}
+
         out.write('%(name)s_signature = [\n') 
-        ##### ADD SIGNATURE
+
+        for arg in arguments:
+            fmt = arg[0]
+            out.write('tf.TensorSpec(shape=%(shape)s, dtype=%(type)s),\n' %
+                    {'shape': shape_dict[fmt], 'type': type_dict[fmt]})
         out.write(']\n\n')
 
-        out.write('@tf.function(input_signature=%(name)s_signature')
-        out.write('def %(name)s(%(args)s):\n' % \
-                                    {'name': name, 'args': ','.join(arguments)})
+        out.write('@tf.function(input_signature=%(name)s_signature)\n')
+        out.write('def %(name)s(%(args)s):\n' )
 
-        return out.getvalue()
+        return out.getvalue() % {'name': name, 'args': ','.join(arguments_names)}
 
 
 
