@@ -41,6 +41,11 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
     realoperator = 'tf.math.real()'
     imagoperator = 'tf.math.imag()'
 
+    # use complex_me everywhere
+    type2def = {}    
+    type2def['int'] = 'complex_me'
+    type2def['double'] = 'complex_me'
+    type2def['complex'] = 'complex_me'
 
     #@staticmethod
     def change_number_format(self, number):
@@ -152,8 +157,6 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
             finally:
                 out.write(text)
 
-
-
         numerator = self.routine.expr
         if not 'Coup(1)' in self.routine.infostr:
             coup_name = 'COUP'
@@ -236,6 +239,114 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
         out.write('def %(name)s(%(args)s):\n' )
 
         return out.getvalue() % {'name': name, 'args': ','.join(arguments_names)}
+
+
+    def get_momenta_txt(self):
+        """Define the Header of the fortran file. This include
+            - momentum conservation
+            - definition of the impulsion"""
+             
+        out = StringIO()
+        
+        # Define all the required momenta
+        p = [] # a list for keeping track how to write the momentum
+        
+        signs = self.get_momentum_conservation_sign()
+        
+        for i,type in enumerate(self.particles):
+            if self.declaration.is_used('OM%s' % (i+1)):
+               out.write("    OM{0} = complex_tf(0, 0)\n    if (M{0}): OM{0}=complex_tf(1,0)/M{0}**2\n".format( (i+1) ))
+            if i+1 == self.outgoing:
+                out_type = type
+                out_size = self.type_to_size[type] 
+                continue
+            elif self.offshell:
+                p.append('{0}{1}{2}[%(i)s]'.format(signs[i],type,i+1))  
+                
+            if self.declaration.is_used('P%s' % (i+1)):
+                self.get_one_momenta_def(i+1, out)             
+             
+        # define the resulting momenta
+        if self.offshell:
+            type = self.particles[self.outgoing-1]
+            out.write('    %s%s = [complex_tf(0,0)] * %s\n' % (type, self.outgoing, out_size))
+            if aloha.loop_mode:
+                size_p = 4
+            else:
+                size_p = 2
+            for i in range(size_p):
+                dict_energy = {'i':i}
+    
+                out.write('    %s%s[%s] = %s\n' % (type,self.outgoing, i, 
+                                             ''.join(p) % dict_energy))
+            
+            self.get_one_momenta_def(self.outgoing, out)
+
+               
+        # Returning result
+        return out.getvalue()
+
+
+    def get_one_momenta_def(self, i, strfile):
+        """return the string defining the momentum"""
+
+        type = self.particles[i-1]
+        
+        main = '    P%d = complex_tf(tf.stack([' % i
+        if aloha.loop_mode:
+            template ='%(sign)s%(type)s%(i)d[%(nb)d]'
+        else:
+            template ='%(sign)stf.math%(operator)s(%(type)s%(i)d[%(nb2)d])'
+
+        nb2 = 0
+        strfile.write(main)
+        data = []
+        for j in range(4):
+            if not aloha.loop_mode:
+                nb = j
+                if j == 0: 
+                    assert not aloha.mp_precision 
+                    operator = '.real' # not suppose to pass here in mp
+                elif j == 1: 
+                    nb2 += 1
+                elif j == 2:
+                    assert not aloha.mp_precision 
+                    operator = '.imag' # not suppose to pass here in mp
+                elif j ==3:
+                    nb2 -= 1
+            else:
+                operator =''
+                nb = j
+                nb2 = j
+            data.append(template % {'j':j,'type': type, 'i': i, 
+                        'nb': nb, 'nb2': nb2, 'operator':operator,
+                        'sign': self.get_P_sign(i)}) 
+            
+        strfile.write(', '.join(data))
+        strfile.write('], axis=0), 0.)\n')
+
+
+    def get_declaration_txt(self, add_i=True):
+        """ Prototype for how to write the declaration of variable
+            Include the symmetry line (entry FFV_2)
+        """
+        
+        out = StringIO()
+        argument_var = [name for type,name in self.call_arg]
+        # define the complex number CI = 0+1j
+        if add_i:
+            out.write('    ' + self.ci_definition)
+                    
+        for type, name in self.declaration.tolist():
+            # skip P, V, etc... only Coup, masses, CI,
+            print ('TN', type, name)
+            if type.startswith('list'): continue
+            if type == '': continue
+            if name.startswith('TMP'): continue
+            print ('OK', type, name)
+            out.write('    %s = %s(%s)\n' % (name, self.type2def[type], name))               
+
+        return out.getvalue()
 
 
 
