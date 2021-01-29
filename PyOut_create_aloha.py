@@ -9,10 +9,24 @@
 #####################################################
 
 import madgraph.iolibs.file_writers as file_writers
+import madgraph.various.misc as misc
 import aloha
 import aloha.create_aloha as create_aloha
 import aloha.aloha_writers as aloha_writers
 from . import PyOut_PythonFileWriter as PythonFileWriter
+
+import cmath
+import os
+import re 
+from numbers import Number
+from collections import defaultdict
+from fractions import Fraction
+# fast way to deal with string
+from six import StringIO
+# Look at http://www.skymind.com/~ocrow/python_string/ 
+# For knowing how to deal with long strings efficiently.
+import itertools
+
 
 
 class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
@@ -28,7 +42,7 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
     imagoperator = 'tf.math.imag()'
 
 
-    @staticmethod
+    #@staticmethod
     def change_number_format(self, number):
         """Formating the number
         MZ: similar to the CPP function
@@ -96,17 +110,88 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
             return self.fct_format[fct]
         elif hasattr(cmath, fct):
             self.declaration.add(('fct', fct))
-            print 'MZ, this case should be changed for tensorflow'
+            print ('MZ, this case should be changed for tensorflow', fct)
             return 'cmath.{0}(%s)'.format(fct)
         else:
             raise Exception("Unable to handle function name %s (no special rule defined and not in cmath)" % fct)
 
 
     def define_expression(self):
-        """ use the mother class function, but replace 1j with cI
+        """ Identical to the mother class function, but replace 1j with cI
+        (strange errors were obtained when calling the mother class function
         """
-        out = super(ALOHAWriterForTensorFlow, self).define_expression()
-        return out.replace('1j', 'cI')
+        out = StringIO()
+
+        if self.routine.contracted:
+            keys = list( self.routine.contracted.keys())
+            keys.sort()
+            
+            for name in keys:
+                obj = self.routine.contracted[name]
+                out.write('    %s = %s\n' % (name, self.write_obj(obj)))
+
+        def sort_fct(a, b):
+            if len(a) < len(b):
+                return -1
+            elif len(a) > len(b):
+                return 1
+            elif a < b:
+                return -1
+            else:
+                return +1
+            
+        keys = list(self.routine.fct.keys())        
+        keys.sort(key=misc.cmp_to_key(sort_fct))
+        for name in keys:
+            fct, objs = self.routine.fct[name]
+            format = '    %s = %s\n' % (name, self.get_fct_format(fct))
+            try:
+                text = format % ','.join([self.write_obj(obj) for obj in objs])
+            except TypeError:
+                text = format % tuple([self.write_obj(obj) for obj in objs])
+            finally:
+                out.write(text)
+
+
+
+        numerator = self.routine.expr
+        if not 'Coup(1)' in self.routine.infostr:
+            coup_name = 'COUP'
+        else:
+            coup_name = '%s' % self.change_number_format(1)
+
+        if not self.offshell:
+            if coup_name == 'COUP':
+                out.write('    vertex = COUP*%s\n' % self.write_obj(numerator.get_rep([0])))
+            else:
+                out.write('    vertex = %s\n' % self.write_obj(numerator.get_rep([0])))
+        else:
+            OffShellParticle = '%s%d' % (self.particles[self.offshell-1],\
+                                                                  self.offshell)
+
+            if not 'L' in self.tag:
+                coeff = 'denom'
+                if not aloha.complex_mass:
+                    if self.routine.denominator:
+                        out.write('    denom = %(COUP)s/(%(denom)s)\n' % {'COUP': coup_name,\
+                                'denom':self.write_obj(self.routine.denominator)}) 
+                    else:
+                        out.write('    denom = %(coup)s/(P%(i)s[0]**2-P%(i)s[1]**2-P%(i)s[2]**2-P%(i)s[3]**2 - M%(i)s * (M%(i)s -cI* W%(i)s))\n' % 
+                          {'i': self.outgoing,'coup':coup_name})
+                else:
+                    if self.routine.denominator:
+                        raise Exception('modify denominator are not compatible with complex mass scheme')                
+                    
+                    out.write('    denom = %(coup)s/(P%(i)s[0]**2-P%(i)s[1]**2-P%(i)s[2]**2-P%(i)s[3]**2 - M%(i)s**2)\n' % 
+                          {'i': self.outgoing,'coup':coup_name})                    
+            else:
+                coeff = 'COUP'
+                
+            for ind in numerator.listindices():
+                out.write('    %s[%d]= %s*%s\n' % (self.outname, 
+                                        self.pass_to_HELAS(ind), coeff, 
+                                        self.write_obj(numerator.get_rep(ind))))
+        return out.getvalue()
 
 
     def get_foot_txt(self):
@@ -137,6 +222,8 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
         out.write('@tf.function(input_signature=%(name)s_signature')
         out.write('def %(name)s(%(args)s):\n' % \
                                     {'name': name, 'args': ','.join(arguments)})
+
+        return out.getvalue()
 
 
 
