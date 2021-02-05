@@ -98,8 +98,9 @@ def ixxxxx(p,fmass,nhel,nsf):
     true_args = [p, fmass, nhel, nsf, nh, float_me(1)]
     false_args = [p, nsf, nh, nhel, float_me(1)]
     massive = fmass != 0
-    v[2] = tf.cond(massive, lambda: ioxxxxx_massive(*true_args),
-                lambda: ioxxxxx_massless(*false_args))
+    v[2] = tf.cond(massive,
+                   lambda: ioxxxxx_massive(*true_args),
+                   lambda: ioxxxxx_massless(*false_args))
     return tf.concat(v, axis=0)
 
 
@@ -115,8 +116,9 @@ def oxxxxx(p,fmass,nhel,nsf):
     true_args = [p, fmass, nhel, nsf, nh, float_me(-1)]
     false_args = [p, nsf, nh, nhel, float_me(-1)]
     massive = fmass != 0
-    v[2] = tf.cond(massive, lambda: ioxxxxx_massive(*true_args),
-                lambda: ioxxxxx_massless(*false_args))
+    v[2] = tf.cond(massive,
+                   lambda: ioxxxxx_massive(*true_args),
+                   lambda: ioxxxxx_massless(*false_args))
     return tf.concat(v, axis=0)
 
 
@@ -253,12 +255,14 @@ def vxxxxx(p, vmass, nhel, nsv):
         brst_massless_args = [p, nevts]
         brst_massive_args = [p, vmass, nevts]
         massless = vmass == 0
-        v[2] = tf.where(massless, vxxxxx_brst_massless(*brst_massless_args),
-                     vxxxxx_brst_massive(*brst_massive_args))        
+        v[2] = tf.cond(massless,
+                       lambda: vxxxxx_brst_massless(*brst_massless_args),
+                       lambda: vxxxxx_brst_massive(*brst_massive_args))        
     else:
         massive_args = [p, pp, pt, vmass, hel0, nsvahl, nhel, sqh, nevts]
         massless_args = [p, nhel, nsv, sqh, nevts]            
         massive = vmass != 0
-        v[2] =  tf.where(massive, vxxxxx_massive(*massive_args),
-                         vxxxxx_massless(*massless_args))
+        v[2] =  tf.cond(massive,
+                        lambda: vxxxxx_massive(*massive_args),
+                        lambda: vxxxxx_massless(*massless_args))
     return tf.concat(v, axis=0)
