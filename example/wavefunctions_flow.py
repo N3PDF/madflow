@@ -88,11 +88,13 @@ def ioxxxxx_moving(p, pp, fmass, nsf, nh, io, ip, im):
     sf = tf.stack([(1+nsf+(1-nsf)*io*nh)*0.5,(1+nsf-(1-nsf)*io*nh)*0.5], axis=0)
     omega = tf.stack([tf.math.sqrt(p[:,0]+pp),fmass/(tf.math.sqrt(p[:,0]+pp))], axis=0)
     sfomeg = tf.stack([sf[0]*omega[ip],sf[1]*omega[im]], axis=0)
+    if io == -1:
+        sfomeg = tf.reverse(sfomeg,[0])
     pp3 = tf.math.maximum(pp+p[:,3],0.)
     chi1 = tf.where(pp3==0,
                     complex_tf(-nh,0),
                     complex_tf(nh*p[:,1]/tf.math.sqrt(2.*pp*pp3),
-                               p[:,2]/tf.math.sqrt(2.*pp*pp3)))
+                               io*p[:,2]/tf.math.sqrt(2.*pp*pp3)))
     chi2 = complex_tf(tf.math.sqrt(pp3*0.5/pp),0.)
     chi = tf.stack([chi2, chi1], axis=0)
     v = [0]*4
