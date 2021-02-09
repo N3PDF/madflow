@@ -23,6 +23,8 @@ import os, argparse
 import numpy as np
 from time import time as tm
 from vegasflow import VegasFlow, float_me, run_eager, int_me
+#run_eager(True)
+from vegasflow.utils import consume_array_into_indices
 from pdfflow import mkPDF
 from pdfflow.functions import _condition_to_idx
 from pdfflow.configflow import fzero, fone
@@ -249,15 +251,48 @@ def cross_section(xrand, **kwargs):
     return float_me(res)
 
 
+histo_bins = 10
+fixed_bins = float_me([i*20 for i in range(histo_bins)])
+
+# Integrand with accumulator:
+def generate_integrand(cummulator_tensor):
+    """ 
+    This function will generate an integrand function
+    which will already hold a reference to the tensor to accumulate
+    """
+
+    @tf.function
+    def histogram_collector(results, variables):
+        """ This function will receive a tensor (result)
+        and the variables corresponding to those integrand results 
+        In the example integrand below, these corresponds to 
+            `final_result` and `histogram_values` respectively.
+        `current_histograms` instead is the current value of the histogram
+        which will be overwritten """
+        # Fill a histogram with (10) PT bins with fixed distance 
+        indices = tf.histogram_fixed_width_bins(variables, [fixed_bins[0],fixed_bins[-1]] , nbins=histo_bins)
+        t_indices = tf.transpose(indices)
+        # Then consume the results with the utility we provide
+        partial_hist = consume_array_into_indices(results, t_indices, histo_bins)
+        # Then update the results of current_histograms
+        new_histograms = partial_hist + current_histograms
+        cummulator_tensor.assign(new_histograms)
+
 # Minimal working example of tf vectorized cross section function
-def cross_section_flow(xrand, **kwargs):
-    res = 0.0
-    for matrixflow in all_matrices_flow:
-        all_ps, wts, x1, x2 = phasespace_generator(xrand, matrixflow.nexternal)
-        pdf = luminosity(x1, x2, tf.ones_like(x1) * Q2)
-        smatrices = matrixflow.smatrix(all_ps, *model_params) * wts
-        res += smatrices * pdf
-    return res
+    def cross_section_flow(xrand, weight=1.0, **kwargs):
+        """ We need the weight to fill the historgams """
+        res = 0.0
+        for matrixflow in all_matrices_flow:
+            all_ps, wts, x1, x2 = phasespace_generator(xrand, matrixflow.nexternal)
+            pdf = luminosity(x1, x2, tf.ones_like(x1) * Q2)
+            smatrices = matrixflow.smatrix(all_ps, *model_params) * wts
+            res += smatrices * pdf
+            # Histogram results on the pt of particle 3 (one of the tops)
+            pt = tf.sqrt(all_ps[:,3,1]**2 + all_ps[:,3,2]**2)
+            histogram_collector(res*weight, (pt,))
+        return res
+
+    return cross_section_flow
 
 
 if __name__ == "__main__":
@@ -317,7 +352,22 @@ if __name__ == "__main__":
     # Run the Parallel ME
     new_vegas = VegasFlow(n_dim, n_events)
     new_vegas.set_seed(seed)
-    new_vegas.compile(cross_section_flow, compilable=not args.reproducible)
+    ##  Create a reference to the histograms
+    current_histograms = tf.Variable(float_me(tf.zeros(histo_bins)))
+    integrand = generate_integrand(current_histograms)
+    ## 
+    new_vegas.compile(integrand, compilable=not args.reproducible)
     start = tm()
-    new_vegas.run_integration(n_iter)
+    # When running the histogram, pass the reference to the histogram so it is accumulated
+    new_vegas.run_integration(n_iter, histograms=(current_histograms,))
     print(f"Vegasflow integration with tf vectorized smatrix function done in: {tm()-start} s")
+    print(f"Histogram:")
+    print(f"   pt_l   |   pt_u   |  ds/dpt")
+    print(f"------------------------------")
+    for i, wgt in enumerate(current_histograms.numpy()):
+        pt_l = str(fixed_bins[i].numpy())
+        if i < (histo_bins-1):
+            pt_u = str(fixed_bins[i+1].numpy())
+        else:
+            pt_u = "inf"
+        print(f"{pt_l.center(10)}|{pt_u.center(10)}| {wgt:.5f}")
