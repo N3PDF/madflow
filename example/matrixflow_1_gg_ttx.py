@@ -234,13 +234,13 @@ if __name__ == "__main__":
     COM_SQRTS = 7e3
     nevt = args.nevents
     ndim = 4*matrixflow.nexternal
-    xrand = float_me(np.random.rand(nevt,ndim)*100)
+    xrand = float_me(np.random.rand(nevt,ndim))
     from parallel_rambo import parallel_rambo
     def phasespace_generator(xrand, nparticles):
         """ Takes as input an array of nevent x ndim random points and outputs
         an array of momenta (nevents x nparticles x 4)
         """
-        return parallel_rambo(xrand, 4, COM_SQRTS)
+        return parallel_rambo(xrand, 4, COM_SQRTS, masses=[0,0,173,173])
     all_momenta, _ = phasespace_generator(xrand, 4)
     print("Tracing TGraph ...")
     print(f"Evaluating smatrix for {nevt} events")
