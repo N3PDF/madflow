@@ -1,30 +1,63 @@
-import pickle
 import os
 import sys
+
+from vegasflow.configflow import int_me, float_me, DTYPE, DTYPEINT
+from vegasflow import run_eager
+import tensorflow as tf
+import collections
+
+ModelParamTuple = collections.namedtuple("Model", [%(paramnames)s])
 
 root_path = '%(root_path)s'
 sys.path.insert(0, root_path)
 sys.path.insert(0, os.path.join(root_path, 'madgraph'))
 sys.path.insert(0, os.path.join(root_path, 'aloha', 'template_files'))
 
-from wavefunctions import oxxxxx, ixxxxx, vxxxxx, sxxxxx
+from wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
 import models.import_ufo as import_ufo
+
+from config import complex_tf, complex_me, DTYPECOMPLEX
 
 
 %(aloha_imports)s
 
 
+def get_model_param(model):
+    %(model_parameters)s
+    return ModelParamTuple(%(paramtuple)s)
+
+
+
+smatrix_signature = [
+        tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
+        %(paramsignature)s
+        ]
+
+
+matrix_signature = [
+        tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
+        tf.TensorSpec(shape=[4], dtype=DTYPE),
+        %(paramsignature)s
+        ]
+
+
 class Matrix_%(process_string)s(object):
-    nexternal = %(nexternal)d
+    nexternal = float_me(%(nexternal)d)
+    ndiags = float_me(%(ndiags)d)
+    ncomb = float_me(%(ncomb)d)
+    %(helicity_lines)s
+    %(den_factor_line)s
 
     def __init__(self):
         """define the object"""
         self.clean()
 
     def clean(self):
-        self.jamp = []
+        pass
+        ##self.jamp = []
 
-    def smatrix(self,p, model):
+    @tf.function(input_signature=smatrix_signature)
+    def smatrix(self,all_ps,%(params)s):
         #  
         %(info_lines)s
         # 
@@ -38,32 +71,20 @@ class Matrix_%(process_string)s(object):
         #  
         # Clean additional output
         #
-        self.clean()
-        #  
-        # CONSTANTS
-        #  
-        nexternal = %(nexternal)d
-        ndiags = %(ndiags)d
-        ncomb = %(ncomb)d
-        #  
-        # LOCAL VARIABLES 
-        #  
-        %(helicity_lines)s
-        %(den_factor_line)s
+        ###self.clean()
         # ----------
         # BEGIN CODE
         # ----------
-        self.amp2 = [0.] * ndiags
-        self.helEvals = []
-        ans = 0.
-        for hel in helicities:
-            t = self.matrix(p, hel, model)
+        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
+        ans = tf.zeros(nevts, dtype=DTYPECOMPLEX)
+        for hel in self.helicities:
+            t = self.matrix(all_ps,hel,%(params)s)
             ans = ans + t
-            self.helEvals.append([hel, t.real / denominator ])
-        ans = ans / denominator
-        return ans.real
 
-    def matrix(self, p, hel, model):
+        return tf.math.real(ans)/self.denominator
+
+    @tf.function(input_signature=matrix_signature)
+    def matrix(self,all_ps,hel,%(params)s):
         #  
         %(info_lines)s
         #
@@ -79,7 +100,8 @@ class Matrix_%(process_string)s(object):
         nexternal = self.nexternal
         nwavefuncs = %(nwavefuncs)d
         ncolor = %(ncolor)d
-        ZERO = 0.
+        ZERO = float_me(0.)
+        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
         #  
         # Color matrix
         #  
@@ -87,7 +109,6 @@ class Matrix_%(process_string)s(object):
         #
         # Model parameters
         #
-        %(model_parameters)s
         # ----------
         # Begin code
         # ----------
@@ -95,14 +116,12 @@ class Matrix_%(process_string)s(object):
         w = [None] * nwavefuncs
         %(helas_calls)s
 
-        jamp = [None] * ncolor
-
         %(jamp_lines)s
 
         %(amp2_lines)s
-        matrix = 0.
+        matrix = tf.zeros(nevts, dtype=DTYPECOMPLEX)
         for i in range(ncolor):
-            ztemp = 0
+            ztemp = tf.zeros(nevts, dtype=DTYPECOMPLEX)
             for j in range(ncolor):
                 ztemp = ztemp + cf[i][j]*jamp[j]
             matrix = matrix + ztemp * jamp[i].conjugate()/denom[i]   
@@ -113,11 +132,63 @@ class Matrix_%(process_string)s(object):
 
 
 if __name__ == "__main__":
-    model = import_ufo.import_model("%(model_path)s") 
-    momenta = [[100., 0., 0., 100.],
-               [100., 0., 0.,-100.],
-               [100., 100., 0., 0.],
-               [100.,-100., 0., 0.]]
+    matrix_elm_folder = "../../vegasflow_example/"
+    model = None
 
-    mymatrix = Matrix_%(process_string)s()
-    print('RESULT', mymatrix.smatrix(momenta, model))
+    import sys
+    import glob
+    import copy
+    import importlib.util
+    import re
+    from time import time as tm
+    re_name = re.compile("\w{3,}")
+    original_path = copy.copy(sys.path)
+    sys.path.insert(0, matrix_elm_folder)
+    matrix_file = f"{matrix_elm_folder}/matrix_1_gg_ttx.py"
+    matrix_name = re_name.findall(matrix_file)[-1]
+    class_name = matrix_name.capitalize()
+    module_spec = importlib.util.spec_from_file_location(matrix_name, matrix_file)
+    module = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
+    
+    matrix = getattr(module, class_name)()
+    matrixflow = Matrixflow_1_gg_ttx()
+    root_path = getattr(module, "root_path")
+    import_ufo = getattr(module, "import_ufo")
+    model = import_ufo.import_model("%(model_path)s") 
+    model_params = get_model_param(model)
+
+    # Clean the path
+    sys.path = original_path
+    # run_eager(True)
+
+    import numpy as np
+    COM_SQRTS = 7e3
+    nevt = 100000
+    ndim = 4*matrixflow.nexternal
+    xrand = float_me(np.random.rand(nevt,ndim)*100)
+    from parallel_rambo import parallel_rambo
+    def phasespace_generator(xrand, nparticles):
+        """ Takes as input an array of nevent x ndim random points and outputs
+        an array of momenta (nevents x nparticles x 4)
+        """
+        return parallel_rambo(xrand, 4, COM_SQRTS)
+    all_momenta, _ = phasespace_generator(xrand, 4)
+    print("Tracing TGraph ...")
+    print(f"Evaluating smatrix for {nevt} events")
+    start = tm()
+    matrixflow.smatrix(all_momenta[:1], *model_params)
+    print(f"TGraph traced in {tm()-start} s")
+    start = tm()
+    resflow = matrixflow.smatrix(all_momenta, *model_params)
+    print(f"Mg5Flow computed smatrix in: {tm()-start} s")
+    start = tm()
+    res = []
+    for momenta in all_momenta.numpy():
+        res.append(matrix.smatrix(momenta, model))
+    res = np.stack(res) # [nevt,]
+    print(f"Mg5 computed smatrix in: {tm()-start}")
+
+    print("Checking smatrix results...")
+    np.testing.assert_allclose(res, resflow, rtol=1e-4)
+    print("All good!")
