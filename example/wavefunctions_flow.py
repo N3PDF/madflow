@@ -11,6 +11,11 @@ wave_signature=[
     tf.TensorSpec(shape=[], dtype=DTYPE)
 ]
 
+scalar_signature=[
+    tf.TensorSpec(shape=[None,4], dtype=DTYPE),
+    tf.TensorSpec(shape=[], dtype=DTYPE)
+]
+
 sign_signature=[
     tf.TensorSpec(shape=[], dtype=DTYPE),
     tf.TensorSpec(shape=[], dtype=DTYPE),
@@ -37,6 +42,18 @@ def signvec(x,y):
     # dropping the checks for the moment
     return x*tf.math.sign(y)
 
+
+
+@tf.function(input_signature=scalar_signature)
+def sxxxxx(p,nss):
+    """Defines a scalar."""
+    # Note: here p[:,i] selects the momentum dimension and is a [nevt,] tensor
+    nevts = tf.shape(p, out_type=DTYPEINT)[0]    
+    v0 = tf.expand_dims(complex_tf(p[:,0]*nss,p[:,3]*nss), 0) # [nevt,] complex
+    v1 = tf.expand_dims(complex_tf(p[:,1]*nss,p[:,2]*nss), 0) # [nevt,] complex
+    v = tf.expand_dims(complex_tf(1.,0.), 0)
+    fi = tf.concat([v0,v1,v], axis=0)
+    return fi
 
 @tf.function(input_signature=wave_signature)
 def ixxxxx(p,fmass,nhel,nsf):
