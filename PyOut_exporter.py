@@ -174,14 +174,13 @@ class PyOutExporter(export_python.ProcessExporterPython):
                               % {"coup": coup} for coup in couplings])
 
             if aloha.complex_mass:
-                paramsignature = "\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(parameters+couplings))
+                paramsignature = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(parameters+couplings))
                 paramtuple = ",".join(["complex_me(%s)" % p for p in paramters+couplings]) 
 
             else:
-                paramsignature = "\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPE)'] * len(parameters))
-                paramsignature += "\n        " + "\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(couplings))
-                paramtuple = ",".join(["float_me(%s)" % p for p in parameters]) 
-                paramtuple += "," + ",".join(["complex_me(%s)" % p for p in couplings]) 
+                paramsignature = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPE)'] * len(parameters) + 
+                                                    ['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(couplings))
+                paramtuple = ",".join(["float_me(%s)" % p for p in parameters] + ["complex_me(%s)" % p for p in couplings]) 
 
             params = ",".join([p for p in parameters + couplings])
             paramnames = ",".join(["\"%s\"" % p for p in parameters + couplings])
@@ -204,7 +203,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
             # Extract amp2 lines
             amp2_lines = self.get_amp2_lines(matrix_element,
                                         self.config_maps.setdefault(ime, []))
-            replace_dict['amp2_lines'] = '\n        '.join(amp2_lines)
+            replace_dict['amp2_lines'] = '\n        #'.join(amp2_lines)
 
             replace_dict['model_path'] = self.model.path 
             replace_dict['root_path'] = MG5DIR

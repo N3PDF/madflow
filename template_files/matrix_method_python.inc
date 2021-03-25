@@ -13,7 +13,8 @@ sys.path.insert(0, root_path)
 sys.path.insert(0, os.path.join(root_path, 'madgraph'))
 sys.path.insert(0, os.path.join(root_path, 'aloha', 'template_files'))
 
-from wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
+#from wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
+#from wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx
 import models.import_ufo as import_ufo
 
 from config import complex_tf, complex_me, DTYPECOMPLEX
@@ -118,14 +119,14 @@ class Matrix_%(process_string)s(object):
 
         %(jamp_lines)s
 
-        %(amp2_lines)s
+        ##%(amp2_lines)s
         matrix = tf.zeros(nevts, dtype=DTYPECOMPLEX)
         for i in range(ncolor):
             ztemp = tf.zeros(nevts, dtype=DTYPECOMPLEX)
             for j in range(ncolor):
                 ztemp = ztemp + cf[i][j]*jamp[j]
-            matrix = matrix + ztemp * jamp[i].conjugate()/denom[i]   
-        self.jamp.append(jamp)
+            matrix = matrix + ztemp * tf.math.conj(jamp[i])/denom[i]   
+        #self.jamp.append(jamp)
 
         return matrix
 
