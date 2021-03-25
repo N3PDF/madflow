@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(root_path, 'madgraph'))
 sys.path.insert(0, os.path.join(root_path, 'aloha', 'template_files'))
 
 #from wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
-#from wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx
+from wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx
 import models.import_ufo as import_ufo
 
 from config import complex_tf, complex_me, DTYPECOMPLEX
