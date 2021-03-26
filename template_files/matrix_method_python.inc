@@ -139,63 +139,61 @@ class Matrix_%(process_string)s(object):
 
 
 if __name__ == "__main__":
-    matrix_elm_folder = "../../vegasflow_example/"
-    model = None
+    import sys, pathlib
+    import numpy as np
 
-    import sys
-    import glob
-    import copy
-    import importlib.util
-    import re
-    from time import time as tm
-    re_name = re.compile("\w{3,}")
-    original_path = copy.copy(sys.path)
-    sys.path.insert(0, matrix_elm_folder)
-    matrix_file = f"{matrix_elm_folder}/matrix_1_gg_ttx.py"
-    matrix_name = re_name.findall(matrix_file)[-1]
-    class_name = matrix_name.capitalize()
-    module_spec = importlib.util.spec_from_file_location(matrix_name, matrix_file)
-    module = importlib.util.module_from_spec(module_spec)
-    module_spec.loader.exec_module(module)
-    
-    matrix = getattr(module, class_name)()
-    matrixflow = Matrixflow_1_gg_ttx()
-    root_path = getattr(module, "root_path")
-    import_ufo = getattr(module, "import_ufo")
-    model = import_ufo.import_model("%(model_path)s") 
+    # Get the name of the matrix in this file
+    matrix_name = pathlib.Path(sys.argv[0]).stem.capitalize()
+    matrix_class = globals()[matrix_name]
+
+    # Instantiate the matrix
+    matrix = matrix_class()
+
+    # Read up the model
+    model_sm = pathlib.Path(root_path) / "models/sm"
+    if not model_sm.exists():
+        print(f"No model sm found at {model_sm}, test cannot continue")
+        sys.exit(0)
+    model = import_ufo.import_model(model_sm.as_posix())
     model_params = get_model_param(model)
 
-    # Clean the path
-    sys.path = original_path
-    # run_eager(True)
+    # Define th phase space
+    # The structure asked by the matrix elements is
+    #   (nevents, nparticles, ndimensions)
+    # the 4 dimensions of the 4-momentum is expected as
+    #   (E, px, py, pz)
 
-    import numpy as np
-    COM_SQRTS = 7e3
-    nevt = 100000
-    ndim = 4*matrixflow.nexternal
-    xrand = float_me(np.random.rand(nevt,ndim)*100)
-    from parallel_rambo import parallel_rambo
-    def phasespace_generator(xrand, nparticles):
-        """ Takes as input an array of nevent x ndim random points and outputs
-        an array of momenta (nevents x nparticles x 4)
-        """
-        return parallel_rambo(xrand, 4, COM_SQRTS)
-    all_momenta, _ = phasespace_generator(xrand, 4)
-    print("Tracing TGraph ...")
-    print(f"Evaluating smatrix for {nevt} events")
-    start = tm()
-    matrixflow.smatrix(all_momenta[:1], *model_params)
-    print(f"TGraph traced in {tm()-start} s")
-    start = tm()
-    resflow = matrixflow.smatrix(all_momenta, *model_params)
-    print(f"Mg5Flow computed smatrix in: {tm()-start} s")
-    start = tm()
-    res = []
-    for momenta in all_momenta.numpy():
-        res.append(matrix.smatrix(momenta, model))
-    res = np.stack(res) # [nevt,]
-    print(f"Mg5 computed smatrix in: {tm()-start}")
+    ndim = 4
+    npar = int(matrix.nexternal)
+    nevents = 2
+    max_momentum = 7e3
 
-    print("Checking smatrix results...")
-    np.testing.assert_allclose(res, resflow, rtol=1e-4)
+    # Now generate random outgoing particles in a com frame (last_p carries whatever momentum is needed to sum 0 )
+    partial_out_p = tf.random.uniform(
+        (nevents, npar - 3, ndim - 1), minval=-max_momentum, maxval=max_momentum, dtype=DTYPE
+    )
+    last_p = -tf.reduce_sum(partial_out_p, keepdims=True, axis=1)
+    out_p = tf.concat([partial_out_p, last_p], axis=1)
+
+    if "mdl_MT" in dir(model_params):
+        # TODO fill in the mass according to the particles
+        out_m = tf.reshape((npar - 2) * [model_params.mdl_MT], (1, -1, 1))
+    else:
+        out_m = 0.0
+    out_e = tf.sqrt(tf.reduce_sum(out_p ** 2, keepdims=True, axis=-1) + out_m ** 2)
+
+    outgoing_4m = tf.concat([out_e, out_p], axis=-1)
+
+    # Put all incoming momenta in the z axis (TODO: for now assume massless input)
+    ea = tf.reduce_sum(out_e, axis=1, keepdims=True) / 2
+    zeros = tf.zeros_like(ea)
+    inc_p1 = tf.concat([ea, zeros, zeros, ea], axis=-1)
+    inc_p2 = tf.concat([ea, zeros, zeros, -ea], axis=-1)
+
+    all_ps = tf.concat([inc_p1, inc_p2, outgoing_4m], axis=1)
+
+    wgt_set = matrix.smatrix(all_ps, *model_params)
+
     print("All good!")
+    for i, (p, wgt) in enumerate(zip(all_ps, wgt_set)):
+        print(f"\n#{i} ME value: {wgt.numpy():.5f} for P set:\n{p.numpy()}")
