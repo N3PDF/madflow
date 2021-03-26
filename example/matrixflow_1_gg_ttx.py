@@ -191,7 +191,8 @@ class Matrixflow_1_gg_ttx:
 
 
 if __name__ == "__main__":
-    matrix_elm_folder = "../../vegasflow_example/"
+    # matrix_elm_folder = "../../vegasflow_example/"
+    matrix_elm_folder = "../../mg5amcnlo/bin/vegasflow_example"
     model = None
     base_model = "models/sm"
 
@@ -220,19 +221,27 @@ if __name__ == "__main__":
 
     # Clean the path
     sys.path = original_path
-    # run_eager(True)
+    import argparse
+    arger = argparse.ArgumentParser()
+    arger.add_argument("-e", "--eager", help="Run eager", action="store_true")
+    arger.add_argument(
+        "-n", "--nevents", help="Number of events to be run", type=int, default=int(1e4)
+    )
+    args = arger.parse_args()
+    if args.eager:
+        run_eager(True)
 
     import numpy as np
     COM_SQRTS = 7e3
-    nevt = 100000
+    nevt = args.nevents
     ndim = 4*matrixflow.nexternal
-    xrand = float_me(np.random.rand(nevt,ndim)*100)
+    xrand = float_me(np.random.rand(nevt,ndim))
     from parallel_rambo import parallel_rambo
     def phasespace_generator(xrand, nparticles):
         """ Takes as input an array of nevent x ndim random points and outputs
         an array of momenta (nevents x nparticles x 4)
         """
-        return parallel_rambo(xrand, 4, COM_SQRTS)
+        return parallel_rambo(xrand, 4, COM_SQRTS, masses=[0,0,173,173])
     all_momenta, _ = phasespace_generator(xrand, 4)
     print("Tracing TGraph ...")
     print(f"Evaluating smatrix for {nevt} events")
