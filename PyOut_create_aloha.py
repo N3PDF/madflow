@@ -211,9 +211,8 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
            
         out = StringIO()
 
-        out.write('import tensorflow as tf\n')
-        out.write('from vegasflow.configflow import DTYPE, DTYPEINT\n')
-        out.write('from config import complex_tf, complex_me, DTYPECOMPLEX\n\n')
+        out.write('from alohaflow.config import DTYPE, DTYPEINT, complex_tf, complex_me, DTYPECOMPLEX\n')
+        out.write('import tensorflow as tf\n\n')
 
         arguments = self.define_argument_list(couplings) 
 

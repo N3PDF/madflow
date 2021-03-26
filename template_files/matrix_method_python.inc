@@ -1,8 +1,19 @@
+
+from alohaflow.config import (
+    int_me,
+    float_me,
+    DTYPE,
+    DTYPEINT,
+    run_eager,
+    DTYPECOMPLEX,
+    complex_tf,
+    complex_me
+)
+from alohaflow.wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
+
 import os
 import sys
 
-from vegasflow.configflow import int_me, float_me, DTYPE, DTYPEINT
-from vegasflow import run_eager
 import tensorflow as tf
 import collections
 
@@ -13,12 +24,7 @@ sys.path.insert(0, root_path)
 sys.path.insert(0, os.path.join(root_path, 'madgraph'))
 sys.path.insert(0, os.path.join(root_path, 'aloha', 'template_files'))
 
-#from wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
-from wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx
 import models.import_ufo as import_ufo
-
-from config import complex_tf, complex_me, DTYPECOMPLEX
-
 
 %(aloha_imports)s
 
