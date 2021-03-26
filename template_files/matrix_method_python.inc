@@ -43,7 +43,7 @@ smatrix_signature = [
 
 matrix_signature = [
         tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
-        tf.TensorSpec(shape=[4], dtype=DTYPE),
+        tf.TensorSpec(shape=[%(nexternal)d], dtype=DTYPE),
         %(paramsignature)s
         ]
 
@@ -159,41 +159,43 @@ if __name__ == "__main__":
 
     # Define th phase space
     # The structure asked by the matrix elements is
-    #   (nevents, nparticles, ndimensions)
+    #   (nevents, ndimensions, nparticles)
     # the 4 dimensions of the 4-momentum is expected as
     #   (E, px, py, pz)
-
     ndim = 4
     npar = int(matrix.nexternal)
     nevents = 2
     max_momentum = 7e3
 
+    par_ax = 1
+    dim_ax = 2
+
     # Now generate random outgoing particles in a com frame (last_p carries whatever momentum is needed to sum 0 )
-    partial_out_p = tf.random.uniform(
-        (nevents, npar - 3, ndim - 1), minval=-max_momentum, maxval=max_momentum, dtype=DTYPE
-    )
-    last_p = -tf.reduce_sum(partial_out_p, keepdims=True, axis=1)
-    out_p = tf.concat([partial_out_p, last_p], axis=1)
+    shape = [nevents, 0, 0]
+    shape[par_ax] = npar - 3
+    shape[dim_ax] = ndim - 1
+    partial_out_p = tf.random.uniform(shape, minval=-max_momentum, maxval=max_momentum, dtype=DTYPE)
+    last_p = -tf.reduce_sum(partial_out_p, keepdims=True, axis=par_ax)
+    out_p = tf.concat([partial_out_p, last_p], axis=par_ax)
 
     if "mdl_MT" in dir(model_params):
         # TODO fill in the mass according to the particles
         out_m = tf.reshape((npar - 2) * [model_params.mdl_MT], (1, -1, 1))
     else:
         out_m = 0.0
-    out_e = tf.sqrt(tf.reduce_sum(out_p ** 2, keepdims=True, axis=-1) + out_m ** 2)
-
-    outgoing_4m = tf.concat([out_e, out_p], axis=-1)
+    out_e = tf.sqrt(tf.reduce_sum(out_p ** 2, keepdims=True, axis=dim_ax) + out_m ** 2)
+    outgoing_4m = tf.concat([out_e, out_p], axis=dim_ax)
 
     # Put all incoming momenta in the z axis (TODO: for now assume massless input)
-    ea = tf.reduce_sum(out_e, axis=1, keepdims=True) / 2
+    ea = tf.reduce_sum(out_e, axis=par_ax, keepdims=True) / 2
     zeros = tf.zeros_like(ea)
-    inc_p1 = tf.concat([ea, zeros, zeros, ea], axis=-1)
-    inc_p2 = tf.concat([ea, zeros, zeros, -ea], axis=-1)
+    inc_p1 = tf.concat([ea, zeros, zeros, ea], axis=dim_ax)
+    inc_p2 = tf.concat([ea, zeros, zeros, -ea], axis=dim_ax)
 
-    all_ps = tf.concat([inc_p1, inc_p2, outgoing_4m], axis=1)
+    all_ps = tf.concat([inc_p1, inc_p2, outgoing_4m], axis=par_ax)
 
     wgt_set = matrix.smatrix(all_ps, *model_params)
 
     print("All good!")
     for i, (p, wgt) in enumerate(zip(all_ps, wgt_set)):
-        print(f"\n#{i} ME value: {wgt.numpy():.5f} for P set:\n{p.numpy()}")
+        print(f"\n#{i} ME value: {wgt.numpy():.3e} for P set:\n{p.numpy()}")
