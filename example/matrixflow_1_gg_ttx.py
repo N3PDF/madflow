@@ -1,6 +1,6 @@
 from alohaflow.config import complex_tf, complex_me, DTYPECOMPLEX
 from alohaflow.wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx
-from alohaflow.vertices_flow import FFV1_0, FFV1_1, FFV1_2, VVV1P0_1
+from vertices_flow import FFV1_0, FFV1_1, FFV1_2, VVV1P0_1
 
 from vegasflow.configflow import int_me, float_me, DTYPE, DTYPEINT
 from vegasflow import run_eager

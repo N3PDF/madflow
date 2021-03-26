@@ -2,7 +2,7 @@
     Tensorised vertex functions
 """
 
-from .config import complex_tf, complex_me, DTYPECOMPLEX, DTYPE
+from alohaflow.config import complex_tf, complex_me, DTYPECOMPLEX, DTYPE
 import tensorflow as tf
 
 vertex_signature = [
