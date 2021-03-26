@@ -1,11 +1,12 @@
+from alohaflow.config import complex_tf, complex_me, DTYPECOMPLEX
+from alohaflow.wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx
+from alohaflow.vertices_flow import FFV1_0, FFV1_1, FFV1_2, VVV1P0_1
+
 from vegasflow.configflow import int_me, float_me, DTYPE, DTYPEINT
 from vegasflow import run_eager
 import tensorflow as tf
 import collections
 ModelParamTuple = collections.namedtuple("Model", ["mdl_MT", "mdl_WT", "GC_10", "GC_11"])
-from wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx
-from vertices_flow import FFV1_0, FFV1_1, FFV1_2, VVV1P0_1
-from config import complex_tf, complex_me, DTYPECOMPLEX
 
 def get_model_param(model):
     mdl_MT = model.get('parameter_dict')["mdl_MT"]

@@ -1,5 +1,24 @@
+"""
+    Default settings for alohaFlow
+
+    Since this program is to be installed together with VegasFlow
+    it is allow to take the configuration from there
+"""
+
+from vegasflow.configflow import (
+    run_eager,
+    DTYPE,
+    DTYPEINT,
+    int_me,
+    float_me,
+    fzero,
+    fone,
+    ione,
+    izero,
+)
+
 import tensorflow as tf
-from vegasflow.configflow import float_me, DTYPE, DTYPEINT
+
 if DTYPE == tf.float64:
     DTYPECOMPLEX = tf.complex128
 else:
@@ -15,7 +34,6 @@ def complex_tf(real, imag):
     return tf.complex(real, imag)
 
 
-# TODO: check if this is really needed
 def complex_me(cmp):
     """ Cast the input to complex type """
     # print("complex me")
