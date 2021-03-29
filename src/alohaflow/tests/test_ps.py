@@ -32,3 +32,8 @@ def test_rambo(sqrts=7e3, max_n=8):
     """ Check that rambo produces the right type of phase space """
     for n in range(2, max_n):
         auto_test_rambo_massless(n, sqrts)
+
+    # Check that it also accepts a variable input energy
+    events = 13
+    variable_sqrts = tf.random.uniform((13,), dtype=DTYPE)*sqrts
+    auto_test_rambo_massless(n, variable_sqrts, n_events=events)
