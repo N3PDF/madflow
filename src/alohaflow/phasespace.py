@@ -5,9 +5,7 @@
     When a complete set of momenta is output the structure is (n_events, n_particles, n_dim)
 """
 
-from .config import float_me, run_eager, DTYPE
-
-run_eager(True)
+from .config import float_me, DTYPE, run_eager
 
 import numpy as np
 import tensorflow as tf
@@ -19,9 +17,18 @@ ACC = float_me(1e-10)
 logger = logging.getLogger(__name__)
 
 # Helpers for rambo
+events_signature = tf.TensorSpec(shape=[None, 1], dtype=DTYPE)
+p_signature = tf.TensorSpec(shape=[None, 4], dtype=DTYPE)
+ps_signature = tf.TensorSpec(shape=[None, None, 4], dtype=DTYPE)
 
 
-@tf.function
+@tf.function(
+    input_signature=[
+        events_signature,
+        tf.TensorSpec(shape=[None], dtype=DTYPE),
+        tf.TensorSpec(shape=[None, None], dtype=DTYPE),
+    ]
+)
 def _massive_xfactor(sqrts, masses, massless_energies):
     """
     Takes as input the total energy of the system
@@ -85,6 +92,19 @@ def _massive_xfactor(sqrts, masses, massless_energies):
     return xfactor, new_E
 
 
+@tf.function(input_signature=[p_signature, p_signature])
+def _conformal_transformation(input_q, bquad):
+    """ Perform the conformal transformation q->p """
+    bvec = bquad[:, 1:]
+    gamma = -bquad[:, 0:1]
+    a = 1.0 / (1.0 + gamma)
+    bq = tf.reduce_sum(input_q[:, 1:] * bvec, axis=1, keepdims=True)
+    tmp = bq * a + input_q[:, 0:1]
+    pvec = input_q[:, 1:] + bvec * tmp  # (n_events, 3)
+    pnrg = input_q[:, 0:1] * gamma + bq
+    return tf.concat([pnrg, pvec], axis=1)  # (n_events, 4)
+
+
 def _gen_unconstrained_momenta(xrand):
     """
     Generates unconstrained 4-momenta
@@ -139,23 +159,15 @@ def rambo(xrand, n_particles, sqrts, masses=None, check_physical=False):
     all_q = [_gen_unconstrained_momenta(xrand[:, i * 4 : (i + 1) * 4]) for i in range(n_particles)]
     sum_q = tf.reduce_sum(all_q, axis=0)  # (n_events, 4)
     sum_q2 = sum_q ** 2
-    qmass = tf.sqrt(sum_q2[:, 0:1] - tf.reduce_sum(sum_q2[:, 1:], axis=1, keepdims=1))
+    qmass = tf.sqrt(sum_q2[:, 0:1] - tf.reduce_sum(sum_q2[:, 1:], axis=1, keepdims=True))
     x = sqrts / qmass  # (nevents, 1)
     bquad = -sum_q / qmass  # (nevents, 4)
-    bvec = bquad[:, 1:]
-    gamma = -bquad[:, 0:1]
-    a = 1.0 / (1.0 + gamma)
 
     # Perform the conformal transformation q -> p
-    all_p = []
-    for q in all_q:
-        bq = tf.reduce_sum(q[:, 1:] * bvec, axis=1, keepdims=True)
-        tmp = bq * a + q[:, 0:1]
-        pvec = q[:, 1:] + bvec * tmp  # (n_events, 3)
-        pnrg = q[:, 0:1] * gamma + bq
-        p = tf.concat([pnrg, pvec], axis=1) * x  # (n_events, 4)
-        all_p.append(p)
-    all_p = tf.stack(all_p, axis=1)  # (n_events, n_particles, 4)
+    tmp_p = tf.stack(
+        [_conformal_transformation(q, bquad) for q in all_q], axis=1
+    )  # (n_events, n_particles, 4)
+    all_p = tmp_p * tf.expand_dims(x, axis=-1)
 
     # Finally compute the weight for the phase space point
     wt = tf.math.log(PI / 2.0) * (n_particles - 1)
