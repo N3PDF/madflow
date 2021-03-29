@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Helpers for rambo
 
+
 @tf.function
 def _massive_xfactor(sqrts, masses, massless_energies):
     """
@@ -61,7 +62,7 @@ def _massive_xfactor(sqrts, masses, massless_energies):
         different events would have had a different accuracy threshold
         """
         x2 = xfactor ** 2
-        new_E = tf.sqrt(masses2 + e2*x2)
+        new_E = tf.sqrt(masses2 + e2 * x2)
         f0 = tf.reduce_sum(new_E, axis=1, keepdims=True) - sqrts
         g0 = tf.reduce_sum(e2 / new_E, axis=1, keepdims=True)
         next_xfactor = xfactor - f0 / (xfactor * g0)
@@ -125,8 +126,8 @@ def rambo(xrand, n_particles, sqrts, masses=None, check_physical=False):
             logger.warning("Graph-compiled functions assumes all imput is physical")
 
     if isinstance(sqrts, float):
-        sqrts = float_me(sqrts)*tf.ones_like(xrand[:,0])
-    sqrts = tf.reshape(sqrts, (-1,1))
+        sqrts = float_me(sqrts) * tf.ones_like(xrand[:, 0])
+    sqrts = tf.reshape(sqrts, (-1, 1))
 
     if masses is not None:
         if isinstance(masses, list) and np.sum(masses) == 0:
@@ -160,29 +161,27 @@ def rambo(xrand, n_particles, sqrts, masses=None, check_physical=False):
     wt = tf.math.log(PI / 2.0) * (n_particles - 1)
     wt -= 2.0 * tf.math.lgamma(float_me(n_particles - 1))
     wt -= tf.math.log(float_me(n_particles - 1))
-    wt += (2 * n_particles - 4) * tf.math.log(sqrts[:,0])
+    wt += (2 * n_particles - 4) * tf.math.log(sqrts[:, 0])
 
     if masses is None:
         wt = tf.exp(wt) / tf.pow(2 * PI, 3 * n_particles - 4)
         return all_p, wt
 
     # If dealing with massive particles, momenta needs to be rescaled
-    xfactor, new_E = _massive_xfactor(sqrts, masses, all_p[:,:,0])
+    xfactor, new_E = _massive_xfactor(sqrts, masses, all_p[:, :, 0])
 
     # Rescale the momenta
     wt2 = 1.0
     wt3 = 0.0
     v = []
 
-    rescaled_pvec = all_p[:,:,1:]*tf.expand_dims(xfactor, axis=-1)
+    rescaled_pvec = all_p[:, :, 1:] * tf.expand_dims(xfactor, axis=-1)
     massive_p = tf.concat([tf.expand_dims(new_E, axis=-1), rescaled_pvec], axis=-1)
 
     # and weights
-    v = all_p[:,:,0]*xfactor
+    v = all_p[:, :, 0] * xfactor
     wt2 = tf.reduce_prod(v / new_E, axis=1)
-    wt3 = tf.reduce_sum(v**2/new_E, axis=1)
-    wt += (2*n_particles -3)*tf.math.log(xfactor[:,0]) + tf.math.log(wt2/wt3*sqrts[:,0])
+    wt3 = tf.reduce_sum(v ** 2 / new_E, axis=1)
+    wt += (2 * n_particles - 3) * tf.math.log(xfactor[:, 0]) + tf.math.log(wt2 / wt3 * sqrts[:, 0])
     wt = tf.exp(wt) / tf.pow(2 * PI, 3 * n_particles - 4)
     return massive_p, wt
-
-
