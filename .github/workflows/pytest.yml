@@ -30,5 +30,10 @@ jobs:
         pylint src/*/*.py --exit-zero
     - name: Test with pytest
       run: |
-        pip install pytest
+        pip install pytest, pdfflow
+        mkdir -p /tmp/LHAPDF/
+        cd /tmp/LHAPDF
+        wget http://pcteserver.mi.infn.it/~nnpdf/nnpdf31/NNPDF31_nnlo_as_0108.tar.gz
+        tar xvfz NNPDF31_nnlo_as_0108.tar.gz
+        cd -
         pytest
