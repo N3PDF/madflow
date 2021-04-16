@@ -15,7 +15,7 @@
     Link that folder to this script in the first line below (`matrix_elm_folder`).
 """
 # matrix_elm_folder = "../../vegasflow_example/"
-matrix_elm_folder = "../../mg5amcnlo/bin/vegasflow_example"
+matrix_elm_folder = "../../mg5amcnlo/vegasflow_example"
 
 import os, argparse
 
@@ -42,7 +42,6 @@ phimin = fzero
 phimax = float_me(2.0 * np.pi)
 
 ######### Import the matrix elements and the necessary models
-all_matrices = []
 all_matrices_flow = []
 model = None
 base_model = "models/sm"
@@ -67,28 +66,18 @@ for matrix_file in glob.glob(f"{matrix_elm_folder}/matrix_*.py"):
     module = importlib.util.module_from_spec(module_spec)
     module_spec.loader.exec_module(module)
     # Now with access to the module, fill the list of matrices (with the object instantiated)
-    all_matrices.append(getattr(module, class_name)())
+    all_matrices_flow.append(getattr(module, class_name)())
 
 # Use the last module to load its model (all matrices should be using the same one!)
 root_path = getattr(module, "root_path")
 import_ufo = getattr(module, "import_ufo")
 model = import_ufo.import_model(f"{root_path}/{base_model}")
 
-# Import the parallel matrix
-from matrixflow_1_gg_ttx import Matrixflow_1_gg_ttx, get_model_param
-
-all_matrices_flow = [Matrixflow_1_gg_ttx()]
+get_model_param = getattr(module, "get_model_param")
 model_params = get_model_param(model)
 
 # Clean the path
 sys.path = original_path
-# Uncomment loop below to run a test over the loaded matrix elements
-# for matrix in all_matrices:
-#     # Generate a random momentum according to the number of external particles
-#     # (likely unphysical!)
-#     momenta = np.random.rand(matrix.nexternal,4)*100
-#     print(f"Result: {matrix.smatrix(momenta, model):.5f}")
-#######################################################
 
 ################# Phase space
 @tf.function
@@ -235,21 +224,6 @@ def luminosity(x1, x2, q2array):
     gluon_2 = PDF.xfxQ2(int_me([0]), x2, q2array)
     lumi = gluon_1 * gluon_2
     return lumi / x1 / x2
-
-
-# Minimal working exaple of cross section calculation with vegasflow
-def cross_section(xrand, **kwargs):
-    # IRL we would be gruping matrices by nparticles
-    res = []
-    for matrix in all_matrices:
-        all_ps, wts, x1, x2 = phasespace_generator(xrand, matrix.nexternal)
-        pdf = luminosity(x1, x2, tf.ones_like(x1) * Q2)
-        for ps, wt, ff in zip(
-            all_ps.numpy(), wts.numpy(), pdf.numpy()
-        ):  # when in eager mode, better to loop over numpy
-            res.append(matrix.smatrix(ps, model) * wt * ff)
-    return float_me(res)
-
 
 histo_bins = 10
 fixed_bins = float_me([i*20 for i in range(histo_bins)])
