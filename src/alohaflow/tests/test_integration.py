@@ -15,9 +15,15 @@ def test_integration():
     mockup matrix element.
     Checks that the result is within 3 sigmas of the true result
     """
-    from .mockup_debug_me import Matrix_1_gg_ttx, model_params
+    from alohaflow.tests.mockup_debug_me import Matrix_1_gg_ttx, model_params
     matrix = Matrix_1_gg_ttx()
     pdf = mkPDF("NNPDF31_nnlo_as_0118/0", dirname=git_pdfs)
     res, error = one_matrix_integration(matrix, model_params, pdf=pdf, flavours=(0,), out_masses=[173.0, 173.0])
     true_result = 103.4
     assert np.fabs(true_result - res) < 3*error
+
+if __name__=='__main__':
+    from time import time as tm
+    start = tm()
+    test_integration()
+    print(f"Program done in {tm()-start} s")

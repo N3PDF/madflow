@@ -37,3 +37,9 @@ def test_rambo(sqrts=7e3, max_n=8):
     events = 13
     variable_sqrts = tf.random.uniform((13,), dtype=DTYPE)*sqrts
     auto_test_rambo_massless(n, variable_sqrts, n_events=events)
+
+if __name__=='__main__':
+    from time import time as tm
+    start = tm()
+    test_rambo()
+    print(f"Program done in {tm()-start} s")
