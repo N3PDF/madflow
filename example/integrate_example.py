@@ -299,10 +299,7 @@ if __name__ == "__main__":
 
     arger = argparse.ArgumentParser(
         """
-    Example script to integrate Madgraph generated matrix element.
-
-    By default first it the original mg5 matrix element will be run (which is not compiled)
-    and then the vegasflow-compatible one (compiled).
+    Example script to integrate Madgraph tensorflow compatible generated matrix element.
 
     In order to generate comparable results it is necessary to set the seed (-s) and not compile the integrand
         ~$ ./integrate_example.py -s 4 -r
@@ -325,9 +322,6 @@ if __name__ == "__main__":
     )
     arger.add_argument("-r", "--reproducible", help="Run in reproducible mode", action="store_true")
     arger.add_argument("-e", "--eager", help="Run eager", action="store_true")
-    arger.add_argument(
-        "-v", "--only_vegasflow", help="Run only the Vegasflow ME", action="store_true"
-    )
     args = arger.parse_args()
 
     if args.eager:
@@ -339,15 +333,6 @@ if __name__ == "__main__":
     n_events = args.nevents
 
     seed = args.set_seed
-
-    # Run the Madgraph ME
-    if not args.only_vegasflow:
-        vegas_integrator = VegasFlow(n_dim, n_events)
-        vegas_integrator.set_seed(seed)
-        vegas_integrator.compile(cross_section, compilable=False)
-        start = tm()
-        vegas_integrator.run_integration(n_iter)
-        print(f"Vegasflow integration with original mg5 smatrix function done in: {tm()-start} s")
 
     # Run the Parallel ME
     new_vegas = VegasFlow(n_dim, n_events)
