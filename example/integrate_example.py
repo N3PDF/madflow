@@ -14,10 +14,9 @@
     which will generate a vegasflow_example folder with all the required files.
     Link that folder to this script in the first line below (`matrix_elm_folder`).
 """
-# matrix_elm_folder = "../../vegasflow_example/"
-matrix_elm_folder = "../../mg5amcnlo/vegasflow_example"
 
 import os, argparse
+from pathlib import Path
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import numpy as np
@@ -56,28 +55,6 @@ import importlib.util
 import re
 
 re_name = re.compile("\w{3,}")
-original_path = copy.copy(sys.path)
-sys.path.insert(0, matrix_elm_folder)
-for matrix_file in glob.glob(f"{matrix_elm_folder}/matrix_*.py"):
-    matrix_name = re_name.findall(matrix_file)[-1]
-    class_name = matrix_name.capitalize()
-    # This seems unnecesarily complicated to load a class from a file by anyway
-    module_spec = importlib.util.spec_from_file_location(matrix_name, matrix_file)
-    module = importlib.util.module_from_spec(module_spec)
-    module_spec.loader.exec_module(module)
-    # Now with access to the module, fill the list of matrices (with the object instantiated)
-    all_matrices_flow.append(getattr(module, class_name)())
-
-# Use the last module to load its model (all matrices should be using the same one!)
-root_path = getattr(module, "root_path")
-import_ufo = getattr(module, "import_ufo")
-model = import_ufo.import_model(f"{root_path}/{base_model}")
-
-get_model_param = getattr(module, "get_model_param")
-model_params = get_model_param(model)
-
-# Clean the path
-sys.path = original_path
 
 ################# Phase space
 @tf.function
@@ -296,10 +273,43 @@ if __name__ == "__main__":
     )
     arger.add_argument("-r", "--reproducible", help="Run in reproducible mode", action="store_true")
     arger.add_argument("-e", "--eager", help="Run eager", action="store_true")
+    arger.add_argument("-p", "--path", help="Path with the madgraph matrix element", type=Path)
     args = arger.parse_args()
 
     if args.eager:
         run_eager(True)
+
+    if args.path:
+        if not args.path.exists():
+            raise ValueError(f"Cannot find {args.path}")
+        matrix_elm_folder = args.path.as_posix()
+    else:
+        matrix_elm_folder = "../../mg5amcnlo/vegasflow_example"
+    ### go to the madgraph folder and load up anything that you need
+    original_path = copy.copy(sys.path)
+    sys.path.insert(0, matrix_elm_folder)
+    for matrix_file in glob.glob(f"{matrix_elm_folder}/matrix_*.py"):
+        matrix_name = re_name.findall(matrix_file)[-1]
+        class_name = matrix_name.capitalize()
+        # this seems unnecesarily complicated to load a class from a file by anyway
+        module_spec = importlib.util.spec_from_file_location(matrix_name, matrix_file)
+        module = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(module)
+        # now with access to the module, fill the list of matrices (with the object instantiated)
+        all_matrices_flow.append(getattr(module, class_name)())
+
+    # use the last module to load its model (all matrices should be using the same one!)
+    root_path = getattr(module, "root_path")
+    import_ufo = getattr(module, "import_ufo")
+    model = import_ufo.import_model(f"{root_path}/{base_model}")
+
+    get_model_param = getattr(module, "get_model_param")
+    model_params = get_model_param(model)
+
+    # We have matrix and model parameters, clean the path
+    sys.path = original_path
+    ################################################
+
 
     nparticles = 4
     n_dim = (nparticles - 2) * 3 - 2
