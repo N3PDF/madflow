@@ -175,7 +175,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
 
             if aloha.complex_mass:
                 paramsignature = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(parameters+couplings))
-                paramtuple = ",".join(["complex_me(%s)" % p for p in paramters+couplings]) 
+                paramtuple = ",".join(["complex_me(%s)" % p for p in parameters+couplings]) 
 
             else:
                 paramsignature = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPE)'] * len(parameters) + 
@@ -422,6 +422,5 @@ class PyOutExporter(export_python.ProcessExporterPython):
     def finalize(self, matrix_elements, history, mg5options, flaglist):
         """ do nothing at the moment"""
         pass
-
 
 
