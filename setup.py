@@ -4,8 +4,13 @@
 
 from setuptools import setup, find_packages
 
-
-requirements = ["tensorflow", "vegasflow"]
+requirements = ['vegasflow']
+if version_info.major >=3 and version_info.minor >= 9:
+    # For python above 3.9 the only existing TF is 2.5 which works well (even pre releases)
+    tf_pack = "tensorflow"
+else:
+    tf_pack = "tensorflow>2.1"
+requirements.append(tf_pack)
 package_name = "alohaflow"
 description = "Tensorized verson of ALOHA package"
 
@@ -28,5 +33,6 @@ setup(
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Physics",
     ],
+    python_requires='>=3.6',
     install_requires=requirements,
 )
