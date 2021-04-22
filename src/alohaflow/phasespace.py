@@ -35,9 +35,9 @@ def _massive_xfactor(sqrts, masses, massless_energies):
     the masses of the external particles
     and the energies of the (massless) phase space
     computes the new energies and the necessary rescaling of the
-    momenta
+    momenta.
 
-    This relies in an iterative process which is can't be naively parallelized
+    This relies in an iterative process which can't be naively parallelized
     over the number of events.
     Instead we loop until all points are below the desired accuracy or the maximum
     number of iterations is reached.
