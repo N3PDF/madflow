@@ -21,16 +21,38 @@ sys.path = original_path
 __package__ = None
 ################################################
 
+class EventFlow(lhe_parser.Event):
+    def __init__(self, info, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.nexternal = info.get('nexternal')
+        self.ievent    = info.get('ievent')
+        self.wgt       = info.get('wgt')
+        self.aqcd      = info.get('aqcd')
+        self.scale     = info.get('scale')
+        self.aqed      = info.get('aqed')
+        self.tag       = info.get('tag')
+        self.comment   = info.get('comment')
+    
+    def add_particles(self, particles):
+        self.extend(particles)
 
-def set_attributes_from_dict(obj, d):
-    """
-    Parameters
-    ----------
-        - obj : obj, class instance
-        - d   : dict, key-value dictionary to update obj attributes
-    """
-    for key, value in d.items():
-        setattr(obj, key, value)
+
+class ParticleFlow(lhe_parser.Particle):
+    def __init__(self, info, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pid      = info.get('pid')
+        self.status   = info.get('status')
+        self.mother1  = info.get('mother1')
+        self.mother2  = info.get('mother2')
+        self.color1   = info.get('color1')
+        self.color2   = info.get('color2')
+        self.px       = info.get('px')
+        self.py       = info.get('py')
+        self.pz       = info.get('pz')
+        self.E        = info.get('E')
+        self.mass     = info.get('mass')
+        self.vtim     = info.get('vtim')
+        self.helicity = info.get('helicity')
 
 
 def dump_lhe_banner(out):
@@ -56,15 +78,10 @@ def dump_lhe_events(evt_info, part_info, out):
         - out       : _io.TextIOWrapper, output file object
     """
     for info, p_info in zip(evt_info, part_info):
-        evt = lhe_parser.Event()
-        set_attributes_from_dict(evt, info)
+        evt = EventFlow(info)
 
-        particles = []
-        for info in p_info:
-            p = lhe_parser.Particle(event=evt)
-            set_attributes_from_dict(p, info)
-            particles.append(p)
-        evt.extend(particles)
+        particles = [ParticleFlow(pinfo, event=evt) for pinfo in p_info]
+        evt.add_particles(particles)
         out.write(str(evt).encode('utf-8'))
 
 
