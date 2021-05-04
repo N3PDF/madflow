@@ -26,7 +26,7 @@ from vegasflow import VegasFlow, float_me, run_eager, int_me
 from vegasflow.utils import consume_array_into_indices
 from pdfflow import mkPDF
 from pdfflow.functions import _condition_to_idx
-from pdfflow.configflow import fzero, fone
+from pdfflow.configflow import fzero, fone, DTYPE
 
 import tensorflow as tf
 
@@ -206,10 +206,11 @@ histo_bins = 10
 fixed_bins = float_me([i*20 for i in range(histo_bins)])
 
 # Integrand with accumulator:
-def generate_integrand(cummulator_tensor):
+def generate_integrand(cummulator_tensor, lhe_path):
     """ 
     This function will generate an integrand function
-    which will already hold a reference to the tensor to accumulate
+    which will already hold a reference to the tensor to accumulate.
+    `lhe_path` instructs where to save the Les Houches Event file
     """
 
     @tf.function
@@ -228,6 +229,58 @@ def generate_integrand(cummulator_tensor):
         # Then update the results of current_histograms
         new_histograms = partial_hist + current_histograms
         cummulator_tensor.assign(new_histograms)
+    
+    def lhe_parser (all_ps, res):
+        _, nexternal, _ = all_ps.shape
+        events_info = [{
+            'nexternal': nexternal,
+            'ievent': 1,
+            'wgt': wgt,
+            'aqcd': 0.0,  # alpha strong value, get this from vegasflow?
+            'scale': 0.0, # Q^2 scale for pdfs, get this from vegasflow?
+            'aqed': 0.0,  # alpha EW value    , get this from vegasflow?
+            'tag': '',
+            'comment': ''
+        } for wgt in res.numpy()]
+
+        index_to_pid = {
+            0: 2212, # p
+            1: 2212, # p
+            2: 6,    # t
+            3: -6    # t~
+        }
+
+        index_to_status = {
+            0: -1, # incoming particle
+            1: -1, # incoming particle
+            2:  1, # outgoing particle
+            3:  1, # outgoing particle
+        }
+
+        # we are missing the virtual particles
+        particles_info = [
+            [{
+            'pid': index_to_pid[i],
+            'status': index_to_status[i],
+            'mother1': 0,
+            'mother2': 0,
+            'color1': 0,
+            'color2': 0,
+            'E': ps[0],
+            'px': ps[1],
+            'py': ps[2],
+            'pz': ps[3],
+            'mass': np.sqrt(ps[0]**2 - ps[1]**2 - ps[2]**2 - ps[3]**2), # vectorize this?
+            'vtim': 0,
+            'helicity': 0,
+            } for i, ps in enumerate(ps_external)
+        ] for ps_external in all_ps.numpy()]
+
+        from lhe_parse_example import dump_lhe
+        dump_lhe([events_info, particles_info], lhe_path)
+
+        return float_me(0.0)
+        
 
 # Minimal working example of tf vectorized cross section function
     def cross_section_flow(xrand, weight=1.0, **kwargs):
@@ -241,6 +294,7 @@ def generate_integrand(cummulator_tensor):
             # Histogram results on the pt of particle 3 (one of the tops)
             pt = tf.sqrt(all_ps[:,3,1]**2 + all_ps[:,3,2]**2)
             histogram_collector(res*weight, (pt,))
+            tf.py_function(func=lhe_parser, inp=[all_ps, res], Tout=DTYPE)
         return res
 
     return cross_section_flow
@@ -274,6 +328,7 @@ if __name__ == "__main__":
     arger.add_argument("-r", "--reproducible", help="Run in reproducible mode", action="store_true")
     arger.add_argument("-e", "--eager", help="Run eager", action="store_true")
     arger.add_argument("-p", "--path", help="Path with the madgraph matrix element", type=Path)
+    # arger.add_argument("-l", "--lhe", help="Path with the Les Houches Event file", type=Path)
     args = arger.parse_args()
 
     if args.eager:
@@ -308,6 +363,11 @@ if __name__ == "__main__":
 
     # We have matrix and model parameters, clean the path
     sys.path = original_path
+
+    # create LHE file directory tree
+    lhe_folder = os.path.join(matrix_elm_folder, 'Events/run_1')
+    Path(lhe_folder).mkdir(parents=True, exist_ok=True)
+    lhe_path = os.path.join(lhe_folder, 'weighted_events.lhe.gz')
     ################################################
 
 
@@ -323,7 +383,7 @@ if __name__ == "__main__":
     new_vegas.set_seed(seed)
     ##  Create a reference to the histograms
     current_histograms = tf.Variable(float_me(tf.zeros(histo_bins)))
-    integrand = generate_integrand(current_histograms)
+    integrand = generate_integrand(current_histograms, lhe_path)
     ## 
     new_vegas.compile(integrand, compilable=not args.reproducible)
     start = tm()

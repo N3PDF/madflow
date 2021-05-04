@@ -6,8 +6,8 @@ import tensorflow as tf
 import numpy as np
 from time import time as tm
 
-import collections
-momentum = collections.namedtuple("Momentum", ['E', 'px', 'py', 'pz'])
+# import collections
+# momentum = collections.namedtuple("Momentum", ['E', 'px', 'py', 'pz'])
 
 ### go to the madgraph folder and load up anything that you need
 original_path = copy.copy(sys.path)
@@ -24,6 +24,7 @@ __package__ = None
 class EventFlow(lhe_parser.Event):
     def __init__(self, info, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
         self.nexternal = info.get('nexternal')
         self.ievent    = info.get('ievent')
         self.wgt       = info.get('wgt')
@@ -40,6 +41,7 @@ class EventFlow(lhe_parser.Event):
 class ParticleFlow(lhe_parser.Particle):
     def __init__(self, info, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         self.pid      = info.get('pid')
         self.status   = info.get('status')
         self.mother1  = info.get('mother1')
@@ -117,7 +119,7 @@ def main():
     } for i in range(nb_events)]
 
     particle_info = [[{
-        'pid': np.random.choice([21,1,2,-1,-2]),
+        'pid': 2212, # np.random.choice([21,1,2,-1,-2]),
         'status': np.random.choice([-1,1,2]),
         'mother1': 0,
         'mother2': 0,
