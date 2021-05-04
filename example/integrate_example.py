@@ -28,6 +28,8 @@ from pdfflow import mkPDF
 from pdfflow.functions import _condition_to_idx
 from pdfflow.configflow import fzero, fone, DTYPE
 
+from alohaflow.lhe_writer import LheWriter
+
 import tensorflow as tf
 
 COM_SQRTS = 7e3
@@ -206,11 +208,11 @@ histo_bins = 10
 fixed_bins = float_me([i*20 for i in range(histo_bins)])
 
 # Integrand with accumulator:
-def generate_integrand(cummulator_tensor, lhe_path):
+def generate_integrand(cummulator_tensor, matrix_elm_folder):
     """ 
     This function will generate an integrand function
     which will already hold a reference to the tensor to accumulate.
-    `lhe_path` instructs where to save the Les Houches Event file
+    `matrix_elm_folder` instructs where to save the Les Houches Event file
     """
 
     @tf.function
@@ -229,7 +231,9 @@ def generate_integrand(cummulator_tensor, lhe_path):
         # Then update the results of current_histograms
         new_histograms = partial_hist + current_histograms
         cummulator_tensor.assign(new_histograms)
-    
+
+    lhe_writer = LheWriter(matrix_elm_folder, run='run_1')
+
     def lhe_parser (all_ps, res):
         _, nexternal, _ = all_ps.shape
         events_info = [{
@@ -276,8 +280,7 @@ def generate_integrand(cummulator_tensor, lhe_path):
             } for i, ps in enumerate(ps_external)
         ] for ps_external in all_ps.numpy()]
 
-        from lhe_parse_example import dump_lhe
-        dump_lhe([events_info, particles_info], lhe_path)
+        lhe_writer.dump(events_info, particles_info)
 
         return float_me(0.0)
         
@@ -297,7 +300,7 @@ def generate_integrand(cummulator_tensor, lhe_path):
             tf.py_function(func=lhe_parser, inp=[all_ps, res], Tout=DTYPE)
         return res
 
-    return cross_section_flow
+    return cross_section_flow, lhe_writer
 
 
 if __name__ == "__main__":
@@ -363,13 +366,7 @@ if __name__ == "__main__":
 
     # We have matrix and model parameters, clean the path
     sys.path = original_path
-
-    # create LHE file directory tree
-    lhe_folder = os.path.join(matrix_elm_folder, 'Events/run_1')
-    Path(lhe_folder).mkdir(parents=True, exist_ok=True)
-    lhe_path = os.path.join(lhe_folder, 'weighted_events.lhe.gz')
     ################################################
-
 
     nparticles = 4
     n_dim = (nparticles - 2) * 3 - 2
@@ -383,12 +380,13 @@ if __name__ == "__main__":
     new_vegas.set_seed(seed)
     ##  Create a reference to the histograms
     current_histograms = tf.Variable(float_me(tf.zeros(histo_bins)))
-    integrand = generate_integrand(current_histograms, lhe_path)
+    integrand, lhe_writer = generate_integrand(current_histograms, matrix_elm_folder)
     ## 
     new_vegas.compile(integrand, compilable=not args.reproducible)
     start = tm()
     # When running the histogram, pass the reference to the histogram so it is accumulated
     new_vegas.run_integration(n_iter, histograms=(current_histograms,))
+    lhe_writer.close()
     print(f"Vegasflow integration with tf vectorized smatrix function done in: {tm()-start} s")
     print(f"Histogram:")
     print(f"   pt_l   |   pt_u   |  ds/dpt")
