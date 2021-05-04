@@ -78,7 +78,8 @@ class LheWriter:
         self.stream = gzip.open(self.lhe_path, 'wb')
 
     def dump_banner(self):
-        pass
+        self.stream.write('<LesHouchesEvent>\n'.encode('utf-8'))
+
 
     def dump_events(self, events_info, particles_info):
         """
@@ -107,7 +108,6 @@ class LheWriter:
             events_info: list, dictionaries for events info
             particles_info: list, dictionaries for particles info
         """
-        self.dump_banner()
         self.dump_events(events_info, particles_info)
     
     def dump(self, *args):
@@ -116,8 +116,13 @@ class LheWriter:
         """
         self.pool.apply_async(self.async_dump, args)
     
-    def close(self):
+    def __exit__(self, exc_type, exc_value, exc_traceback):
         """ Send closing signal to asynchronous dumping pool."""
         self.pool.close()
         self.pool.join()
+        self.stream.write('</LesHouchesEvent>\n'.encode('utf-8'))
         self.stream.close()
+    
+    def __enter__(self):
+        self.dump_banner()
+        return self

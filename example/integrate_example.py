@@ -385,8 +385,8 @@ if __name__ == "__main__":
     new_vegas.compile(integrand, compilable=not args.reproducible)
     start = tm()
     # When running the histogram, pass the reference to the histogram so it is accumulated
-    new_vegas.run_integration(n_iter, histograms=(current_histograms,))
-    lhe_writer.close()
+    with lhe_writer:
+        new_vegas.run_integration(n_iter, histograms=(current_histograms,))
     print(f"Vegasflow integration with tf vectorized smatrix function done in: {tm()-start} s")
     print(f"Histogram:")
     print(f"   pt_l   |   pt_u   |  ds/dpt")
