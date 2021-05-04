@@ -1,7 +1,4 @@
-import sys
-import os
-import gzip
-import copy
+import sys, os, six, gzip, copy
 import numpy as np
 from pathlib import Path
 from multiprocessing.pool import ThreadPool as Pool
@@ -52,6 +49,7 @@ class ParticleFlow(lhe_parser.Particle):
         self.mass     = info.get('mass')
         self.vtim     = info.get('vtim')
         self.helicity = info.get('helicity')
+
 
 class LheWriter:
     def __init__(self, folder, run='run_1'):
@@ -126,3 +124,11 @@ class LheWriter:
     def __enter__(self):
         self.dump_banner()
         return self
+
+class EventFileFlow(lhe_parser.EventFile):
+    def __init__(self, path, mode='r', *args, **kwargs):
+        super().__init__(path, mode, *args, **kwargs)
+
+class FourMomentumFlow(lhe_parser.FourMomentum):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)

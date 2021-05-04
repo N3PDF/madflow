@@ -331,7 +331,6 @@ if __name__ == "__main__":
     arger.add_argument("-r", "--reproducible", help="Run in reproducible mode", action="store_true")
     arger.add_argument("-e", "--eager", help="Run eager", action="store_true")
     arger.add_argument("-p", "--path", help="Path with the madgraph matrix element", type=Path)
-    # arger.add_argument("-l", "--lhe", help="Path with the Les Houches Event file", type=Path)
     args = arger.parse_args()
 
     if args.eager:
