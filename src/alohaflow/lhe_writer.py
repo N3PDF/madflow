@@ -1,7 +1,11 @@
 import sys, os, six, gzip, copy
+from time import time as tm
 import numpy as np
 from pathlib import Path
 from multiprocessing.pool import ThreadPool as Pool
+import logging
+
+logger = logging.getLogger(__name__)
 
 ### go to the madgraph folder and load up anything that you need
 original_path = copy.copy(sys.path)
@@ -13,7 +17,30 @@ from madgraph.various import lhe_parser
 
 sys.path = original_path
 __package__ = None
+
 ################################################
+
+def do_unweighting(wgt_path, unwgt_path=None):
+    """
+    From an LHE file of weighted events, do unweighting and produce a new LHE
+    file of unweighted events.
+
+    Parameters
+    ----------
+        wgt_path: str, input LHE file to load events from
+        unwgt_path: str, output file, defaults to `unweighted_events.lhe.gz`
+
+    Returns
+    -------
+        EventFileFlow object
+    """
+    lhe = EventFileFlow(wgt_path)
+    if not unwgt_path:
+        fname = "unweighted_events.lhe.gz"
+        unwgt_path = Path(wgt_path).with_name(fname).as_posix()
+    nb_keep = lhe.unweight(unwgt_path)
+    return lhe, nb_keep # does unweight method modify the lhe object ?
+
 
 class EventFlow(lhe_parser.Event):
     def __init__(self, info, *args, **kwargs):
@@ -52,7 +79,7 @@ class ParticleFlow(lhe_parser.Particle):
 
 
 class LheWriter:
-    def __init__(self, folder, run='run_1'):
+    def __init__(self, folder, run='run_1', unweight=False):
         """
         Utility class to write Les Houches Event (LHE) file info: writes LHE
         events to <folder>/Events/<run>/weighted_events.lhe.gz
@@ -61,10 +88,12 @@ class LheWriter:
         ----------
             folder: str, the matrix element folder
             run: str, the run name
-        
+            unweight: bool, wether to unweight or not events before objects goes
+                      out of scope        
         """
         self.folder = folder
         self.run = run
+        self.unweight = unweight
         self.pool = Pool(processes=1)
         self.build_folder_and_check_streamer()
 
@@ -74,6 +103,28 @@ class LheWriter:
         Path(lhe_folder).mkdir(parents=True, exist_ok=True)
         self.lhe_path = os.path.join(lhe_folder, 'weighted_events.lhe.gz')
         self.stream = gzip.open(self.lhe_path, 'wb')
+    
+    def __enter__(self):
+        self.dump_banner()
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        """ Send closing signal to asynchronous dumping pool."""
+        self.pool.close()
+        self.pool.join()
+        self.stream.write('</LesHouchesEvent>\n'.encode('utf-8'))
+        logger.debug(f"Saved LHE file at {self.lhe_path}")
+        self.stream.close()
+        if self.unweight:
+            logger.debug("Unweighting ...")
+            start = tm()
+            lhe, nb_keep = do_unweighting(self.lhe_path)
+            end = tm()-start
+            log = "Unweighting stats: kept %d events out of %d (efficiency %.2g %%, time %.5f)" \
+                        %(nb_keep, len(lhe), nb_keep/len(lhe)*100, end)
+            logger.info(log)
+            # print(log)
+
 
     def dump_banner(self):
         self.stream.write('<LesHouchesEvent>\n'.encode('utf-8'))
@@ -113,21 +164,12 @@ class LheWriter:
         Dumps info asynchronously.
         """
         self.pool.apply_async(self.async_dump, args)
-    
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        """ Send closing signal to asynchronous dumping pool."""
-        self.pool.close()
-        self.pool.join()
-        self.stream.write('</LesHouchesEvent>\n'.encode('utf-8'))
-        self.stream.close()
-    
-    def __enter__(self):
-        self.dump_banner()
-        return self
+
 
 class EventFileFlow(lhe_parser.EventFile):
     def __init__(self, path, mode='r', *args, **kwargs):
         super().__init__(path, mode, *args, **kwargs)
+
 
 class FourMomentumFlow(lhe_parser.FourMomentum):
     def __init__(self, *args, **kwargs):

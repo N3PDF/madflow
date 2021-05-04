@@ -208,11 +208,22 @@ histo_bins = 10
 fixed_bins = float_me([i*20 for i in range(histo_bins)])
 
 # Integrand with accumulator:
-def generate_integrand(cummulator_tensor, matrix_elm_folder):
+def generate_integrand(cummulator_tensor, matrix_elm_folder, unweight):
     """ 
-    This function will generate an integrand function
-    which will already hold a reference to the tensor to accumulate.
-    `matrix_elm_folder` instructs where to save the Les Houches Event file
+    This function will generate an integrand function which will already hold a
+    reference to the tensor to accumulate.
+
+    Parameters
+    ----------
+        cummulator_tensor: tf.Variable
+        matrix_elm_folder: str
+        unweight: bool, wether to unweight or not events
+    
+    Returns
+    -------
+        cross_section_flow: function, vegasflow integrand
+        lhe_writer: LheWriter object, with statement wrapper for
+                    vegasflow.run_integration
     """
 
     @tf.function
@@ -232,7 +243,7 @@ def generate_integrand(cummulator_tensor, matrix_elm_folder):
         new_histograms = partial_hist + current_histograms
         cummulator_tensor.assign(new_histograms)
 
-    lhe_writer = LheWriter(matrix_elm_folder, run='run_1')
+    lhe_writer = LheWriter(matrix_elm_folder, run='run_1', unweight=unweight)
 
     def lhe_parser (all_ps, res):
         _, nexternal, _ = all_ps.shape
@@ -302,6 +313,45 @@ def generate_integrand(cummulator_tensor, matrix_elm_folder):
 
     return cross_section_flow, lhe_writer
 
+def collect_rapidity(filename):
+    """ Collects events particles rapidity from LHE file. Cut on
+    absolute rapidity: etaabs < 4.
+    
+    Parameters
+    ----------
+        filename: str, LHE file to extract particle rapidities from
+    
+    Returns
+    -------
+        nb_pass: int, number of particles passing the cut
+        nbins: int, number of bins to compute histogram
+        data: list, particles rapities of length=(num particles)
+        wgts: list, event weights of length=(num particles)
+    """
+    from alohaflow.lhe_writer import EventFileFlow, FourMomentumFlow
+    lhe = EventFileFlow(filename)
+    nbins = 100
+        
+    nb_pass = 0
+    data = []
+    wgts = []
+    for event in lhe:
+        etaabs = 0 
+        etafinal = 0
+        for particle in event:
+            if particle.status==1:
+                p = FourMomentumFlow(particle)
+                eta = p.pseudorapidity
+                if abs(eta) > etaabs:
+                    etafinal = eta
+                    etaabs = abs(eta)
+        if etaabs < 4:
+            data.append(etafinal)
+            wgts.append(event.wgt)
+            nb_pass +=1
+    return  nb_pass, nbins, data, wgts
+
+
 
 if __name__ == "__main__":
 
@@ -331,6 +381,7 @@ if __name__ == "__main__":
     arger.add_argument("-r", "--reproducible", help="Run in reproducible mode", action="store_true")
     arger.add_argument("-e", "--eager", help="Run eager", action="store_true")
     arger.add_argument("-p", "--path", help="Path with the madgraph matrix element", type=Path)
+    arger.add_argument("-u", "--unweight", help="Unweight events", action="store_true")
     args = arger.parse_args()
 
     if args.eager:
@@ -379,7 +430,7 @@ if __name__ == "__main__":
     new_vegas.set_seed(seed)
     ##  Create a reference to the histograms
     current_histograms = tf.Variable(float_me(tf.zeros(histo_bins)))
-    integrand, lhe_writer = generate_integrand(current_histograms, matrix_elm_folder)
+    integrand, lhe_writer = generate_integrand(current_histograms, matrix_elm_folder, args.unweight)
     ## 
     new_vegas.compile(integrand, compilable=not args.reproducible)
     start = tm()
@@ -397,3 +448,37 @@ if __name__ == "__main__":
         else:
             pt_u = "inf"
         print(f"{pt_l.center(10)}|{pt_u.center(10)}| {wgt:.5f}")
+    
+    if args.unweight:
+        import matplotlib.pyplot as plt
+        import matplotlib.gridspec as gridspec
+        lhe_folder = os.path.dirname(lhe_writer.lhe_path)
+        weighted_path = os.path.join(lhe_folder, 'weighted_events.lhe.gz')
+        unweighted_path = os.path.join(lhe_folder, 'unweighted_events.lhe.gz')
+
+        wgt_nb_pass, wgt_nbins, wgt_data, wgt_wgts = collect_rapidity(weighted_path)
+        unwgt_nb_pass, unwgt_nbins, unwgt_data, unwgt_wgts = collect_rapidity(unweighted_path)
+                        
+        gs1 = gridspec.GridSpec(2, 1, height_ratios=[5,1])
+        gs1.update(wspace=0, hspace=0) # set the spacing between axes. 
+        ax = plt.subplot(gs1[0])
+        
+        label = f"wgt, {wgt_nb_pass} entries"
+        wgt_n, wgt_bins, wgt_patches = ax.hist(wgt_data, wgt_nbins, weights=wgt_wgts, histtype='step', label=label)
+        label = f"unwgt, {unwgt_nb_pass} entries"
+        unwgt_n, unwgt_bins, unwgt_patches = ax.hist(unwgt_data, unwgt_nbins, weights=unwgt_wgts, histtype='step', label=label)
+        ax_c = ax.twinx()
+        ax_c.set_ylabel('MadFlow')
+        ax_c.yaxis.set_label_coords(1.01, 0.25)
+        ax_c.set_yticks(ax.get_yticks())
+        ax_c.set_yticklabels([])
+        ax.set_xlim([-4,4])
+        ax.set_xlabel('\N{GREEK SMALL LETTER ETA}', loc='right')
+        ax.legend(loc='upper left')
+
+        plt.axis('on')
+        plt.xlabel('weight ratio')
+        fname = os.path.join(lhe_folder, 'rapidity.png')
+        print(f"Saved rapidity histogram at {fname}")
+        plt.savefig(fname, bbox_inches='tight', dpi=200)
+        plt.close()
