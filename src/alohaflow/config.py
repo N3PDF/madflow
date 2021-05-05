@@ -43,7 +43,7 @@ import os, logging
 module_name = __name__.split(".")[0]
 logger = logging.getLogger(module_name)
 
-DEFAULT_LOG_LEVEL = "3"
+DEFAULT_LOG_LEVEL = "2"
 log_level_idx = os.environ.get("ALOHAFLOW_LOG_LEVEL", DEFAULT_LOG_LEVEL)
 log_dict = {"0": logging.ERROR, "1": logging.WARNING, "2": logging.INFO, "3": logging.DEBUG}
 bad_log_warning = None

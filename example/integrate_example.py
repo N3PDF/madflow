@@ -208,7 +208,7 @@ histo_bins = 10
 fixed_bins = float_me([i*20 for i in range(histo_bins)])
 
 # Integrand with accumulator:
-def generate_integrand(cummulator_tensor, matrix_elm_folder, unweight, event_target):
+def generate_integrand(cummulator_tensor, matrix_elm_folder, no_unweight, event_target):
     """ 
     This function will generate an integrand function which will already hold a
     reference to the tensor to accumulate.
@@ -216,8 +216,8 @@ def generate_integrand(cummulator_tensor, matrix_elm_folder, unweight, event_tar
     Parameters
     ----------
         cummulator_tensor: tf.Variable
-        matrix_elm_folder: str
-        unweight: bool, wether to unweight or not events
+        matrix_elm_folder: Path, path to madflow output folder
+        no_unweight: bool, wether to unweight or not events
         event_target: int, number of requested unweighted events
     
     Returns
@@ -244,7 +244,7 @@ def generate_integrand(cummulator_tensor, matrix_elm_folder, unweight, event_tar
         new_histograms = partial_hist + current_histograms
         cummulator_tensor.assign(new_histograms)
 
-    lhe_writer = LheWriter(matrix_elm_folder, run='run_01', unweight=unweight, event_target=event_target)
+    lhe_writer = LheWriter(matrix_elm_folder, run='run_01', no_unweight=no_unweight, event_target=event_target)
 
     def lhe_parser (all_ps, res):
         """
@@ -315,7 +315,7 @@ def generate_integrand(cummulator_tensor, matrix_elm_folder, unweight, event_tar
             # Histogram results on the pt of particle 3 (one of the tops)
             pt = tf.sqrt(all_ps[:,3,1]**2 + all_ps[:,3,2]**2)
             histogram_collector(res*weight, (pt,))
-            tf.py_function(func=lhe_parser, inp=[all_ps, res], Tout=DTYPE)
+            tf.py_function(func=lhe_parser, inp=[all_ps, res*weight], Tout=DTYPE)
         return res
 
     return cross_section_flow, lhe_writer
@@ -355,7 +355,7 @@ if __name__ == "__main__":
         "-p", "--path", help="Path with the madgraph matrix element", type=Path
     )
     arger.add_argument(
-        "-u", "--unweight", help="Unweight events", action="store_true"
+        "--no_unweight", help="Do no unweight events", action="store_true", default=False
     )
     arger.add_argument(
         "--event_target", help="Number of unweighted events", type=int, default=0
@@ -409,15 +409,17 @@ if __name__ == "__main__":
     ##  Create a reference to the histograms
     current_histograms = tf.Variable(float_me(tf.zeros(histo_bins)))
     integrand, lhe_writer = generate_integrand(
-                                current_histograms, matrix_elm_folder,
-                                args.unweight, args.event_target
+                                current_histograms, Path(matrix_elm_folder),
+                                args.no_unweight, args.event_target
                                               )
     ## 
     new_vegas.compile(integrand, compilable=not args.reproducible)
     start = tm()
     # When running the histogram, pass the reference to the histogram so it is accumulated
     with lhe_writer:
-        new_vegas.run_integration(n_iter, histograms=(current_histograms,))
+        cross, err = new_vegas.run_integration(n_iter, histograms=(current_histograms,))
+        lhe_writer.cross = cross
+        lhe_writer.err   = err
     print(f"Vegasflow integration with tf vectorized smatrix function done in: {tm()-start} s")
     print(f"Histogram:")
     print(f"   pt_l   |   pt_u   |  ds/dpt")

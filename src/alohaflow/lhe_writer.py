@@ -21,28 +21,6 @@ __package__ = None
 
 ################################################
 
-def do_unweighting(wgt_path, unwgt_path=None, event_target=0):
-    """
-    From an LHE file of weighted events, do unweighting and produce a new LHE
-    file of unweighted events.
-
-    Parameters
-    ----------
-        wgt_path: str, input LHE file to load events from
-        unwgt_path: str, output file, defaults to `unweighted_events.lhe.gz`
-
-    Returns
-    -------
-        EventFileFlow object
-    """
-    lhe = EventFileFlow(wgt_path)
-    if not unwgt_path:
-        fname = "unweighted_events.lhe.gz"
-        unwgt_path = Path(wgt_path).with_name(fname).as_posix()
-    nb_keep = lhe.unweight(unwgt_path, event_target=event_target)
-    return lhe, nb_keep # does unweight method modify the lhe object ?
-
-
 class EventFlow(lhe_parser.Event):
     def __init__(self, info, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -80,57 +58,70 @@ class ParticleFlow(lhe_parser.Particle):
 
 
 class LheWriter:
-    def __init__(self, folder, run='run_01', unweight=False, event_target=0):
+    def __init__(self, folder, run='run_01', no_unweight=False, event_target=0):
         """
         Utility class to write Les Houches Event (LHE) file info: writes LHE
         events to <folder>/Events/<run>/weighted_events.lhe.gz
 
         Parameters
         ----------
-            folder: str, the matrix element folder
+            folder: Path, the madflow output folder
             run: str, the run name
-            unweight: bool, wether to unweight or not events before objects goes
+            no_unweight: bool, wether to unweight or not events before objects goes
                       out of scope
             event_target: int, number of requested unweighted events
         """
         self.folder = folder
         self.run = run
-        self.unweight = unweight
+        self.no_unweight = no_unweight
         self.event_target = event_target
         self.pool = Pool(processes=1)
-        self.build_folder_and_check_streamer()
-
-    def build_folder_and_check_streamer(self):
+        
         # create LHE file directory tree
-        lhe_folder = os.path.join(self.folder, f"Events/{self.run}")
-        Path(lhe_folder).mkdir(parents=True, exist_ok=True)
-        self.lhe_path = os.path.join(lhe_folder, 'weighted_events.lhe.gz')
-        self.stream = gzip.open(self.lhe_path, 'wb')
-    
+        lhe_folder = self.folder.joinpath(f"Events/{self.run}")
+        lhe_folder.mkdir(parents=True, exist_ok=True)
+        self.lhe_path = lhe_folder.joinpath('weighted_events.lhe.gz')
+
+        # create I/O stream
+        self.stream = gzip.open(self.lhe_path.as_posix(), 'wb')
+
+
     def __enter__(self):
         self.dump_banner()
         return self
 
+
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        """ Send closing signal to asynchronous dumping pool."""
+        """
+        Send closing signal to asynchronous dumping pool. Triggers unweighting
+        if self.no_unweight is False (default).
+        """
         self.pool.close()
         self.pool.join()
-        self.stream.write('</LesHouchesEvent>\n'.encode('utf-8'))
-        logger.debug(f"Saved LHE file at {self.lhe_path}")
+        self.dump_exit()
+        logger.debug(f"Saved LHE file at {self.lhe_path.as_posix()}")
         self.stream.close()
-        if self.unweight:
+        if not self.no_unweight:
             logger.debug("Unweighting ...")
             start = tm()
-            lhe, nb_keep = do_unweighting(self.lhe_path, event_target=self.event_target)
+            nb_keep, nb_wgt = self.do_unweighting(event_target=self.event_target)
             end = tm()-start
             log = "Unweighting stats: kept %d events out of %d (efficiency %.2g %%, time %.5f)" \
-                        %(nb_keep, len(lhe), nb_keep/len(lhe)*100, end)
+                        %(nb_keep, nb_wgt, nb_keep/nb_wgt*100, end)
             logger.info(log)
-            # TODO: drop weighted events?
 
 
-    def dump_banner(self):
-        self.stream.write('<LesHouchesEvent>\n'.encode('utf-8'))
+    def dump_banner(self, stream=None):
+        """
+        Parameters
+        ----------
+            stream: _io.TextIOWrapper, output file object, if None use default
+                    self.stream
+        """
+        if stream:
+            stream.write('<LesHouchesEvent>\n'.encode('utf-8'))
+        else:
+            self.stream.write('<LesHouchesEvent>\n'.encode('utf-8'))
 
 
     def dump_events(self, events_info, particles_info):
@@ -140,9 +131,8 @@ class LheWriter:
 
         Parameters
         ----------
-            events_info : list, list of events dict info
-            particles_info : list, list particles dict info
-            out : _io.TextIOWrapper, output file object
+            events_info: list, list of events dict info
+            particles_info: list, list particles dict info
         """
         for info, p_info in zip(events_info, particles_info):
             evt = EventFlow(info)
@@ -150,6 +140,21 @@ class LheWriter:
             particles = [ParticleFlow(pinfo, event=evt) for pinfo in p_info]
             evt.add_particles(particles)
             self.stream.write(str(evt).encode('utf-8'))
+
+
+    def dump_exit(self, stream=None):
+        """
+        Parameters
+        ----------
+            stream: _io.TextIOWrapper, output file object, if None use default
+                    self.stream
+        """
+        tag = '</LesHouchesEvent>\n'
+        if stream:
+            stream.write(tag.encode('utf-8'))
+        else:
+            self.stream.write(tag.encode('utf-8'))
+
 
     def async_dump(self, events_info, particles_info):
         """
@@ -161,16 +166,79 @@ class LheWriter:
             particles_info: list, dictionaries for particles info
         """
         self.dump_events(events_info, particles_info)
+
     
     def dump(self, *args):
         """
         Dumps info asynchronously.
         """
         self.pool.apply_async(self.async_dump, args)
+    
+    @property
+    def cross(self):
+        """ VegasFlow integrated cross section. """
+        return self.__cross
+
+
+    @cross.setter
+    def cross(self, value):
+        """ Cross section setter"""
+        self.__cross = value
+
+
+    @property
+    def err(self):
+        """ VegasFlow integrated cross section. """
+        return self.__err
+
+
+    @err.setter
+    def err(self, value):
+        """ Cross section setter"""
+        self.__err = value
+
+    
+    def do_unweighting(self, event_target=0):
+        """
+        Does unweighting. Removes the weighted LHE file.
+        
+        Parameters
+        ----------
+            event_target: int, number of unweighted events requested
+        """
+        # load weighted LHE file
+        lhe = EventFileFlow(self.lhe_path)
+        nb_wgt = len(lhe)
+        
+        # open a tmp stream for unweighted LHE file
+        tmp_path = self.lhe_path.with_name("tmp_unweighted_events.lhe.gz")
+        # unweight
+        nb_keep = lhe.unweight(tmp_path.as_posix(), event_target=event_target)
+
+        # delete weighted LHE file
+        self.lhe_path.unlink()
+        
+        # load tmp file
+        tmp_lhe = EventFileFlow(tmp_path)
+
+        # open a stream for final unweighted LHE file
+        unwgt_path = tmp_path.with_name("unweighted_events.lhe.gz")
+        with gzip.open(unwgt_path.as_posix(), 'wb') as stream:
+            self.dump_banner(stream)
+            for event in tmp_lhe:
+                event.wgt = self.__cross
+                stream.write(str(event).encode('utf-8'))
+            self.dump_exit(stream)
+
+        # delete tmp file
+        tmp_path.unlink()
+        return nb_keep, nb_wgt
 
 
 class EventFileFlow(lhe_parser.EventFile):
     def __init__(self, path, mode='r', *args, **kwargs):
+        if isinstance(path, Path):
+            path = path.as_posix()
         super().__init__(path, mode, *args, **kwargs)
 
 
@@ -180,7 +248,7 @@ class FourMomentumFlow(lhe_parser.FourMomentum):
     
     @property
     def phi(self):
-        """ Return the azimuthal angle. """
+        """ Returns the azimuthal angle. """
         phi = 0.0 if (self.pt == 0.0) else math.atan2(self.py, self.px)
         if (phi < 0.0):
             phi += 2.0*math.pi

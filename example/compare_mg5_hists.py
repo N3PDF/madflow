@@ -23,9 +23,12 @@ def top_hists(lhe, nbins=50, printings=False):
         np.array, containing histogram
         np.array, containing bin edges
     """
+    pt_bins = np.linspace(0,300,nbins+1)
+    eta_bins = np.linspace(-4,4,nbins+1)
     pts  = []
     etas = []
     wgts = []
+    nb_kept = 0
     for event in lhe:
         etaabs = 0 
         etafinal = 0
@@ -38,12 +41,13 @@ def top_hists(lhe, nbins=50, printings=False):
                     etafinal = eta
                     etaabs = abs(eta)
         if etaabs < 4:
+            nb_kept += 1
             etas.append(etafinal)
             wgts.append(event.wgt)
             pts.append(pt)
-    
-    pt_hist = np.histogram(pts, nbins, ) #weights=wgts)
-    eta_hist = np.histogram(etas, nbins, ) #weights=wgts)
+    wgts = np.array(wgts)
+    pt_hist = np.histogram(pts, bins=pt_bins, weights=wgts/nb_kept)
+    eta_hist = np.histogram(etas, bins=eta_bins, weights=wgts/nb_kept)
 
     return pt_hist, eta_hist
 
@@ -56,35 +60,43 @@ def plot_hist(hist_flow, hist_mg5, xlabel, fname):
         hist_flow: list, madflow histogram weights and bin edges
         hist_mg5: list, mg5 histogram weights and bin edges
         xlabel: str, label of x axis
-        fname: str, plot file name
+        fname: Path, plot file name
     """
-    gs1 = gridspec.GridSpec(2, 1, height_ratios=[5,1])
-    gs1.update(wspace=0, hspace=0) # set the spacing between axes. 
-    ax = plt.subplot(gs1[0])
+    fig = plt.figure()
+    gs = fig.add_gridspec(nrows=5, ncols=1, wspace=0.05)
+    ax = fig.add_subplot(gs[:-1])
+    ax.title.set_text('g g > t t~')
 
     h_flow, bins_flow = hist_flow
-    flow_n, flow_bins, flow_patches = ax.hist(
-                bins_flow[:-1], bins_flow, weights=h_flow,
-                histtype='step', label='madflow'
-                                             )
+    ax.step(bins_flow[:-1], h_flow, where='post', label='madflow', lw=0.75)
     h_mg5, bins_mg5 = hist_mg5
-    flow_n, flow_bins, flow_patches = ax.hist(
-                bins_mg5[:-1], bins_mg5, weights=h_mg5,
-                histtype='step', label='mg5_aMC'
-                                             )
-    ax_c = ax.twinx()
-    ax_c.set_ylabel('MadFlow')
-    ax_c.yaxis.set_label_coords(1.01, 0.25)
-    ax_c.set_yticks(ax.get_yticks())
-    ax_c.set_yticklabels([])
-    ax.set_xlabel(xlabel, loc='right')
+    ax.step(bins_mg5[:-1], h_mg5, where='post', label='mg5_aMC', lw=0.75)
+    ax.tick_params(axis='x', which='both', direction='in',
+                   bottom=True, labelbottom=False,
+                   top=True, labeltop=False)
+    ax.tick_params(axis='y', which='both', direction='in',
+                   left=True, labelleft=True,
+                   right=True, labelright=False)
     ax.legend()
 
-    ax.title.set_text('g g > t t~')
-    plt.axis('on')
-    plt.xlabel('weight ratio')
+    ax = fig.add_subplot(gs[-1])
+    ax.set_ylabel("Ratio")
+    ax.step(bins_flow[:-1], (h_flow-h_mg5)/h_mg5, where='post', lw=0.75)
+    ax.plot(
+        [bins_flow[0], bins_flow[-2]], [0,0],
+        lw=0.8, color='black', linestyle='dashed'
+        )
+    ax.set_xlabel(xlabel, loc='right')
+    ax.set_ylim([-1,1])
+    ax.tick_params(axis='x', which='both', direction='in',
+                   bottom=True, labelbottom=True,
+                   top=True, labeltop=False)
+    ax.tick_params(axis='y', which='both', direction='in',
+                   left=True, labelleft=True,
+                   right=True, labelright=False)
+
     print(f"Saved histogram at {fname}")
-    plt.savefig(fname, bbox_inches='tight', dpi=200)
+    plt.savefig(fname.as_posix(), bbox_inches='tight', dpi=300)
     plt.close()
 
 
@@ -101,29 +113,26 @@ def main():
         "--mg5", help="Path to the mg5_aMC output folder", type=Path
     )
     arger.add_argument(
-        "--nbins", help="Path to the mg5_aMC output folder", type=int, default=50
+        "--nbins", help="Path to the mg5_aMC output folder", type=int, default=30
     )
     args = arger.parse_args()
     path_flow = args.madflow.joinpath('Events/run_01/unweighted_events.lhe.gz')
     path_mg5 = args.mg5.joinpath('Events/run_01/unweighted_events.lhe.gz')
-    if path_flow.exists() and path_mg5.exists():
-        path_lhe_flow = path_flow.as_posix()
-        path_lhe_mg5 = path_mg5.as_posix()
-    else:
+    if not (path_flow.exists() and path_mg5.exists()):
         raise FileNotFoundError(f"LHE files with unweighted events do not exist")
     
-    lhe_flow = EventFileFlow(path_lhe_flow)
-    lhe_mg5 = EventFileFlow(path_lhe_mg5)
+    lhe_flow = EventFileFlow(path_flow)
+    lhe_mg5 = EventFileFlow(path_mg5)
 
     print(f"Filling MadFlow histograms with {len(lhe_flow)} events")
-    print(f"Filling mg5_aMC histograms with {len(lhe_mg5)} events")
-
     pt_flow, eta_flow = top_hists(lhe_flow, args.nbins, printings=True)
+
+    print(f"Filling mg5_aMC histograms with {len(lhe_mg5)} events")
     pt_mg5, eta_mg5 = top_hists(lhe_mg5, args.nbins)
 
-    lhe_folder = os.path.dirname(path_lhe_flow)
-    plot_hist(pt_flow, pt_mg5, 'top pT [MeV]', os.path.join(lhe_folder, 'top_pt.png'))
-    plot_hist(eta_flow, eta_mg5, 'top \N{GREEK SMALL LETTER ETA}', os.path.join(lhe_folder, 'top_eta.png'))
+    lhe_folder = path_flow.parent
+    plot_hist(pt_flow, pt_mg5, 'top pT [MeV]', lhe_folder.joinpath('top_pt.png'))
+    plot_hist(eta_flow, eta_mg5, 'top \N{GREEK SMALL LETTER ETA}', lhe_folder.joinpath('top_eta.png'))
 
 
 if __name__ == '__main__':
