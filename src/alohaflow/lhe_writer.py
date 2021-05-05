@@ -1,5 +1,6 @@
 import sys, os, six, gzip, copy
 from time import time as tm
+import math
 import numpy as np
 from pathlib import Path
 from multiprocessing.pool import ThreadPool as Pool
@@ -20,7 +21,7 @@ __package__ = None
 
 ################################################
 
-def do_unweighting(wgt_path, unwgt_path=None):
+def do_unweighting(wgt_path, unwgt_path=None, event_target=0):
     """
     From an LHE file of weighted events, do unweighting and produce a new LHE
     file of unweighted events.
@@ -38,7 +39,7 @@ def do_unweighting(wgt_path, unwgt_path=None):
     if not unwgt_path:
         fname = "unweighted_events.lhe.gz"
         unwgt_path = Path(wgt_path).with_name(fname).as_posix()
-    nb_keep = lhe.unweight(unwgt_path)
+    nb_keep = lhe.unweight(unwgt_path, event_target=event_target)
     return lhe, nb_keep # does unweight method modify the lhe object ?
 
 
@@ -79,7 +80,7 @@ class ParticleFlow(lhe_parser.Particle):
 
 
 class LheWriter:
-    def __init__(self, folder, run='run_1', unweight=False):
+    def __init__(self, folder, run='run_01', unweight=False, event_target=0):
         """
         Utility class to write Les Houches Event (LHE) file info: writes LHE
         events to <folder>/Events/<run>/weighted_events.lhe.gz
@@ -89,11 +90,13 @@ class LheWriter:
             folder: str, the matrix element folder
             run: str, the run name
             unweight: bool, wether to unweight or not events before objects goes
-                      out of scope        
+                      out of scope
+            event_target: int, number of requested unweighted events
         """
         self.folder = folder
         self.run = run
         self.unweight = unweight
+        self.event_target = event_target
         self.pool = Pool(processes=1)
         self.build_folder_and_check_streamer()
 
@@ -118,12 +121,12 @@ class LheWriter:
         if self.unweight:
             logger.debug("Unweighting ...")
             start = tm()
-            lhe, nb_keep = do_unweighting(self.lhe_path)
+            lhe, nb_keep = do_unweighting(self.lhe_path, event_target=self.event_target)
             end = tm()-start
             log = "Unweighting stats: kept %d events out of %d (efficiency %.2g %%, time %.5f)" \
                         %(nb_keep, len(lhe), nb_keep/len(lhe)*100, end)
             logger.info(log)
-            # print(log)
+            # TODO: drop weighted events?
 
 
     def dump_banner(self):
@@ -174,3 +177,13 @@ class EventFileFlow(lhe_parser.EventFile):
 class FourMomentumFlow(lhe_parser.FourMomentum):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+    
+    @property
+    def phi(self):
+        """ Return the azimuthal angle. """
+        phi = 0.0 if (self.pt == 0.0) else math.atan2(self.py, self.px)
+        if (phi < 0.0):
+            phi += 2.0*math.pi
+        if (phi > 2.0*math.pi):
+            phi -= 2.0*math.pi
+        return phi
