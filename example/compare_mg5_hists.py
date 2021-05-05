@@ -80,6 +80,7 @@ def plot_hist(hist_flow, hist_mg5, xlabel, fname):
     ax.set_xlabel(xlabel, loc='right')
     ax.legend()
 
+    ax.title.set_text('g g > t t~')
     plt.axis('on')
     plt.xlabel('weight ratio')
     print(f"Saved histogram at {fname}")
@@ -121,8 +122,8 @@ def main():
     pt_mg5, eta_mg5 = top_hists(lhe_mg5, args.nbins)
 
     lhe_folder = os.path.dirname(path_lhe_flow)
-    plot_hist(pt_flow, pt_mg5, 'pT [MeV]', os.path.join(lhe_folder, 'top_pt.png'))
-    plot_hist(eta_flow, eta_mg5, '\N{GREEK SMALL LETTER ETA}', os.path.join(lhe_folder, 'top_eta.png'))
+    plot_hist(pt_flow, pt_mg5, 'top pT [MeV]', os.path.join(lhe_folder, 'top_pt.png'))
+    plot_hist(eta_flow, eta_mg5, 'top \N{GREEK SMALL LETTER ETA}', os.path.join(lhe_folder, 'top_eta.png'))
 
 
 if __name__ == '__main__':
