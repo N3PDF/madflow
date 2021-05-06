@@ -14,10 +14,9 @@
     which will generate a vegasflow_example folder with all the required files.
     Link that folder to this script in the first line below (`matrix_elm_folder`).
 """
-# matrix_elm_folder = "../../vegasflow_example/"
-matrix_elm_folder = "../../mg5amcnlo/bin/vegasflow_example"
 
 import os, argparse
+from pathlib import Path
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import numpy as np
@@ -42,7 +41,6 @@ phimin = fzero
 phimax = float_me(2.0 * np.pi)
 
 ######### Import the matrix elements and the necessary models
-all_matrices = []
 all_matrices_flow = []
 model = None
 base_model = "models/sm"
@@ -57,38 +55,6 @@ import importlib.util
 import re
 
 re_name = re.compile("\w{3,}")
-original_path = copy.copy(sys.path)
-sys.path.insert(0, matrix_elm_folder)
-for matrix_file in glob.glob(f"{matrix_elm_folder}/matrix_*.py"):
-    matrix_name = re_name.findall(matrix_file)[-1]
-    class_name = matrix_name.capitalize()
-    # This seems unnecesarily complicated to load a class from a file by anyway
-    module_spec = importlib.util.spec_from_file_location(matrix_name, matrix_file)
-    module = importlib.util.module_from_spec(module_spec)
-    module_spec.loader.exec_module(module)
-    # Now with access to the module, fill the list of matrices (with the object instantiated)
-    all_matrices.append(getattr(module, class_name)())
-
-# Use the last module to load its model (all matrices should be using the same one!)
-root_path = getattr(module, "root_path")
-import_ufo = getattr(module, "import_ufo")
-model = import_ufo.import_model(f"{root_path}/{base_model}")
-
-# Import the parallel matrix
-from matrixflow_1_gg_ttx import Matrixflow_1_gg_ttx, get_model_param
-
-all_matrices_flow = [Matrixflow_1_gg_ttx()]
-model_params = get_model_param(model)
-
-# Clean the path
-sys.path = original_path
-# Uncomment loop below to run a test over the loaded matrix elements
-# for matrix in all_matrices:
-#     # Generate a random momentum according to the number of external particles
-#     # (likely unphysical!)
-#     momenta = np.random.rand(matrix.nexternal,4)*100
-#     print(f"Result: {matrix.smatrix(momenta, model):.5f}")
-#######################################################
 
 ################# Phase space
 @tf.function
@@ -236,21 +202,6 @@ def luminosity(x1, x2, q2array):
     lumi = gluon_1 * gluon_2
     return lumi / x1 / x2
 
-
-# Minimal working exaple of cross section calculation with vegasflow
-def cross_section(xrand, **kwargs):
-    # IRL we would be gruping matrices by nparticles
-    res = []
-    for matrix in all_matrices:
-        all_ps, wts, x1, x2 = phasespace_generator(xrand, matrix.nexternal)
-        pdf = luminosity(x1, x2, tf.ones_like(x1) * Q2)
-        for ps, wt, ff in zip(
-            all_ps.numpy(), wts.numpy(), pdf.numpy()
-        ):  # when in eager mode, better to loop over numpy
-            res.append(matrix.smatrix(ps, model) * wt * ff)
-    return float_me(res)
-
-
 histo_bins = 10
 fixed_bins = float_me([i*20 for i in range(histo_bins)])
 
@@ -299,10 +250,7 @@ if __name__ == "__main__":
 
     arger = argparse.ArgumentParser(
         """
-    Example script to integrate Madgraph generated matrix element.
-
-    By default first it the original mg5 matrix element will be run (which is not compiled)
-    and then the vegasflow-compatible one (compiled).
+    Example script to integrate Madgraph tensorflow compatible generated matrix element.
 
     In order to generate comparable results it is necessary to set the seed (-s) and not compile the integrand
         ~$ ./integrate_example.py -s 4 -r
@@ -325,13 +273,43 @@ if __name__ == "__main__":
     )
     arger.add_argument("-r", "--reproducible", help="Run in reproducible mode", action="store_true")
     arger.add_argument("-e", "--eager", help="Run eager", action="store_true")
-    arger.add_argument(
-        "-v", "--only_vegasflow", help="Run only the Vegasflow ME", action="store_true"
-    )
+    arger.add_argument("-p", "--path", help="Path with the madgraph matrix element", type=Path)
     args = arger.parse_args()
 
     if args.eager:
         run_eager(True)
+
+    if args.path:
+        if not args.path.exists():
+            raise ValueError(f"Cannot find {args.path}")
+        matrix_elm_folder = args.path.as_posix()
+    else:
+        matrix_elm_folder = "../../mg5amcnlo/vegasflow_example"
+    ### go to the madgraph folder and load up anything that you need
+    original_path = copy.copy(sys.path)
+    sys.path.insert(0, matrix_elm_folder)
+    for matrix_file in glob.glob(f"{matrix_elm_folder}/matrix_*.py"):
+        matrix_name = re_name.findall(matrix_file)[-1]
+        class_name = matrix_name.capitalize()
+        # this seems unnecesarily complicated to load a class from a file by anyway
+        module_spec = importlib.util.spec_from_file_location(matrix_name, matrix_file)
+        module = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(module)
+        # now with access to the module, fill the list of matrices (with the object instantiated)
+        all_matrices_flow.append(getattr(module, class_name)())
+
+    # use the last module to load its model (all matrices should be using the same one!)
+    root_path = getattr(module, "root_path")
+    import_ufo = getattr(module, "import_ufo")
+    model = import_ufo.import_model(f"{root_path}/{base_model}")
+
+    get_model_param = getattr(module, "get_model_param")
+    model_params = get_model_param(model)
+
+    # We have matrix and model parameters, clean the path
+    sys.path = original_path
+    ################################################
+
 
     nparticles = 4
     n_dim = (nparticles - 2) * 3 - 2
@@ -339,15 +317,6 @@ if __name__ == "__main__":
     n_events = args.nevents
 
     seed = args.set_seed
-
-    # Run the Madgraph ME
-    if not args.only_vegasflow:
-        vegas_integrator = VegasFlow(n_dim, n_events)
-        vegas_integrator.set_seed(seed)
-        vegas_integrator.compile(cross_section, compilable=False)
-        start = tm()
-        vegas_integrator.run_integration(n_iter)
-        print(f"Vegasflow integration with original mg5 smatrix function done in: {tm()-start} s")
 
     # Run the Parallel ME
     new_vegas = VegasFlow(n_dim, n_events)
