@@ -1,30 +1,70 @@
-import pickle
+
+from alohaflow.config import (
+    int_me,
+    float_me,
+    DTYPE,
+    DTYPEINT,
+    run_eager,
+    DTYPECOMPLEX,
+    complex_tf,
+    complex_me
+)
+from alohaflow.wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
+
 import os
 import sys
+
+import tensorflow as tf
+import collections
+
+ModelParamTuple = collections.namedtuple("Model", [%(paramnames)s])
 
 root_path = '%(root_path)s'
 sys.path.insert(0, root_path)
 sys.path.insert(0, os.path.join(root_path, 'madgraph'))
 sys.path.insert(0, os.path.join(root_path, 'aloha', 'template_files'))
 
-from wavefunctions import oxxxxx, ixxxxx, vxxxxx, sxxxxx
 import models.import_ufo as import_ufo
-
 
 %(aloha_imports)s
 
 
+def get_model_param(model):
+    %(model_parameters)s
+    return ModelParamTuple(%(paramtuple)s)
+
+
+
+smatrix_signature = [
+        tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
+        %(paramsignature)s
+        ]
+
+
+matrix_signature = [
+        tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
+        tf.TensorSpec(shape=[%(nexternal)d], dtype=DTYPE),
+        %(paramsignature)s
+        ]
+
+
 class Matrix_%(process_string)s(object):
-    nexternal = %(nexternal)d
+    nexternal = float_me(%(nexternal)d)
+    ndiags = float_me(%(ndiags)d)
+    ncomb = float_me(%(ncomb)d)
+    %(helicity_lines)s
+    %(den_factor_line)s
 
     def __init__(self):
         """define the object"""
         self.clean()
 
     def clean(self):
-        self.jamp = []
+        pass
+        ##self.jamp = []
 
-    def smatrix(self,p, model):
+    @tf.function(input_signature=smatrix_signature)
+    def smatrix(self,all_ps,%(params)s):
         #  
         %(info_lines)s
         # 
@@ -38,32 +78,20 @@ class Matrix_%(process_string)s(object):
         #  
         # Clean additional output
         #
-        self.clean()
-        #  
-        # CONSTANTS
-        #  
-        nexternal = %(nexternal)d
-        ndiags = %(ndiags)d
-        ncomb = %(ncomb)d
-        #  
-        # LOCAL VARIABLES 
-        #  
-        %(helicity_lines)s
-        %(den_factor_line)s
+        ###self.clean()
         # ----------
         # BEGIN CODE
         # ----------
-        self.amp2 = [0.] * ndiags
-        self.helEvals = []
-        ans = 0.
-        for hel in helicities:
-            t = self.matrix(p, hel, model)
+        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
+        ans = tf.zeros(nevts, dtype=DTYPECOMPLEX)
+        for hel in self.helicities:
+            t = self.matrix(all_ps,hel,%(params)s)
             ans = ans + t
-            self.helEvals.append([hel, t.real / denominator ])
-        ans = ans / denominator
-        return ans.real
 
-    def matrix(self, p, hel, model):
+        return tf.math.real(ans)/self.denominator
+
+    @tf.function(input_signature=matrix_signature)
+    def matrix(self,all_ps,hel,%(params)s):
         #  
         %(info_lines)s
         #
@@ -79,7 +107,8 @@ class Matrix_%(process_string)s(object):
         nexternal = self.nexternal
         nwavefuncs = %(nwavefuncs)d
         ncolor = %(ncolor)d
-        ZERO = 0.
+        ZERO = float_me(0.)
+        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
         #  
         # Color matrix
         #  
@@ -87,7 +116,6 @@ class Matrix_%(process_string)s(object):
         #
         # Model parameters
         #
-        %(model_parameters)s
         # ----------
         # Begin code
         # ----------
@@ -95,29 +123,79 @@ class Matrix_%(process_string)s(object):
         w = [None] * nwavefuncs
         %(helas_calls)s
 
-        jamp = [None] * ncolor
-
         %(jamp_lines)s
 
-        %(amp2_lines)s
-        matrix = 0.
+        ##%(amp2_lines)s
+        matrix = tf.zeros(nevts, dtype=DTYPECOMPLEX)
         for i in range(ncolor):
-            ztemp = 0
+            ztemp = tf.zeros(nevts, dtype=DTYPECOMPLEX)
             for j in range(ncolor):
                 ztemp = ztemp + cf[i][j]*jamp[j]
-            matrix = matrix + ztemp * jamp[i].conjugate()/denom[i]   
-        self.jamp.append(jamp)
+            matrix = matrix + ztemp * tf.math.conj(jamp[i])/denom[i]   
+        #self.jamp.append(jamp)
 
         return matrix
 
 
 
 if __name__ == "__main__":
-    model = import_ufo.import_model("%(model_path)s") 
-    momenta = [[100., 0., 0., 100.],
-               [100., 0., 0.,-100.],
-               [100., 100., 0., 0.],
-               [100.,-100., 0., 0.]]
+    import sys, pathlib
+    import numpy as np
 
-    mymatrix = Matrix_%(process_string)s()
-    print('RESULT', mymatrix.smatrix(momenta, model))
+    # Get the name of the matrix in this file
+    matrix_name = pathlib.Path(sys.argv[0]).stem.capitalize()
+    matrix_class = globals()[matrix_name]
+
+    # Instantiate the matrix
+    matrix = matrix_class()
+
+    # Read up the model
+    model_sm = pathlib.Path(root_path) / "models/sm"
+    if not model_sm.exists():
+        print(f"No model sm found at {model_sm}, test cannot continue")
+        sys.exit(0)
+    model = import_ufo.import_model(model_sm.as_posix())
+    model_params = get_model_param(model)
+
+    # Define th phase space
+    # The structure asked by the matrix elements is
+    #   (nevents, ndimensions, nparticles)
+    # the 4 dimensions of the 4-momentum is expected as
+    #   (E, px, py, pz)
+    ndim = 4
+    npar = int(matrix.nexternal)
+    nevents = 2
+    max_momentum = 7e3
+
+    par_ax = 1
+    dim_ax = 2
+
+    # Now generate random outgoing particles in a com frame (last_p carries whatever momentum is needed to sum 0 )
+    shape = [nevents, 0, 0]
+    shape[par_ax] = npar - 3
+    shape[dim_ax] = ndim - 1
+    partial_out_p = tf.random.uniform(shape, minval=-max_momentum, maxval=max_momentum, dtype=DTYPE)
+    last_p = -tf.reduce_sum(partial_out_p, keepdims=True, axis=par_ax)
+    out_p = tf.concat([partial_out_p, last_p], axis=par_ax)
+
+    if "mdl_MT" in dir(model_params):
+        # TODO fill in the mass according to the particles
+        out_m = tf.reshape((npar - 2) * [model_params.mdl_MT], (1, -1, 1))
+    else:
+        out_m = 0.0
+    out_e = tf.sqrt(tf.reduce_sum(out_p ** 2, keepdims=True, axis=dim_ax) + out_m ** 2)
+    outgoing_4m = tf.concat([out_e, out_p], axis=dim_ax)
+
+    # Put all incoming momenta in the z axis (TODO: for now assume massless input)
+    ea = tf.reduce_sum(out_e, axis=par_ax, keepdims=True) / 2
+    zeros = tf.zeros_like(ea)
+    inc_p1 = tf.concat([ea, zeros, zeros, ea], axis=dim_ax)
+    inc_p2 = tf.concat([ea, zeros, zeros, -ea], axis=dim_ax)
+
+    all_ps = tf.concat([inc_p1, inc_p2, outgoing_4m], axis=par_ax)
+
+    wgt_set = matrix.smatrix(all_ps, *model_params)
+
+    print("All good!")
+    for i, (p, wgt) in enumerate(zip(all_ps, wgt_set)):
+        print(f"\n#{i} ME value: {wgt.numpy():.3e} for P set:\n{p.numpy()}")

@@ -7,6 +7,7 @@
 
 import os
 import logging
+import fractions
 import shutil
 import itertools
 import copy
@@ -21,9 +22,12 @@ from madgraph import MadGraph5Error, InvalidCmd, MG5DIR
 import madgraph.iolibs.export_python as export_python
 import madgraph.iolibs.helas_call_writers as helas_call_writers
 import madgraph.iolibs.files as files
+import madgraph.core.color_algebra as color
+import aloha
 import aloha.create_aloha as create_aloha
 import aloha.aloha_writers as aloha_writers
 from . import PyOut_create_aloha as pyout_create_aloha
+from . import PyOut_helas_call_writer as pyout_helas_call_writer
 
 import models.check_param_card as check_param_card
 
@@ -33,6 +37,41 @@ pjoin = os.path.join
 
 class PyOutExporterError(MadGraph5Error):
     """ Error from the Resummation MEs exporter. """ 
+
+
+def coeff(ff_number, frac, is_imaginary, Nc_power, Nc_value=3, is_first = False):
+    """Returns a nicely formatted string for the coefficients in JAMP lines"""
+
+    total_coeff = ff_number * frac * fractions.Fraction(Nc_value) ** Nc_power
+
+    if total_coeff == 1:
+        plus = '+'
+        if is_first:
+            plus = ''
+        if is_imaginary:
+            return plus + 'complex_tf(0,1)*'
+        else:
+            return plus
+    elif total_coeff == -1:
+        if is_imaginary:
+            return '-complex(0,1)*'
+        else:
+            return '-'
+
+    if is_first:
+        res_str = '%-i.' % total_coeff.numerator
+    else:
+        res_str = '%+i.' % total_coeff.numerator
+
+    if total_coeff.denominator != 1:
+        # Check if total_coeff is an integer
+        res_str = res_str + '/%i.' % total_coeff.denominator
+
+    if is_imaginary:
+        res_str = res_str + '*complex(0,1)'
+
+    return res_str + '*'
+
 
 class PyOutExporter(export_python.ProcessExporterPython):
     """this exporter is built upon the Python exporter of MG5_aMC.
@@ -124,9 +163,33 @@ class PyOutExporter(export_python.ProcessExporterPython):
             replace_dict['ncolor'] = ncolor
 
             # Extract model parameter lines
-            model_parameter_lines = \
-                                 self.get_model_parameter_lines(matrix_element)
+            parameters, couplings = \
+                                 self.get_model_parameters(matrix_element)
+
+            model_parameter_lines =  "\n    ".join([\
+                         "%(param)s = model.get(\'parameter_dict\')[\"%(param)s\"]"\
+                         % {"param": param} for param in parameters]) + \
+                                     "\n    " + "\n    ".join([\
+                         "%(coup)s = model.get(\'coupling_dict\')[\"%(coup)s\"]"\
+                              % {"coup": coup} for coup in couplings])
+
+            if aloha.complex_mass:
+                paramsignature = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(parameters+couplings))
+                paramtuple = ",".join(["complex_me(%s)" % p for p in parameters+couplings]) 
+
+            else:
+                paramsignature = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPE)'] * len(parameters) + 
+                                                    ['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(couplings))
+                paramtuple = ",".join(["float_me(%s)" % p for p in parameters] + ["complex_me(%s)" % p for p in couplings]) 
+
+            params = ",".join([p for p in parameters + couplings])
+            paramnames = ",".join(["\"%s\"" % p for p in parameters + couplings])
+
             replace_dict['model_parameters'] = model_parameter_lines
+            replace_dict['paramsignature'] = paramsignature
+            replace_dict['params'] = params
+            replace_dict['paramnames'] = paramnames
+            replace_dict['paramtuple'] = paramtuple
 
             # Extract color data lines
             color_matrix_lines = self.get_color_matrix_lines(matrix_element)
@@ -135,12 +198,12 @@ class PyOutExporter(export_python.ProcessExporterPython):
 
             # Extract JAMP lines
             jamp_lines = self.get_jamp_lines(matrix_element)
-            replace_dict['jamp_lines'] = "\n        ".join(jamp_lines)
+            replace_dict['jamp_lines'] = jamp_lines
 
             # Extract amp2 lines
             amp2_lines = self.get_amp2_lines(matrix_element,
                                         self.config_maps.setdefault(ime, []))
-            replace_dict['amp2_lines'] = '\n        '.join(amp2_lines)
+            replace_dict['amp2_lines'] = '\n        #'.join(amp2_lines)
 
             replace_dict['model_path'] = self.model.path 
             replace_dict['root_path'] = MG5DIR
@@ -156,11 +219,133 @@ class PyOutExporter(export_python.ProcessExporterPython):
         return self.matrix_methods
 
 
+    def get_helicity_matrix(self, matrix_element):
+        """Return the Helicity matrix definition lines for this matrix element"""
+
+        helicity_line = "helicities = float_me([ \\\n        "
+        helicity_line_list = []
+
+        for helicities in matrix_element.get_helicity_matrix():
+           helicity_line_list.append("[" + ",".join(['%d'] * len(helicities)) % \
+                                      tuple(helicities) + "]")
+            
+        return helicity_line + ",\n        ".join(helicity_line_list) + "])"
+
+
+    def get_color_matrix_lines(self, matrix_element):
+        """Return the color matrix definition lines for this matrix element. Split
+        rows in chunks of size n."""
+
+        if not matrix_element.get('color_matrix'):
+            return ["denom = tf.constant([1.], dtype=DTYPECOMPLEX)", "cf = tf.constant([[1.]], dtype=DTYPECOMPLEX)"]
+        else:
+            color_denominators = matrix_element.get('color_matrix').\
+                                                 get_line_denominators()
+            denom_string = "denom = tf.constant([%s], dtype=DTYPECOMPLEX)" % \
+                           ",".join(["%i" % denom for denom in color_denominators])
+
+            matrix_strings = []
+            my_cs = color.ColorString()
+            for index, denominator in enumerate(color_denominators):
+                # Then write the numerators for the matrix elements
+                num_list = matrix_element.get('color_matrix').\
+                                            get_line_numerators(index, denominator)
+
+                matrix_strings.append("%s" % \
+                                     ",".join(["%d" % i for i in num_list]))
+            matrix_string = "cf = tf.constant([[" + \
+                            "],\n                          [".join(matrix_strings) + "]], dtype=DTYPECOMPLEX)"
+            return [denom_string, matrix_string]
+
+
+    def get_den_factor_line(self, matrix_element):
+        """Return the denominator factor line for this matrix element"""
+
+        return "denominator = float_me(%d)" % \
+               matrix_element.get_denominator_factor()
+
+
+    def get_jamp_lines(self, matrix_element):
+        """Return the jamp = sum(fermionfactor * amp[i]) lines"""
+
+        res_list = []
+
+        for i, coeff_list in enumerate(matrix_element.get_color_amplitudes()):
+
+            is_first = i==0
+
+            res = ""
+
+            # Optimization: if all contributions to that color basis element have
+            # the same coefficient (up to a sign), put it in front
+            list_fracs = [abs(coefficient[0][1]) for coefficient in coeff_list]
+            common_factor = False
+            diff_fracs = list(set(list_fracs))
+            if len(diff_fracs) == 1 and abs(diff_fracs[0]) != 1:
+                common_factor = True
+                global_factor = diff_fracs[0]
+                res = res + '%s(' % coeff(1, global_factor, False, 0, is_first=is_first)
+
+            for i2, (coefficient, amp_number) in enumerate(coeff_list):
+                is_first2 = i2==0
+                if common_factor:
+                    res = res + "%samp%d" % (coeff(coefficient[0],
+                                               coefficient[1] / abs(coefficient[1]),
+                                               coefficient[2],
+                                               coefficient[3], is_first=is_first2),
+                                               amp_number - 1)
+                else:
+                    res = res + "%samp%d" % (coeff(coefficient[0],
+                                               coefficient[1],
+                                               coefficient[2],
+                                               coefficient[3], is_first=is_first2),
+                                               amp_number - 1)
+
+            if common_factor:
+                res = res + ')'
+
+            res_list.append(res)
+
+        return "jamp = tf.stack([" + ",".join([r for r in res_list]) + "], axis=0)"
+
+
+    def get_model_parameters(self, matrix_element):
+        """Return definitions for all model parameters used in this
+        matrix element"""
+
+        # Get all masses and widths used
+        if aloha.complex_mass:
+            parameters = [(wf.get('mass') == 'ZERO' or wf.get('width')=='ZERO') 
+                          and wf.get('mass') or 'CMASS_%s' % wf.get('mass') 
+                          for wf in \
+                          matrix_element.get_all_wavefunctions()]
+            parameters += [wf.get('mass') for wf in \
+                      matrix_element.get_all_wavefunctions()]
+        else:
+            parameters = [wf.get('mass') for wf in \
+                      matrix_element.get_all_wavefunctions()]
+        parameters += [wf.get('width') for wf in \
+                       matrix_element.get_all_wavefunctions()]
+        parameters = list(set(parameters))
+        if 'ZERO' in parameters:
+            parameters.remove('ZERO')
+
+        # Get all couplings used
+
+        
+        couplings = list(set([c.replace('-', '') for func \
+                              in matrix_element.get_all_wavefunctions() + \
+                              matrix_element.get_all_amplitudes() for c in func.get('coupling')
+                              if func.get('mothers') ]))
+
+        return sorted(parameters), sorted(couplings)
+        
+
 
     def generate_subprocess_directory(self, subproc_group,
                                          fortran_model, me=None):
 
-        self.helas_writer = helas_call_writers.PythonUFOHelasCallWriter(self.model)
+        self.helas_writer = pyout_helas_call_writer.PyOutUFOHelasCallWriter(self.model)
 
         super(PyOutExporter, self).__init__(subproc_group, self.helas_writer) 
 
@@ -218,7 +403,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
         wanted_lorentz = set(sum(wanted_lorentz, []))
         # Compute the subroutines
         if wanted_lorentz:
-            aloha_model.compute_subset(wanted_lorentz)
+            aloha_model.compute_subset(list(wanted_lorentz))
         else:
             aloha_model.compute_all(save=False)
 
@@ -237,6 +422,5 @@ class PyOutExporter(export_python.ProcessExporterPython):
     def finalize(self, matrix_elements, history, mg5options, flaglist):
         """ do nothing at the moment"""
         pass
-
 
 
