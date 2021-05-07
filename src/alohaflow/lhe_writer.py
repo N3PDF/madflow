@@ -4,6 +4,9 @@ import math
 import numpy as np
 from pathlib import Path
 from multiprocessing.pool import ThreadPool as Pool
+
+from pdfflow.configflow import fzero
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -126,6 +129,9 @@ class LheWriter:
         """
         Send closing signal to asynchronous dumping pool. Triggers unweighting
         if self.no_unweight is False (default).
+
+        Note: this function should be called after having stored the cross
+        section and statistical error values
         """
         self.pool.close()
         self.pool.join()
@@ -140,6 +146,66 @@ class LheWriter:
             log = "Unweighting stats: kept %d events out of %d (efficiency %.2g %%, time %.5f)" \
                         %(nb_keep, nb_wgt, nb_keep/nb_wgt*100, end)
             logger.info(log)
+    
+
+    def lhe_parser(self, all_ps, res):
+        """
+        Takes care of storing and dumping LHE info from the integrator.
+        To be passed as argument to generate the Vegasflow custom integrand.
+
+        Parameters
+        ----------
+            all_ps: tf.Tensor, phase space points of shape=(nevents,nexternal,ndims)
+            res: tf.Tensor, weights of shape=(nevents,)
+        """
+        _, nexternal, _ = all_ps.shape
+        events_info = [{
+            'nexternal': nexternal,
+            'ievent': 1,
+            'wgt': wgt,
+            'aqcd': 0.0,  # alpha strong value, get this from vegasflow?
+            'scale': 0.0, # Q^2 scale for pdfs, get this from vegasflow?
+            'aqed': 0.0,  # alpha EW value    , get this from vegasflow?
+            'tag': '',
+            'comment': ''
+        } for wgt in res.numpy()]
+
+        index_to_pid = {
+            0: 2212, # p
+            1: 2212, # p
+            2: 6,    # t
+            3: -6    # t~
+        }
+
+        index_to_status = {
+            0: -1, # incoming particle
+            1: -1, # incoming particle
+            2:  1, # outgoing particle
+            3:  1, # outgoing particle
+        }
+
+        # we are missing the virtual particles
+        particles_info = [
+            [{
+            'pid': index_to_pid[i],
+            'status': index_to_status[i],
+            'mother1': 0,
+            'mother2': 0,
+            'color1': 0,
+            'color2': 0,
+            'E': ps[0],
+            'px': ps[1],
+            'py': ps[2],
+            'pz': ps[3],
+            'mass': np.sqrt(ps[0]**2 - ps[1]**2 - ps[2]**2 - ps[3]**2), # vectorize this?
+            'vtim': 0,
+            'helicity': 0,
+            } for i, ps in enumerate(ps_external)
+        ] for ps_external in all_ps.numpy()]
+
+        self.dump(events_info, particles_info)
+
+        return fzero
 
 
     def dump_banner(self, stream=None):
@@ -225,8 +291,21 @@ class LheWriter:
     def err(self, value):
         """ Error section setter"""
         self.__err = value
-
     
+
+    def store_result(self, result):
+        """
+        Stores integration result in numpy format.
+        
+        Parameters
+        ----------
+            result: list, cross section and statistical error
+        """
+        print('in store result: ')
+        self.__cross = float(result[0])
+        self.__err = float(result[1])
+
+
     def do_unweighting(self, event_target=0):
         """
         Does unweighting. Removes the weighted LHE file.
@@ -234,6 +313,9 @@ class LheWriter:
         Parameters
         ----------
             event_target: int, number of unweighted events requested
+        
+        Note: this function should be called after having stored the cross
+        section and statistical error values
         """
         # load weighted LHE file
         lhe = EventFileFlow(self.lhe_path)

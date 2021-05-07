@@ -12,7 +12,7 @@
     ```
 
     which will generate a vegasflow_example folder with all the required files.
-    Link that folder to this script in the first line below (`matrix_elm_folder`).
+    Link that folder to this script in the first line below (`folder`).
 """
 
 import os, argparse
@@ -207,35 +207,39 @@ def luminosity(x1, x2, q2array):
 histo_bins = 10
 fixed_bins = float_me([i*20 for i in range(histo_bins)])
 
+def dummy_parser(*args):
+    """
+    Dummy parser to replace LHE parser during first vegasflow iterations
+    """
+    return fzero
+
 # Integrand with accumulator:
-def generate_integrand(cummulator_tensor, matrix_elm_folder, no_unweight, event_target):
-    """ 
+def generate_integrand(cummulator_tensor, parser=None):
+    """
     This function will generate an integrand function which will already hold a
     reference to the tensor to accumulate.
 
     Parameters
     ----------
         cummulator_tensor: tf.Variable
-        matrix_elm_folder: Path, path to madflow output folder
-        no_unweight: bool, wether to unweight or not events
-        event_target: int, number of requested unweighted events
-    
+        parser: LheWriter, keeps track and stores vegasflow events. If None,
+                use a dummy parser
+
     Returns
     -------
         cross_section_flow: function, vegasflow integrand
-        lhe_writer: LheWriter object, with statement wrapper for
-                    vegasflow.run_integration
     """
+    lhe_parser = parser.lhe_parser if parser else dummy_parser
 
     @tf.function
     def histogram_collector(results, variables):
         """ This function will receive a tensor (result)
-        and the variables corresponding to those integrand results 
-        In the example integrand below, these corresponds to 
+        and the variables corresponding to those integrand results
+        In the example integrand below, these corresponds to
             `final_result` and `histogram_values` respectively.
         `current_histograms` instead is the current value of the histogram
         which will be overwritten """
-        # Fill a histogram with (10) PT bins with fixed distance 
+        # Fill a histogram with (10) PT bins with fixed distance
         indices = tf.histogram_fixed_width_bins(variables, [fixed_bins[0],fixed_bins[-1]] , nbins=histo_bins)
         t_indices = tf.transpose(indices)
         # Then consume the results with the utility we provide
@@ -244,64 +248,6 @@ def generate_integrand(cummulator_tensor, matrix_elm_folder, no_unweight, event_
         new_histograms = partial_hist + current_histograms
         cummulator_tensor.assign(new_histograms)
 
-    lhe_writer = LheWriter(matrix_elm_folder, run='run_01', no_unweight=no_unweight, event_target=event_target)
-
-    def lhe_parser (all_ps, res):
-        """
-        Parameters
-        ----------
-            all_ps: tf.Tensor, phase space points of shape=(nevents,nexternal,ndims)
-            res: tf.Tensor, weights of shape=(nevents,)
-        """
-        _, nexternal, _ = all_ps.shape
-        events_info = [{
-            'nexternal': nexternal,
-            'ievent': 1,
-            'wgt': wgt,
-            'aqcd': 0.0,  # alpha strong value, get this from vegasflow?
-            'scale': 0.0, # Q^2 scale for pdfs, get this from vegasflow?
-            'aqed': 0.0,  # alpha EW value    , get this from vegasflow?
-            'tag': '',
-            'comment': ''
-        } for wgt in res.numpy()]
-
-        index_to_pid = {
-            0: 2212, # p
-            1: 2212, # p
-            2: 6,    # t
-            3: -6    # t~
-        }
-
-        index_to_status = {
-            0: -1, # incoming particle
-            1: -1, # incoming particle
-            2:  1, # outgoing particle
-            3:  1, # outgoing particle
-        }
-
-        # we are missing the virtual particles
-        particles_info = [
-            [{
-            'pid': index_to_pid[i],
-            'status': index_to_status[i],
-            'mother1': 0,
-            'mother2': 0,
-            'color1': 0,
-            'color2': 0,
-            'E': ps[0],
-            'px': ps[1],
-            'py': ps[2],
-            'pz': ps[3],
-            'mass': np.sqrt(ps[0]**2 - ps[1]**2 - ps[2]**2 - ps[3]**2), # vectorize this?
-            'vtim': 0,
-            'helicity': 0,
-            } for i, ps in enumerate(ps_external)
-        ] for ps_external in all_ps.numpy()]
-
-        lhe_writer.dump(events_info, particles_info)
-
-        return float_me(0.0)
-        
 
 # Minimal working example of tf vectorized cross section function
     def cross_section_flow(xrand, weight=1.0, **kwargs):
@@ -318,7 +264,7 @@ def generate_integrand(cummulator_tensor, matrix_elm_folder, no_unweight, event_
             tf.py_function(func=lhe_parser, inp=[all_ps, res*weight], Tout=DTYPE)
         return res
 
-    return cross_section_flow, lhe_writer
+    return cross_section_flow
 
 
 if __name__ == "__main__":
@@ -346,6 +292,9 @@ if __name__ == "__main__":
         "-i", "--iterations", help="Number of iterations to be run", type=int, default=4
     )
     arger.add_argument(
+        "-g", "--grid", help="Number of iterations for grid warmup", type=int, default=4
+    )
+    arger.add_argument(
         "-r", "--reproducible", help="Run in reproducible mode", action="store_true"
     )
     arger.add_argument(
@@ -353,6 +302,9 @@ if __name__ == "__main__":
     )
     arger.add_argument(
         "-p", "--path", help="Path with the madgraph matrix element", type=Path
+    )
+    arger.add_argument(
+        "--run", help="Run folder name", type=str, default="run_01"
     )
     arger.add_argument(
         "--no_unweight", help="Do no unweight events", action="store_true", default=False
@@ -368,13 +320,13 @@ if __name__ == "__main__":
     if args.path:
         if not args.path.exists():
             raise ValueError(f"Cannot find {args.path}")
-        matrix_elm_folder = args.path.as_posix()
+        folder = args.path
     else:
-        matrix_elm_folder = "../../mg5amcnlo/vegasflow_example"
+        folder = Path("../../mg5amcnlo/vegasflow_example")
     ### go to the madgraph folder and load up anything that you need
     original_path = copy.copy(sys.path)
-    sys.path.insert(0, matrix_elm_folder)
-    for matrix_file in glob.glob(f"{matrix_elm_folder}/matrix_*.py"):
+    sys.path.insert(0, folder.as_posix())
+    for matrix_file in glob.glob(f"{folder.as_posix()}/matrix_*.py"):
         matrix_name = re_name.findall(matrix_file)[-1]
         class_name = matrix_name.capitalize()
         # this seems unnecesarily complicated to load a class from a file by anyway
@@ -398,6 +350,7 @@ if __name__ == "__main__":
 
     nparticles = 4
     n_dim = (nparticles - 2) * 3 - 2
+    n_warmup = args.grid
     n_iter = args.iterations
     n_events = args.nevents
 
@@ -408,19 +361,20 @@ if __name__ == "__main__":
     new_vegas.set_seed(seed)
     ##  Create a reference to the histograms
     current_histograms = tf.Variable(float_me(tf.zeros(histo_bins)))
-    integrand, lhe_writer = generate_integrand(
-                                current_histograms, Path(matrix_elm_folder),
-                                args.no_unweight, args.event_target
-                                              )
-    ## 
+
+    # Warmup vegasflow grids
+    integrand = generate_integrand(current_histograms)
     new_vegas.compile(integrand, compilable=not args.reproducible)
-    start = tm()
     # When running the histogram, pass the reference to the histogram so it is accumulated
-    with lhe_writer:
-        cross, err = new_vegas.run_integration(n_iter, histograms=(current_histograms,))
-        lhe_writer.cross = cross
-        lhe_writer.err   = err
-    print(f"Vegasflow integration with tf vectorized smatrix function done in: {tm()-start} s")
+    new_vegas.run_integration(n_warmup, histograms=(current_histograms,))
+
+    # Now run vegasflow tracking generated events with lhe parser
+    with LheWriter(folder, args.run, args.no_unweight, args.event_target) as lhe_writer:
+        new_vegas.freeze_grid()
+        integrand = generate_integrand(current_histograms, parser=lhe_writer)
+        new_vegas.compile(integrand, compilable=not args.reproducible)
+        result = new_vegas.run_integration(n_iter, histograms=(current_histograms,))
+        lhe_writer.store_result(result)
     print(f"Histogram:")
     print(f"   pt_l   |   pt_u   |  ds/dpt")
     print(f"------------------------------")
