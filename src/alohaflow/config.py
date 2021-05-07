@@ -4,6 +4,9 @@
     Since this program is to be installed together with VegasFlow
     it is allow to take the configuration from there
 """
+import os
+from pathlib import Path
+
 from vegasflow.configflow import (
     run_eager,
     DTYPE,
@@ -38,7 +41,7 @@ def complex_me(cmp):
     # print("complex me")
     return tf.cast(cmp, dtype=DTYPECOMPLEX)
 
-import os, logging
+import logging
 
 module_name = __name__.split(".")[0]
 logger = logging.getLogger(module_name)
@@ -67,3 +70,10 @@ if bad_log_warning is not None:
         "Accepted log levels are: %s, received: %s", list(log_dict.keys()), bad_log_warning
     )
     logger.warning(f"Setting log level to its default value: {DEFAULT_LOG_LEVEL}")
+
+
+def get_madgraph_path():
+    madgraph_path = Path(os.environ.get("MADGRAPH_PATH", "../../../mg5amcnlo"))
+    if not madgraph_path.exists():
+        raise ValueError("Need a path for a madgraph installation")
+    return madgraph_path

@@ -9,20 +9,34 @@ import logging
 logger = logging.getLogger(__name__)
 
 ### go to the madgraph folder and load up anything that you need
+from alohaflow.config import get_madgraph_path
 original_path = copy.copy(sys.path)
-mg5amcnlo_folder = '../../../mg5amcnlo'
 
+mg5amcnlo_folder = get_madgraph_path()
+sys.path.insert(0, mg5amcnlo_folder.as_posix())
+
+original_package = __package__
 __package__ = "madgraph.various"
-sys.path.insert(0, mg5amcnlo_folder)
 from madgraph.various import lhe_parser
 
 sys.path = original_path
-__package__ = None
+__package__ = original_package
 
 ################################################
 
 class EventFlow(lhe_parser.Event):
+    """
+    Wrapper class for madgraph lhe_parser.Event class. EventFlow deals with
+    holding the LHE info for the event.
+    Subclass of list class: looping over self yields ParticleFlow objects
+    contained in the event.
+    """
     def __init__(self, info, *args, **kwargs):
+        """
+        Parameters
+        ----------
+            info: dict | lhe_parser.Event | list, event information to be stored
+        """
         super().__init__(*args, **kwargs)
         
         self.nexternal = info.get('nexternal')
@@ -35,11 +49,28 @@ class EventFlow(lhe_parser.Event):
         self.comment   = info.get('comment')
     
     def add_particles(self, particles):
+        """
+        Parameters
+        ----------
+            particles: list, ParticleFlow objects list to extend the event with
+        """
         self.extend(particles)
+    
+    def as_bytes(self):
+        """ Returns byte string event representation. """
+        return self.__str__().encode('utf-8')
 
 
 class ParticleFlow(lhe_parser.Particle):
+    """
+    Wrapper class for madgraph lhe_parser.Particle class. Holds particle info.
+    """
     def __init__(self, info, *args, **kwargs):
+        """
+        Parameters
+        ----------
+            info: dict, particle information to be stored
+        """
         super().__init__(*args, **kwargs)
 
         self.pid      = info.get('pid')
@@ -83,7 +114,7 @@ class LheWriter:
         self.lhe_path = lhe_folder.joinpath('weighted_events.lhe.gz')
 
         # create I/O stream
-        self.stream = gzip.open(self.lhe_path.as_posix(), 'wb')
+        self.stream = gzip.open(self.lhe_path, 'wb')
 
 
     def __enter__(self):
@@ -139,7 +170,7 @@ class LheWriter:
 
             particles = [ParticleFlow(pinfo, event=evt) for pinfo in p_info]
             evt.add_particles(particles)
-            self.stream.write(str(evt).encode('utf-8'))
+            self.stream.write(evt.as_bytes())
 
 
     def dump_exit(self, stream=None):
@@ -169,32 +200,30 @@ class LheWriter:
 
     
     def dump(self, *args):
-        """
-        Dumps info asynchronously.
-        """
+        """ Dumps info asynchronously. """
         self.pool.apply_async(self.async_dump, args)
     
     @property
     def cross(self):
-        """ VegasFlow integrated cross section. """
+        """ Cross section. """
         return self.__cross
 
 
     @cross.setter
     def cross(self, value):
-        """ Cross section setter"""
+        """ Cross section setter. """
         self.__cross = value
 
 
     @property
     def err(self):
-        """ VegasFlow integrated cross section. """
+        """ Cross section's statistical error. """
         return self.__err
 
 
     @err.setter
     def err(self, value):
-        """ Cross section setter"""
+        """ Error section setter"""
         self.__err = value
 
     
@@ -216,18 +245,18 @@ class LheWriter:
         nb_keep = lhe.unweight(tmp_path.as_posix(), event_target=event_target)
 
         # delete weighted LHE file
-        self.lhe_path.unlink()
+        # self.lhe_path.unlink()
         
         # load tmp file
         tmp_lhe = EventFileFlow(tmp_path)
 
         # open a stream for final unweighted LHE file
         unwgt_path = tmp_path.with_name("unweighted_events.lhe.gz")
-        with gzip.open(unwgt_path.as_posix(), 'wb') as stream:
+        with gzip.open(unwgt_path, 'wb') as stream:
             self.dump_banner(stream)
             for event in tmp_lhe:
                 event.wgt = self.__cross
-                stream.write(str(event).encode('utf-8'))
+                stream.write(event.as_bytes())
             self.dump_exit(stream)
 
         # delete tmp file
@@ -236,22 +265,66 @@ class LheWriter:
 
 
 class EventFileFlow(lhe_parser.EventFile):
+    """
+    Wrapper class for madgraph lhe_parser.EventFile class. Loads, modifies and
+    dumps the events contained in a LHE file.
+    """
     def __init__(self, path, mode='r', *args, **kwargs):
+        """
+        Parameters
+        ----------
+            path: Path or str, path pointing to a valid LHE file (both with
+                  .lhe or .lhe.gz extension)
+            mode: str, file opening mode
+        """
         if isinstance(path, Path):
             path = path.as_posix()
         super().__init__(path, mode, *args, **kwargs)
+    
+    def __next__(self):
+        """
+        Replacing the mother class method returnin an EventFileFlow, not an
+        lhe_parser.EventFile.
+
+        Note: This won't work with <eventgroup> (if self.eventgroup is True).
+        """
+        event = super().__next__()
+        if isinstance(event, lhe_parser.Event):
+            event.__class__ = EventFlow
+            return event
+        # EventFile.__len__ method loops over self and returns a list
+        # instead of an Event, but the returned object is not used then. In
+        # this case it's fine to return a non EventFileFlow object.
+        return event
 
 
 class FourMomentumFlow(lhe_parser.FourMomentum):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    """
+    Wrapper class for madgraph lhe_parser.FourMomentum class. Stores (E,px,py,pz)
+    of a particle and allows access to its kinematical quantities.
+    """
+    def __init__(self, obj=0, px=0, py=0, pz=0, E=0):
+        """
+        Parameters
+        ----------
+            obj: FourMomentumFlow|ParticleFlow|list|tuple|str|six.text_type|float
+                 object to copy momentum components from.
+                 - If is FourMomentumFlow or ParticleFlow this function acts like
+                 a copy constructor.
+                 - If is list or tuple, momentum components should be
+                 (E,px,py,pz) ordered.
+                 - If is str or six.text_type, a space separated string with
+                 (E,px,py,pz) ordered components.
+                 - If is float, superseeds the E argument
+            px: float, x momentum component
+            py: float, y momentum component
+            pz: float, z momentum component
+            E: float, particle energy
+        """
+        super().__init__(obj, px, py, pz, E)
     
     @property
     def phi(self):
         """ Returns the azimuthal angle. """
         phi = 0.0 if (self.pt == 0.0) else math.atan2(self.py, self.px)
-        if (phi < 0.0):
-            phi += 2.0*math.pi
-        if (phi > 2.0*math.pi):
-            phi -= 2.0*math.pi
-        return phi
+        return phi % (2.0*np.pi)
