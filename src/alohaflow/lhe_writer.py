@@ -301,7 +301,6 @@ class LheWriter:
         ----------
             result: list, cross section and statistical error
         """
-        print('in store result: ')
         self.__cross = float(result[0])
         self.__err = float(result[1])
 
