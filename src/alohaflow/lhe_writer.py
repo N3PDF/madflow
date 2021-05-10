@@ -1,3 +1,4 @@
+from alohaflow.config import get_madgraph_path
 import sys, os, six, gzip, copy
 from time import time as tm
 import math
@@ -12,7 +13,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 ### go to the madgraph folder and load up anything that you need
-from alohaflow.config import get_madgraph_path
 original_path = copy.copy(sys.path)
 
 mg5amcnlo_folder = get_madgraph_path()
@@ -372,7 +372,6 @@ class EventFileFlow(lhe_parser.EventFile):
         event = super().__next__()
         if isinstance(event, lhe_parser.Event):
             event.__class__ = EventFlow
-            return event
         # EventFile.__len__ method loops over self and returns a list
         # instead of an Event, but the returned object is not used then. In
         # this case it's fine to return a non EventFileFlow object.

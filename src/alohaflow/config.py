@@ -75,5 +75,7 @@ if bad_log_warning is not None:
 def get_madgraph_path():
     madgraph_path = Path(os.environ.get("MADGRAPH_PATH", "../../../mg5amcnlo"))
     if not madgraph_path.exists():
-        raise ValueError("Need a path for a madgraph installation")
+        raise ValueError(f"{madgraph_path} does not exist."
+        "Needs a valid path for Madgraph, can be given as env. variable MADGRAPH_PATH"
+        )
     return madgraph_path

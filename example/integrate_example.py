@@ -207,11 +207,6 @@ def luminosity(x1, x2, q2array):
 histo_bins = 10
 fixed_bins = float_me([i*20 for i in range(histo_bins)])
 
-def dummy_parser(*args):
-    """
-    Dummy parser to replace LHE parser during first vegasflow iterations
-    """
-    return fzero
 
 # Integrand with accumulator:
 def generate_integrand(cummulator_tensor, parser=None):
@@ -229,8 +224,6 @@ def generate_integrand(cummulator_tensor, parser=None):
     -------
         cross_section_flow: function, vegasflow integrand
     """
-    lhe_parser = parser.lhe_parser if parser else dummy_parser
-
     @tf.function
     def histogram_collector(results, variables):
         """ This function will receive a tensor (result)
@@ -261,7 +254,8 @@ def generate_integrand(cummulator_tensor, parser=None):
             # Histogram results on the pt of particle 3 (one of the tops)
             pt = tf.sqrt(all_ps[:,3,1]**2 + all_ps[:,3,2]**2)
             histogram_collector(res*weight, (pt,))
-            tf.py_function(func=lhe_parser, inp=[all_ps, res*weight], Tout=DTYPE)
+            if parser is not None:
+                tf.py_function(func=parser.lhe_parser, inp=[all_ps, res*weight], Tout=DTYPE)
         return res
 
     return cross_section_flow
