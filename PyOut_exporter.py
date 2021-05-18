@@ -471,6 +471,11 @@ class PyOutExporter(export_python.ProcessExporterPython):
             os.mkdir(pjoin(cardpath))
             export_v4.UFO_model_to_mg4.create_param_card_static(self.model, pjoin(cardpath, 'param_card.dat'))
 
+        # Write command history as proc_card_mg5
+        if history and os.path.isdir(pjoin(self.dir_path, 'Cards')):
+            output_file = pjoin(self.dir_path, 'Cards', 'proc_card_mg5.dat')
+            history.write(output_file)
+
 
     def get_intparam_definition(self):
         """create the lines analogous to the intparam_definition.inc
