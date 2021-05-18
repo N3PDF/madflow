@@ -17,7 +17,8 @@ import sys
 import tensorflow as tf
 import collections
 
-ModelParamTuple = collections.namedtuple("Model", [%(paramnames)s])
+ModelParamTupleConst = collections.namedtuple("Model", [%(paramnames_const)s])
+ModelParamTupleFunc = collections.namedtuple("Model", [%(paramnames_func)s])
 
 root_path = '%(root_path)s'
 sys.path.insert(0, root_path)
@@ -25,26 +26,28 @@ sys.path.insert(0, os.path.join(root_path, 'madgraph'))
 sys.path.insert(0, os.path.join(root_path, 'aloha', 'template_files'))
 
 import models.import_ufo as import_ufo
+import models.check_param_card as param_card_reader
 
 %(aloha_imports)s
 
 
-def get_model_param(model):
+def get_model_param(model, param_card_path):
+    param_card = param_card_reader.ParamCard(param_card_path)
     %(model_parameters)s
-    return ModelParamTuple(%(paramtuple)s)
+    return ModelParamTupleConst(%(paramtuple_const)s), ModelParamTupleFunc(%(paramtuple_func)s)
 
 
 
 smatrix_signature = [
         tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
-        %(paramsignature)s
+        %(paramsignature_const)s
         ]
 
 
 matrix_signature = [
         tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
         tf.TensorSpec(shape=[%(nexternal)d], dtype=DTYPE),
-        %(paramsignature)s
+        %(paramsignature_const)s
         ]
 
 
@@ -155,7 +158,7 @@ if __name__ == "__main__":
         print(f"No model sm found at {model_sm}, test cannot continue")
         sys.exit(0)
     model = import_ufo.import_model(model_sm.as_posix())
-    model_params = get_model_param(model)
+    model_params = get_model_param(model, 'Cards/param_card.dat')
 
     # Define th phase space
     # The structure asked by the matrix elements is
