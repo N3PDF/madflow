@@ -179,10 +179,10 @@ class PyOutExporter(export_python.ProcessExporterPython):
             parameters, couplings = \
                                  self.get_model_parameters(matrix_element)
 
-            model_parameter_lines = '    # External (param_card) parameters\n'
+            model_parameter_lines = '    # External (param_card) parameters\n    '
             model_parameter_lines +=  "\n    ".join([\
-                         "%(param)s = param_card['%(block)s']%(id)s"\
-                         % {"param": param.name, 'block': param.lhablock, 'id': param.lhacode} for param in self.params_ext]) + '\n\n'
+                         "%(param)s = param_card['%(block)s'].get(%(id)s).value"\
+                         % {"param": param.name, 'block': param.lhablock, 'id': param.lhacode[0]} for param in self.params_ext]) + '\n\n'
 
             model_parameter_lines += self.get_intparam_definition()
 
@@ -215,12 +215,21 @@ class PyOutExporter(export_python.ProcessExporterPython):
 
             paramtuple_func = ",".join(["complex_me(%s)" % p for p in couplings_dep]) 
 
-            params = ",".join([p for p in parameters + couplings])
+            if paramsignature_const:
+                paramsignature_const += ','
+
+            paramsignature_func = ",\n        ".join(['tf.TensorSpec(shape=[None], dtype=DTYPECOMPLEX)'] * len(couplings_dep))
+
+            params = ",".join([p for p in parameters + couplings + couplings_dep])
+
             paramnames_const = ",".join(["\"%s\"" % p for p in parameters + couplings])
             paramnames_func = ",".join(["\"%s\"" % p for p in couplings_dep])
 
             replace_dict['model_parameters'] = model_parameter_lines + model_parameter_lines_dep
+            # replace cmath->numpy(np) inside the model paramaters
+            replace_dict['model_parameters'] = replace_dict['model_parameters'].replace('cmath', 'np')
             replace_dict['paramsignature_const'] = paramsignature_const
+            replace_dict['paramsignature_func'] = paramsignature_func
             replace_dict['params'] = params
             replace_dict['paramnames_const'] = paramnames_const
             replace_dict['paramnames_func'] = paramnames_func

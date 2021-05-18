@@ -13,6 +13,7 @@ from alohaflow.wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
 
 import os
 import sys
+import numpy as np
 
 import tensorflow as tf
 import collections
@@ -41,6 +42,7 @@ def get_model_param(model, param_card_path):
 smatrix_signature = [
         tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
         %(paramsignature_const)s
+        %(paramsignature_func)s
         ]
 
 
@@ -48,6 +50,7 @@ matrix_signature = [
         tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
         tf.TensorSpec(shape=[%(nexternal)d], dtype=DTYPE),
         %(paramsignature_const)s
+        %(paramsignature_func)s
         ]
 
 
