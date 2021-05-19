@@ -195,7 +195,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
             model_parameter_lines_dep += '\n    # PS-dependent couplings\n'
             for c in self.coups_dep:
                 if not c.name in couplings: continue
-                model_parameter_lines_dep += '    %s = lambda G: %s\n' % (c.name, c.expr)
+                model_parameter_lines_dep += '    %s = lambda G: complex_me(%s)\n' % (c.name, c.expr)
                 couplings.remove(c.name)
                 couplings_dep.append(c.name)
 
@@ -213,7 +213,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
                                                     ['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(couplings))
                 paramtuple_const = ",".join(["float_me(%s)" % p for p in parameters] + ["complex_me(%s)" % p for p in couplings]) 
 
-            paramtuple_func = ",".join(["complex_me(%s)" % p for p in couplings_dep]) 
+            paramtuple_func = ",".join(["%s" % p for p in couplings_dep]) 
 
             if paramsignature_const:
                 paramsignature_const += ','
