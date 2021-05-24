@@ -31,16 +31,14 @@ class Model:
     def __init__(self, constants, functions):
         self._tuple_constants = constants
         self._tuple_functions = functions
-        self._constants = [i for i in constants]
+        self._constants = list(constants)
         self._to_evaluate = [tf.function(i, input_signature=GS_SIGNATURE) for i in functions]
         self._frozen = []
 
     @property
     def frozen(self):
-        if self._frozen:
-            return True
-        else:
-            return False
+        """Whether the model is frozen for a given value of alpha_s or not"""
+        return bool(self._frozen)
 
     def freeze_alpha_s(self, alpha_s):
         """The model can be frozen to a specific value
@@ -51,13 +49,7 @@ class Model:
         """
         if self.frozen:
             raise ValueError("The model is already frozen")
-        self._frozen = self._evaluate(
-            float_me(
-                [
-                    alpha_s,
-                ]
-            )
-        )
+        self._frozen = self._evaluate(float_me([alpha_s]))
 
     def unfreeze(self):
         """Remove the frozen status"""
@@ -74,9 +66,17 @@ class Model:
         results = [fun(gs) for fun in self._to_evaluate]
         if not results:
             return self._constants
-        elif not self._constants:
+        if not self._constants:
             return results
         return *self._constants, *results
+
+    def get_masses(self):
+        """Get the masses that entered the model as constants"""
+        masses = []
+        for key, val in self._tuple_constants._asdict().items():
+            if key.startswith("mdl_"):
+                masses.append(val)
+        return masses
 
     def evaluate(self, alpha_s=None):
         """Evaluate alpha_s, if the model is frozen
