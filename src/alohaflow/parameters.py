@@ -74,7 +74,7 @@ class Model:
         """Get the masses that entered the model as constants"""
         masses = []
         for key, val in self._tuple_constants._asdict().items():
-            if key.startswith("mdl_"):
+            if key.startswith("mdl_M"):
                 masses.append(val)
         return masses
 
