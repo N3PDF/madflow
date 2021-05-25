@@ -8,6 +8,7 @@
 from .config import float_me, int_me, DTYPE, run_eager
 
 import numpy as np
+import copy
 import tensorflow as tf
 
 import logging
@@ -313,6 +314,14 @@ class PhaseSpaceGenerator:
         else:
             raise ValueError(f"PS algorithm {algorithm} not understood")
 
+    def clear_cuts(self):
+        """Clear all cuts, if not running on eager mode, we need to regenerate call"""
+        self._cuts = []
+        self._cuts_info = []
+        orig_function = self.__call__.python_function
+        orig_signature = self.__call__.input_signature
+        self.__call__ = tf.function(orig_function, input_signature=orig_signature)
+
     @staticmethod
     def pt(ps_point):
         """Compute the pt of the ps point (nevents,4)"""
@@ -376,7 +385,7 @@ class PhaseSpaceGenerator:
             self._cuts_info.append(f"{min_val} < {variable} < {max_val}")
         self._cuts.append(cut_fun)
 
-    @tf.function
+    @tf.function(input_signature=[tf.TensorSpec(shape=[None, None], dtype=DTYPE)])
     def __call__(self, xrand):
         """
             Generate phase space points according to the xrand random input
