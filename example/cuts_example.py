@@ -9,6 +9,9 @@ The matrix element run by default is: g g > t t~
 ```
     ~$ ./cuts_example.py --madgraph_process "g g > g g"
 ```
+
+It is possible to apply some mock cuts (pt > 60) with the option  `-c`
+It is also possible to use a variable coupling with muF = muR = pt of the top with the option `-g`
 """
 import re
 import sys
@@ -19,7 +22,7 @@ import subprocess as sp
 from pathlib import Path
 
 from vegasflow import vegas_wrapper
-from pdfflow import mkPDF, float_me, int_me
+from pdfflow import mkPDF, float_me, int_me, run_eager
 
 from alohaflow.config import get_madgraph_path
 from alohaflow.phasespace import ramboflow, PhaseSpaceGenerator
@@ -27,8 +30,8 @@ import tensorflow as tf
 
 # Create some temporary directories and files
 # (won't be removed on output so they can be inspected)
-out_path = Path(tempfile.mkdtemp())
-script_path = Path(tempfile.mktemp())
+out_path = Path(tempfile.mkdtemp(prefix="mad"))
+script_path = Path(tempfile.mktemp(prefix="mad_script"))
 
 # Note that if another process is run, the imports below
 # must be changed accordingly, it can be made into options later on
@@ -53,7 +56,10 @@ if __name__ == "__main__":
         type=str,
         default="g g > t t~",
     )
-    arger.add_argument("-m", "--massive_particles", help="Number of massive particles", type=int, default=2)
+    arger.add_argument(
+        "-m", "--massive_particles", help="Number of massive particles", type=int, default=2
+    )
+    arger.add_argument("-g", "--variable_g", help="Use variable g_s", action="store_true")
 
     args = arger.parse_args()
 
@@ -108,15 +114,20 @@ output pyout {out_path}"""
         param_masses *= massive_particles
 
     masses = param_masses + [0.0] * non_massive
-    model_params.freeze_alpha_s(0.118)
+
+    if not args.variable_g:
+        q2 = float_me(91.46 ** 2)
+        model_params.freeze_alpha_s(0.118)
 
     if args.verbose:
-        xrand = tf.random.uniform(shape=(10, ndim), dtype=tf.float64)
+        test_events = 5
+        xrand = tf.random.uniform(shape=(test_events, ndim), dtype=tf.float64)
         ps, wgt, x1, x2 = ramboflow(xrand, nparticles, sqrts, masses)
-        wgts = matrix.smatrix(ps, *model_params.evaluate(None))
+        if args.variable_g:
+            alpha_s = float_me([0.118]*test_events)
+        wgts = matrix.smatrix(ps, *model_params.evaluate(alpha_s))
         print(f"Weights: \n{wgts.numpy()}")
 
-    q2 = float_me(91.46 ** 2)
     pdf = mkPDF(args.pdf + "/0")
 
     # Create the pase space and register the cuts
@@ -125,18 +136,30 @@ output pyout {out_path}"""
         phasespace.register_cut("pt", particle=3, min_val=60.0)
         phasespace.register_cut("pt", particle=2, min_val=60.0)
 
-    def luminosity(x1, x2, flavours):
+    def luminosity(x1, x2, flavours, q2array):
         """Returns f(x1)*f(x2) for the given flavours"""
-        q2array = tf.ones_like(x1) * q2
         hadron_1 = pdf.xfxQ2(flavours, x1, q2array)
         hadron_2 = pdf.xfxQ2(flavours, x2, q2array)
         return (hadron_1 * hadron_2) / x1 / x2
 
     def cross_section(xrand, **kwargs):
         """Compute the cross section"""
+        # Generate the phase space point
         all_ps, wts, x1, x2, idx = phasespace(xrand)
-        pdf_result = luminosity(x1, x2, int_me([21]))
-        smatrix = matrix.smatrix(all_ps, *model_params.evaluate(None))
+
+        # Compute the value of muF==muR if needed
+        if args.variable_g:
+            q2array = phasespace.pt(all_ps[:,2,:]) ** 2
+            alpha_s = pdf.alphasQ2(q2array)
+        else:
+            q2array = tf.ones_like(x1) * q2
+            alpha_s = None
+
+        # Get the luminosity per event
+        pdf_result = luminosity(x1, x2, int_me([21]), q2array)
+
+        # Compute the cross section
+        smatrix = matrix.smatrix(all_ps, *model_params.evaluate(alpha_s))
         ret = smatrix * pdf_result * wts
         if args.enable_cuts:
             ret = tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
