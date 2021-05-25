@@ -65,7 +65,7 @@ def test_PhaseSpaceGenerator(sqrts=7e3, nparticles=5, nevents=10000):
     np.testing.assert_allclose(all_ps, full_np[mask])
 
 
-def test_fourmomenta(sqrts=7e3, nparticles=4, nevents=100, masses=[0.0, 23.0]):
+def test_fourmomenta(sqrts=7e3, nparticles=4, nevents=100, masses=[50.0, 125.0]):
     """Generate a few phase space points and compute some quantities"""
     ps_gen = ps.PhaseSpaceGenerator(nparticles, sqrts, masses=masses, algorithm="ramboflow")
     dim = (nparticles - 2) * 4 + 2
@@ -75,8 +75,8 @@ def test_fourmomenta(sqrts=7e3, nparticles=4, nevents=100, masses=[0.0, 23.0]):
     np.testing.assert_allclose(ps._invariant_mass(all_ps[:, 0, :]), 0.0)
     np.testing.assert_allclose(ps._invariant_mass(all_ps[:, 1, :]), 0.0)
     # And the others whatever is given by the mass
-    np.testing.assert_allclose(ps._invariant_mass(all_ps[:, 2, :]), masses[0] ** 2, atol=1e-4)
-    np.testing.assert_allclose(ps._invariant_mass(all_ps[:, 3, :]), masses[1] ** 2, atol=1e-4)
+    np.testing.assert_allclose(ps._invariant_mass(all_ps[:, 2, :]), masses[0] ** 2, atol=1e-4, rtol=1e-4)
+    np.testing.assert_allclose(ps._invariant_mass(all_ps[:, 3, :]), masses[1] ** 2, atol=1e-4, rtol=1e-4)
 
 
 if __name__ == "__main__":
