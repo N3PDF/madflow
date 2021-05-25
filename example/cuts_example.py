@@ -22,7 +22,7 @@ from vegasflow import vegas_wrapper
 from pdfflow import mkPDF, float_me, int_me
 
 from alohaflow.config import get_madgraph_path
-from alohaflow.utilities import _get_ps
+from alohaflow.phasespace import ramboflow
 import tensorflow as tf
 
 # Create some temporary directories and files 
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     if args.verbose:
         xrand = tf.random.uniform(shape=(10, ndim), dtype=tf.float64)
-        ps, wgt, x1, x2 = _get_ps(xrand, nparticles, sqrts, masses)
+        ps, wgt, x1, x2 = ramboflow(xrand, nparticles, sqrts, masses)
         wgts = matrix.smatrix(ps, *model_params.evaluate(None))
         print(f"Weights: \n{wgts.numpy()}")
 
@@ -94,7 +94,7 @@ if __name__ == "__main__":
         return (hadron_1 * hadron_2) / x1 / x2
 
     def cross_section(xrand, **kwargs):
-        all_ps, wts, x1, x2 = _get_ps(xrand, nparticles, sqrts, masses)
+        all_ps, wts, x1, x2 = ramboflow(xrand, nparticles, sqrts, masses)
         pdf_result = luminosity(x1, x2, int_me([21]))
         smatrix = matrix.smatrix(all_ps, *model_params.evaluate(None))
         return smatrix * pdf_result * wts

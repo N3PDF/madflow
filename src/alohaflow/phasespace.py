@@ -94,7 +94,7 @@ def _massive_xfactor(sqrts, masses, massless_energies):
 
 @tf.function(input_signature=[p_signature, p_signature])
 def _conformal_transformation(input_q, bquad):
-    """ Perform the conformal transformation q->p """
+    """Perform the conformal transformation q->p"""
     bvec = bquad[:, 1:]
     gamma = -bquad[:, 0:1]
     a = 1.0 / (1.0 + gamma)
@@ -197,3 +197,82 @@ def rambo(xrand, n_particles, sqrts, masses=None, check_physical=False):
     wt += (2 * n_particles - 3) * tf.math.log(xfactor[:, 0]) + tf.math.log(wt2 / wt3 * sqrts[:, 0])
     wt = tf.exp(wt) / tf.pow(2 * PI, 3 * n_particles - 4)
     return massive_p, wt
+
+
+def _get_x1x2(xarr, shat_min, s_in):
+    """Receives two random numbers and return the
+    value of the invariant mass of the center of mass
+    as well as the jacobian of the x1,x2 -> tau-y transformation
+    and the values of x1 and x2.
+
+    The xarr array is of shape (batch_size, 2)
+    """
+    taumin = shat_min / s_in
+    taumax = float_me(1.0)
+    # Pick tau
+    delta_tau = taumax - taumin
+    tau = xarr[:, 0] * delta_tau + taumin
+    wgt = delta_tau
+    x1 = tf.pow(tau, xarr[:, 1])
+    x2 = tau / x1
+    wgt *= -1.0 * tf.math.log(tau)
+    shat = x1 * x2 * s_in
+    return shat, wgt, x1, x2
+
+
+def ramboflow(xrand, nparticles, com_sqrts, masses=None):
+    """Takes as input an array of nevent x ndim random points and outputs
+    an array of momenta (nevents x nparticles x 4) in the C.O.M.
+
+    The two first particles are the two incoming particles which are always
+    massless. The masses of the outgoing particles is given by the list ``masses``
+    if not given all outgoing particles are taken as massless
+
+    Parameters
+    ----------
+        xrand: tensor (nevents, (nparticles-2)*4+2)
+            random numbers to generate momenta
+        nparticles: int
+            number of external particles
+        com_sqrts: float
+            center of mass energy
+        masses: lust (nparticles-2)
+            masses of the outgoing particles
+
+    Return
+    ------
+        final_p: tensor (nevents, nparticles, 4)
+            phase space point for all particles for all events (E, px, py, pz)
+        wgt: tensor (nevents)
+            weight of the phase space points
+        x1: tensor (nevents)
+            momentum fraction of parton 1
+        x2: tensor (nevents)
+            momentum fraction of parton 2
+    """
+    if masses is None:
+        shat_min = float_me(0.0)
+    else:
+        shat_min = float_me(np.sum(masses) ** 2)
+
+    # Sample the initial state
+    shat, wgt, x1, x2 = _get_x1x2(xrand[:, :2], shat_min, com_sqrts ** 2)
+    roots = tf.sqrt(shat)
+
+    # Sample the outgoing states
+    p_out, wtps = rambo(xrand[:, 2:], int(nparticles - 2), roots, masses=masses)
+    wgt *= wtps
+
+    # Now stack the input states on top
+    zeros = tf.zeros_like(x1)
+    ein = roots / 2.0
+    pa = tf.expand_dims(tf.stack([ein, zeros, zeros, ein], axis=1), 1)
+    pb = tf.expand_dims(tf.stack([ein, zeros, zeros, -ein], axis=1), 1)
+
+    final_p = tf.concat([pa, pb, p_out], axis=1)
+
+    # Add the flux factor
+    wgt *= float_me(389379365.6)  # GeV to pb
+    wgt /= 2 * shat
+
+    return final_p, wgt, x1, x2
