@@ -124,7 +124,7 @@ output pyout {out_path}"""
         xrand = tf.random.uniform(shape=(test_events, ndim), dtype=tf.float64)
         ps, wgt, x1, x2 = ramboflow(xrand, nparticles, sqrts, masses)
         if args.variable_g:
-            alpha_s = float_me([0.118]*test_events)
+            alpha_s = float_me([0.118] * test_events)
         wgts = matrix.smatrix(ps, *model_params.evaluate(alpha_s))
         print(f"Weights: \n{wgts.numpy()}")
 
@@ -149,7 +149,9 @@ output pyout {out_path}"""
 
         # Compute the value of muF==muR if needed
         if args.variable_g:
-            q2array = phasespace.pt(all_ps[:,2,:]) ** 2
+            mt1 = phasespace.mt2(all_ps[:, 2, :])
+            mt2 = phasespace.mt2(all_ps[:, 3, :])
+            q2array = (mt1 + mt2) / 2.0
             alpha_s = pdf.alphasQ2(q2array)
         else:
             q2array = tf.ones_like(x1) * q2

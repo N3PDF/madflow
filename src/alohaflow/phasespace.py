@@ -23,6 +23,18 @@ p_signature = tf.TensorSpec(shape=[None, 4], dtype=DTYPE)
 ps_signature = tf.TensorSpec(shape=[None, None, 4], dtype=DTYPE)
 
 
+@tf.function(input_signature=2 * [p_signature])
+def _fourdot(f1, f2):
+    ener = f1[:, 0] * f2[:, 0]
+    pmom = tf.reduce_sum(f1[:, 1:] * f2[:, 1:], axis=1)
+    return ener - pmom
+
+
+@tf.function(input_signature=[p_signature])
+def _invariant_mass(fm):
+    return _fourdot(fm, fm)
+
+
 @tf.function(
     input_signature=[
         events_signature,
@@ -321,6 +333,18 @@ class PhaseSpaceGenerator:
         orig_function = self.__call__.python_function
         orig_signature = self.__call__.input_signature
         self.__call__ = tf.function(orig_function, input_signature=orig_signature)
+
+    @staticmethod
+    def mt2(ps_point):
+        """Transverse mass squared of the given ps point (nevents, 4)"""
+        pt2 = PhaseSpaceGenerator.pt(ps_point) ** 2
+        m2 = _invariant_mass(ps_point)
+        return m2 + pt2
+
+    @staticmethod
+    def mt(ps_point):
+        """Transverse mass of the given ps point"""
+        return tf.math.sqrt(PhaseSpaceGenerator.mt2(ps_point))
 
     @staticmethod
     def pt(ps_point):
