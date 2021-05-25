@@ -5,7 +5,7 @@
     When a complete set of momenta is output the structure is (n_events, n_particles, n_dim)
 """
 
-from .config import float_me, DTYPE, run_eager
+from .config import float_me, int_me, DTYPE, run_eager
 
 import numpy as np
 import tensorflow as tf
@@ -276,3 +276,136 @@ def ramboflow(xrand, nparticles, com_sqrts, masses=None):
     wgt /= 2 * shat
 
     return final_p, wgt, x1, x2
+
+
+class PhaseSpaceGenerator:
+    """Phase space generator class
+    able to not only generate momenta but also apply cuts
+
+    Parameters
+    ----------
+        nparticles: int
+            number of external particles
+        com_sqrts: float
+            com energy
+        masses: list(float)
+            mass of the outgoing particles
+        algorithm: str
+            algoirhtm to be used (by default ramboflow)
+    """
+
+    def __init__(self, nparticles, com_sqrts, masses=None, algorithm="ramboflow"):
+        if masses is None:
+            masses = [0.0] * (nparticles - 2)
+        if len(masses) != (nparticles - 2):
+            raise ValueError(
+                "Missmatch in PhaseSpaceGenerator between particles and masses"
+                f" {len(masses)} given for {nparticles-2} outgoing particles"
+            )
+        self._sqrts = float_me(com_sqrts)
+        self._masses = masses
+        self._nparticles = nparticles
+        self._cuts = []
+        self._cuts_info = []
+
+        if algorithm == "ramboflow":
+            self._ps_gen = ramboflow
+        else:
+            raise ValueError(f"PS algorithm {algorithm} not understood")
+
+    @staticmethod
+    def pt(ps_point):
+        """Compute the pt of the ps point (nevents,4)"""
+        px = ps_point[:, 1]
+        py = ps_point[:, 2]
+        return tf.math.sqrt(px ** 2 + py ** 2)
+
+    def register_cuts(self, variable, particle=None, min_val=None, max_val=None):
+        """Register the cut for the given variable for the given particle (if needed)
+        The variables must be done as a string and be a valid method of this class
+        the min and max values are the values between which the variable must be found
+
+        Warning:
+            at this point the user is trusted to use the argument 'particle'
+            whenever the variable applies to
+
+        The cut functions will return a tensor of the idx of the accepted events
+        and a tensor of booleans
+
+        Parameters
+        ----------
+            variable: str
+                name of the variable to which the cut applies
+            particle: int
+                particle index to which the cut applies
+            min_val: float
+                minimum accepted value of the variable
+            max_val: float
+                maximum accepted value of the variable
+        """
+        try:
+            fun = getattr(self, variable)
+        except AttributeError:
+            raise ValueError(f"{variable} is not implemented")
+        if min_val is None and max_val is None:
+            logger.warning(f"Cut for {variable} has no min or max val, ignoring")
+
+        def cut_function(phase_space):
+            if particle is not None:
+                phase_space = phase_space[:, particle, :]
+            variable_value = fun(phase_space)
+
+            if min_val is not None:
+                min_pass = variable_value > float_me(min_val)
+                if max_val is None:
+                    return min_pass
+            if max_val is not None:
+                max_pass = variable_value < float_me(max_val)
+                if min_val is None:
+                    return max_pass
+            return tf.logical_and(min_pass, max_pass)
+
+        if particle is None:
+            cut_fun = tf.function(cut_function, input_signature=[p_signature])
+            self._cuts_info.append(f"{min_val} < {variable}({particle}) < {max_val}")
+        else:
+            cut_fun = tf.function(cut_function, input_signature=[ps_signature])
+            self._cuts_info.append(f"{min_val} < {variable} < {max_val}")
+        self._cuts.append(cut_fun)
+
+    def __call__(self, xrand):
+        """
+            Generate phase space points according to the xrand random input
+
+        Parameters
+        ----------
+            xrand: tensor (nevents, (nparticles-2)*4+2)
+                random numbers to generate momenta
+
+        Return  (if there are cuts, the output nevents =/= input nevents)
+        ------
+            final_p: tensor (nevents, nparticles, 4)
+                phase space point for all particles for all events (E, px, py, pz)
+            wgt: tensor (nevents)
+                weight of the phase space points
+            x1: tensor (nevents)
+                momentum fraction of parton 1
+            x2: tensor (nevents)
+                momentum fraction of parton 2
+            idx: tensor (nevents)
+                if there are cuts, index of the passing events, (1,) otherwise
+        """
+        ps, wgt, x1, x2 = self._ps_gen(xrand, self._nparticles, self._sqrts, self._masses)
+
+        # Apply all cuts
+        if self._cuts:
+            stripes = [cut(ps) for cut in self._cuts]
+            passing_values = tf.math.reduce_all(stripes, axis=0)
+            ps = tf.boolean_mask(ps, passing_values, axis=0)
+            wgt = tf.boolean_mask(wgt, passing_values)
+            x1 = tf.boolean_mask(x1, passing_values)
+            x2 = tf.boolean_mask(x2, passing_values)
+            idx = int_me(tf.where(passing_values))
+        else:
+            idx = float_me(1.0)
+        return ps, wgt, x1, x2, idx
