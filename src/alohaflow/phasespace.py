@@ -320,7 +320,7 @@ class PhaseSpaceGenerator:
         py = ps_point[:, 2]
         return tf.math.sqrt(px ** 2 + py ** 2)
 
-    def register_cuts(self, variable, particle=None, min_val=None, max_val=None):
+    def register_cut(self, variable, particle=None, min_val=None, max_val=None):
         """Register the cut for the given variable for the given particle (if needed)
         The variables must be done as a string and be a valid method of this class
         the min and max values are the values between which the variable must be found
@@ -347,6 +347,9 @@ class PhaseSpaceGenerator:
             fun = getattr(self, variable)
         except AttributeError:
             raise ValueError(f"{variable} is not implemented")
+
+        if particle is not None and particle >= self._nparticles:
+            raise ValueError(f"Cannot apply cuts to particle {particle}, python idx starts at 0!")
         if min_val is None and max_val is None:
             logger.warning(f"Cut for {variable} has no min or max val, ignoring")
 
@@ -373,6 +376,7 @@ class PhaseSpaceGenerator:
             self._cuts_info.append(f"{min_val} < {variable} < {max_val}")
         self._cuts.append(cut_fun)
 
+    @tf.function
     def __call__(self, xrand):
         """
             Generate phase space points according to the xrand random input

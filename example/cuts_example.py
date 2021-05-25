@@ -4,15 +4,15 @@
 Example script that goes from the generation of a matrix element
 to the integration with the corresponding cuts
 
-The matrix element to be run is fixed to be: g g > t t~
+The matrix element run by default is: g g > t t~
 
 ```
-    ~$ ./cuts_example.py
+    ~$ ./cuts_example.py --madgraph_process "g g > g g"
 ```
 """
-import os
-os.environ.setdefault("VEGASFLOW_LOG_LEVEL", "2")
+import re
 import sys
+import importlib
 import argparse
 import tempfile
 import subprocess as sp
@@ -22,27 +22,46 @@ from vegasflow import vegas_wrapper
 from pdfflow import mkPDF, float_me, int_me
 
 from alohaflow.config import get_madgraph_path
-from alohaflow.phasespace import ramboflow
+from alohaflow.phasespace import ramboflow, PhaseSpaceGenerator
 import tensorflow as tf
 
-# Create some temporary directories and files 
+# Create some temporary directories and files
 # (won't be removed on output so they can be inspected)
 out_path = Path(tempfile.mkdtemp())
 script_path = Path(tempfile.mktemp())
 
 # Note that if another process is run, the imports below
 # must be changed accordingly, it can be made into options later on
-madgraph_script = f"""generate g g > t t~
-output pyout {out_path}"""
+re_name = re.compile(r"\w{3,}")
+
+
+def _import_module_from_path(path, module_name):
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
 
 if __name__ == "__main__":
     arger = argparse.ArgumentParser(__doc__)
     arger.add_argument("-v", "--verbose", help="Print extra info", action="store_true")
     arger.add_argument("-p", "--pdf", help="PDF set", type=str, default="NNPDF31_nnlo_as_0118")
+    arger.add_argument("-c", "--enable_cuts", help="Enable the cuts", action="store_true")
+    arger.add_argument(
+        "--madgraph_process",
+        help="Set the madgraph process to be run",
+        type=str,
+        default="g g > t t~",
+    )
+    arger.add_argument("-m", "--massive_particles", help="Number of massive particles", type=int, default=2)
 
     args = arger.parse_args()
 
-    # Run the process
+    # Prepare the madgraph script
+    madgraph_script = f"""generate {args.madgraph_process}
+output pyout {out_path}"""
+
+    # Run the process in madgraph and create the tensorized output
     script_path.write_text(madgraph_script)
     mg5_path = get_madgraph_path()
     mg5_exe = mg5_path / "bin/mg5_aMC"
@@ -53,29 +72,42 @@ if __name__ == "__main__":
         output = None
     else:
         output = sp.DEVNULL
-    sp.run([mg5_exe, "-f", script_path], stdout=output)
+    sp.run([mg5_exe, "-f", script_path], stdout=output, check=True)
     if args.verbose:
         print(f" > Madgraph output can be found at {out_path}")
 
-    # And now bring the python files from the output folder
+    # Import the matrix file from the output folder as a module
     sys.path.insert(0, out_path.as_posix())
-    # Note: these imports must be changed if the process is changed
-    from matrix_1_gg_ttx import Matrix_1_gg_ttx as matrix_element, import_ufo, get_model_param
+    matrix_file = next(out_path.glob("matrix_*.py")).name
+    matrix_name = re_name.findall(matrix_file)[0]
+    matrix_module = _import_module_from_path(out_path / matrix_file, matrix_name)
+    # Import specifically the matrix element
+    matrix_element = getattr(matrix_module, matrix_name.capitalize())
 
     # Read the parameters of the model
     model_sm = mg5_path / "models/sm"
-    model = import_ufo.import_model(model_sm.as_posix())
-    model_params = get_model_param(model, (out_path / 'Cards/param_card.dat').as_posix())
-    
+    model = matrix_module.import_ufo.import_model(model_sm.as_posix())
+    model_params = matrix_module.get_model_param(
+        model, (out_path / "Cards/param_card.dat").as_posix()
+    )
 
+    # Instantiate the matrix element
     matrix = matrix_element()
 
+    # Set up the parameters of the process
     nparticles = int(matrix.nexternal)
-    ndim = (nparticles - 2)*4 + 2
+    ndim = (nparticles - 2) * 4 + 2
     sqrts = 7e3
-    massive_particles = 2
+    massive_particles = args.massive_particles
+    non_massive = nparticles - massive_particles - 2
+    # Assume that the massive particles go first
+    # and _if_ the number of masses is below the number of massive particle
+    # assume they are all the same mass (usually the top anyway)
+    param_masses = model_params.get_masses()
+    if len(param_masses) < massive_particles:
+        param_masses *= massive_particles
 
-    masses = model_params.get_masses()*massive_particles + [0]*(nparticles-massive_particles-2)
+    masses = param_masses + [0.0] * non_massive
     model_params.freeze_alpha_s(0.118)
 
     if args.verbose:
@@ -84,8 +116,15 @@ if __name__ == "__main__":
         wgts = matrix.smatrix(ps, *model_params.evaluate(None))
         print(f"Weights: \n{wgts.numpy()}")
 
-    q2 = float_me(91.46**2)
+    q2 = float_me(91.46 ** 2)
     pdf = mkPDF(args.pdf + "/0")
+
+    # Create the pase space and register the cuts
+    phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses)
+    if args.enable_cuts:
+        phasespace.register_cut("pt", particle=3, min_val=60.0)
+        phasespace.register_cut("pt", particle=2, min_val=60.0)
+
     def luminosity(x1, x2, flavours):
         """Returns f(x1)*f(x2) for the given flavours"""
         q2array = tf.ones_like(x1) * q2
@@ -94,9 +133,13 @@ if __name__ == "__main__":
         return (hadron_1 * hadron_2) / x1 / x2
 
     def cross_section(xrand, **kwargs):
-        all_ps, wts, x1, x2 = ramboflow(xrand, nparticles, sqrts, masses)
+        """Compute the cross section"""
+        all_ps, wts, x1, x2, idx = phasespace(xrand)
         pdf_result = luminosity(x1, x2, int_me([21]))
         smatrix = matrix.smatrix(all_ps, *model_params.evaluate(None))
-        return smatrix * pdf_result * wts
+        ret = smatrix * pdf_result * wts
+        if args.enable_cuts:
+            ret = tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
+        return ret
 
     _ = vegas_wrapper(cross_section, ndim, 5, int(1e5))
