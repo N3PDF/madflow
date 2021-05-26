@@ -33,7 +33,6 @@ signvec_signature = [
 @tf.function(input_signature=sign_signature)
 def sign(x, y):
     """Fortran's sign transfer function"""
-    # print("sign")
     # dropping the checks for the moment
     return x * tf.math.sign(y)
 
@@ -41,14 +40,24 @@ def sign(x, y):
 @tf.function(input_signature=signvec_signature)
 def signvec(x, y):
     """Fortran's sign transfer function"""
-    # print("signvec")
     # dropping the checks for the moment
     return x * tf.math.sign(y)
 
 
 @tf.function(input_signature=scalar_signature)
 def sxxxxx(p, nss):
-    """Defines a scalar."""
+    """
+    Defines a scalar wavefunction. Input momenta have shape (num events, 4).
+    
+    Parameters
+    ----------
+        p: tf.Tensor, of shape=(None,4)
+        nss: tf.Tensor, of shape=()
+    
+    Returns
+    -------
+        fi: tf.Tensor, of shape=(3,None)    
+    """
     # Note: here p[:,i] selects the momentum dimension and is a [nevt,] tensor
     v0 = tf.expand_dims(complex_tf(p[:, 0] * nss, p[:, 3] * nss), 0)  # [nevt,] complex
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nss, p[:, 2] * nss), 0)  # [nevt,] complex
@@ -59,8 +68,21 @@ def sxxxxx(p, nss):
 
 @tf.function(input_signature=wave_signature)
 def ixxxxx(p, fmass, nhel, nsf):
-    """Defines an inflow fermion."""
-    # print("ixxxxx")
+    """
+    Defines an inflow fermion wavefunction. Input momenta have shape
+    (num events, 4).
+
+    Parameters
+    ----------
+        p: tf.Tensor, of shape=(None,4)
+        fmass: tf.Tensor, of shape=()
+        nhel: tf.Tensor, of shape=()
+        nsf: tf.Tensor, of shape=()
+    
+    Returns
+    -------
+        fi: tf.Tensor, of shape=(6,None)    
+    """
     # Note: here p[:,i] selects the momentum dimension and is a [nevt,] tensor
     v0 = tf.expand_dims(complex_tf(-p[:, 0] * nsf, -p[:, 3] * nsf), 0)  # [nevt,] complex
     v1 = tf.expand_dims(complex_tf(-p[:, 1] * nsf, -p[:, 2] * nsf), 0)  # [nevt,] complex
@@ -150,8 +172,21 @@ def ixxxxx(p, fmass, nhel, nsf):
 
 @tf.function(input_signature=wave_signature)
 def oxxxxx(p, fmass, nhel, nsf):
-    """ initialize an outgoing fermion"""
-    # print("oxxxxx")
+    """ 
+    Defines an outgoing fermion wavefunction. Input momenta have shape
+    (num events, 4).
+
+    Parameters
+    ----------
+        p: tf.Tensor, of shape=(None,4)
+        fmass: tf.Tensor, of shape=()
+        nhel: tf.Tensor, of shape=()
+        nsf: tf.Tensor, of shape=()
+    
+    Returns
+    -------
+        fi: tf.Tensor, of shape=(6,None)
+    """
     v0 = tf.expand_dims(complex_tf(p[:, 0] * nsf, p[:, 3] * nsf), 0)  # [nevt,] complex
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nsf, p[:, 2] * nsf), 0)  # [nevt,] complex
     nh = nhel * nsf  # either +1 or -1
@@ -241,8 +276,21 @@ def oxxxxx(p, fmass, nhel, nsf):
 
 @tf.function(input_signature=wave_signature)
 def vxxxxx(p, vmass, nhel, nsv):
-    """ initialize a vector wavefunction. nhel=4 is for checking BRST"""
-    # print("vxxxxx")
+    """
+    Defines a vector wavefunction. nhel=4 is for checking BRST. Inpu
+    momenta have shape (num events, 4).
+
+    Parameters
+    ----------
+        p: tf.Tensor, of shape=(None,4)
+        fmass: tf.Tensor, of shape=()
+        nhel: tf.Tensor, of shape=()
+        nsv: tf.Tensor, of shape=()
+    
+    Returns
+    -------
+        tf.Tensor, of shape=(6,None)
+    """
     nevts = tf.shape(p, out_type=DTYPEINT)[0]
     hel0 = 1.0 - tfmath.abs(nhel)
 
