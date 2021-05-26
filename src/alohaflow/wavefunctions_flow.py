@@ -49,9 +49,8 @@ def sxxxxx(p, nss):
     -------
         tf.Tensor, of shape=(3,None)    
     """
-    # Note: here p[:,i] selects the momentum dimension and is a [nevt,] tensor
-    v0 = tf.expand_dims(complex_tf(p[:, 0] * nss, p[:, 3] * nss), 0)  # [nevt,] complex
-    v1 = tf.expand_dims(complex_tf(p[:, 1] * nss, p[:, 2] * nss), 0)  # [nevt,] complex
+    v0 = tf.expand_dims(complex_tf(p[:, 0] * nss, p[:, 3] * nss), 0)
+    v1 = tf.expand_dims(complex_tf(p[:, 1] * nss, p[:, 2] * nss), 0)
     v = tf.expand_dims(complex_tf(1.0, 0.0), 0)
     return tf.concat([v0, v1, v], axis=0)
 
@@ -73,10 +72,9 @@ def ixxxxx(p, fmass, nhel, nsf):
     -------
         tf.Tensor, of shape=(6,None)    
     """
-    # Note: here p[:,i] selects the momentum dimension and is a [nevt,] tensor
-    v0 = tf.expand_dims(complex_tf(-p[:, 0] * nsf, -p[:, 3] * nsf), 0)  # [nevt,] complex
-    v1 = tf.expand_dims(complex_tf(-p[:, 1] * nsf, -p[:, 2] * nsf), 0)  # [nevt,] complex
-    nh = nhel * nsf  # either +1 or -1
+    v0 = tf.expand_dims(complex_tf(-p[:, 0] * nsf, -p[:, 3] * nsf), 0)
+    v1 = tf.expand_dims(complex_tf(-p[:, 1] * nsf, -p[:, 2] * nsf), 0)
+    nh = nhel * nsf
     ip = (1 + nh) // 2
     im = (1 - nh) // 2
 
@@ -105,10 +103,10 @@ def oxxxxx(p, fmass, nhel, nsf):
     -------
         tf.Tensor, of shape=(6,None)
     """
-    v0 = tf.expand_dims(complex_tf(p[:, 0] * nsf, p[:, 3] * nsf), 0)  # [nevt,] complex
-    v1 = tf.expand_dims(complex_tf(p[:, 1] * nsf, p[:, 2] * nsf), 0)  # [nevt,] complex
-    nh = nhel * nsf  # either +1 or -1
-    sqp0p3 = tfmath.sqrt(tfmath.maximum(p[:, 0] + p[:, 3], 0.0)) * nsf  # [nevt,]
+    v0 = tf.expand_dims(complex_tf(p[:, 0] * nsf, p[:, 3] * nsf), 0)
+    v1 = tf.expand_dims(complex_tf(p[:, 1] * nsf, p[:, 2] * nsf), 0)
+    nh = nhel * nsf
+    sqp0p3 = tfmath.sqrt(tfmath.maximum(p[:, 0] + p[:, 3], 0.0)) * nsf
 
     massive = fmass != 0
     v = tf.cond(massive,
@@ -144,7 +142,7 @@ def vxxxxx(p, vmass, nhel, nsv):
     pp = tfmath.minimum(p[:, 0], tfmath.sqrt(pt2 + p[:, 3] ** 2))
     pt = tfmath.minimum(pp, tfmath.sqrt(pt2))
 
-    v0 = tf.expand_dims(complex_tf(p[:, 0] * nsv, p[:, 3] * nsv), 0)  # [1,nevts] complex
+    v0 = tf.expand_dims(complex_tf(p[:, 0] * nsv, p[:, 3] * nsv), 0)
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nsv, p[:, 2] * nsv), 0)
 
     BRST = nhel == 4
@@ -178,7 +176,7 @@ def _ix_massive(p, fmass, nsf, nh, ip, im):
     """
     pp = tfmath.minimum(
         p[:, 0], tfmath.sqrt(p[:, 1] ** 2 + p[:, 2] ** 2 + p[:, 3] ** 2)
-    )  # [nevt,]
+    )
     cond = tf.expand_dims(pp == 0, 0)
     return tf.where(cond,
                     _ix_massive_pp_zero(fmass, nsf, ip, im),
@@ -232,25 +230,25 @@ def _ix_massive_pp_nonzero(p, fmass, nsf, nh, ip, im, pp):
     """
     sf = tf.stack(
         [(1 + nsf + (1 - nsf) * nh) * 0.5, (1 + nsf - (1 - nsf) * nh) * 0.5], axis=0
-    )  # [2,]
+    )
     omega = tf.stack(
         [tfmath.sqrt(p[:, 0] + pp), fmass / (tfmath.sqrt(p[:, 0] + pp))], axis=0
-    )  # [2, nevt]
+    )
     sfomeg = tf.stack(
         [sf[0] * omega[int_me(ip)], sf[1] * omega[int_me(im)]], axis=0
-    )  # [2,nevt]
-    pp3 = tfmath.maximum(pp + p[:, 3], 0.0)  # [nevt,]
+    )
+    pp3 = tfmath.maximum(pp + p[:, 3], 0.0)
     chi1 = tf.where(
         pp3 == 0,
         complex_tf(-nh, 0),
         complex_tf(
             nh * p[:, 1] / tfmath.sqrt(2.0 * pp * pp3), p[:, 2] / tfmath.sqrt(2.0 * pp * pp3)
         ),
-    )  # [nevt,] complex
-    chi2 = complex_tf(tfmath.sqrt(pp3 * 0.5 / pp), 0.0)  # [nevt,] complex
-    chi = tf.stack([chi2, chi1], axis=0)  # [2, nevt] complex
+    )
+    chi2 = complex_tf(tfmath.sqrt(pp3 * 0.5 / pp), 0.0)
+    chi = tf.stack([chi2, chi1], axis=0)
     v = [complex_tf(0,0)] * 4
-    v[0] = complex_tf(sfomeg[0], 0.0) * chi[int_me(im)]  # [nevt,] complex
+    v[0] = complex_tf(sfomeg[0], 0.0) * chi[int_me(im)]
     v[1] = complex_tf(sfomeg[0], 0.0) * chi[int_me(ip)]
     v[2] = complex_tf(sfomeg[1], 0.0) * chi[int_me(im)]
     v[3] = complex_tf(sfomeg[1], 0.0) * chi[int_me(ip)]
@@ -272,12 +270,12 @@ def _ix_massless(p, nhel, nsf, nh):
     -------
         tf.Tensor, of shape=(4,None) and dtype DTYPECOMPLEX
     """
-    sqp0p3 = tfmath.sqrt(tfmath.maximum(p[:, 0] + p[:, 3], 0.0)) * nsf  # [nevt,]
+    sqp0p3 = tfmath.sqrt(tfmath.maximum(p[:, 0] + p[:, 3], 0.0)) * nsf
     chi1 = tf.where(sqp0p3 == 0,
                     _ix_massless_sqp0p3_zero(p, nhel),
                     _ix_massless_sqp0p3_nonzero(p, nh, sqp0p3)
                    )
-    chi = tf.stack([complex_tf(sqp0p3, 0.0), chi1], axis=0)  # [2, nevt]
+    chi = tf.stack([complex_tf(sqp0p3, 0.0), chi1], axis=0)
     return tf.cond(nh == 1,
                    lambda: _ix_massless_nh_one(chi),
                    lambda: _ix_massless_nh_not_one(chi)
@@ -314,7 +312,7 @@ def _ix_massless_sqp0p3_nonzero(p, nh, sqp0p3):
     -------
         tf.Tensor, of shape=(None) and dtype DTYPECOMPLEX
     """
-    return complex_tf(nh * p[:, 1] / sqp0p3, p[:, 2] / sqp0p3)  # [nevt,] complex
+    return complex_tf(nh * p[:, 1] / sqp0p3, p[:, 2] / sqp0p3)
 
 
 @tf.function(input_signature=[tf.TensorSpec(shape=[2,None], dtype=DTYPECOMPLEX)])
@@ -374,12 +372,12 @@ def _ox_massive(p, fmass, nhel, nsf, nh):
     """
     pp = tfmath.minimum(
         p[:, 0], tfmath.sqrt(p[:, 1] ** 2 + p[:, 2] ** 2 + p[:, 3] ** 2)
-    )  # [nevt,]
+    )
     cond = tf.expand_dims(pp == 0, 0)
     return tf.where(cond,
                     _ox_massive_pp_zero(fmass, nhel, nsf, nh),
                     _ox_massive_pp_nonzero(p, fmass, nsf, nh, pp)
-                   )  # [4, nevt] complex
+                   )
 
 
 _ox_massive_pp_zero_signature = [sscalar]*4
@@ -404,11 +402,11 @@ def _ox_massive_pp_zero(fmass, nhel, nsf, nh):
     ip = -((1 - nh) // 2) * nhel
     im = (1 + nh) // 2 * nhel
     v = [complex_tf(0,0)] * 4
-    v[0] = complex_tf(im * sqm[int_me(tfmath.abs(im))], 0.0)  # just a complex number
+    v[0] = complex_tf(im * sqm[int_me(tfmath.abs(im))], 0.0)
     v[1] = complex_tf(ip * nsf * sqm[int_me(tfmath.abs(im))], 0.0)
     v[2] = complex_tf(im * nsf * sqm[int_me(tfmath.abs(ip))], 0.0)
     v[3] = complex_tf(ip * sqm[int_me(tfmath.abs(ip))], 0.0)
-    return tf.reshape(tf.stack(v), [4,1])  # [4,] complex
+    return tf.reshape(tf.stack(v), [4,1])
 
 
 _ox_massive_pp_nonzero_signature = [smom] + [sscalar]*3 + [svec]
@@ -429,31 +427,31 @@ def _ox_massive_pp_nonzero(p, fmass, nsf, nh, pp):
     """
     sf = tf.stack(
         [(1 + nsf + (1 - nsf) * nh) * 0.5, (1 + nsf - (1 - nsf) * nh) * 0.5], axis=0
-    )  # [2,]
+    )
     omega = tf.stack(
         [tfmath.sqrt(p[:, 0] + pp), fmass / (tfmath.sqrt(p[:, 0] + pp))], axis=0
-    )  # [2, nevt]
+    )
     ip = (1 + nh) // 2
     im = (1 - nh) // 2
     sfomeg = tf.stack(
         [sf[0] * omega[int_me(ip)], sf[1] * omega[int_me(im)]], axis=0
-    )  # [2,nevt]
-    pp3 = tfmath.maximum(pp + p[:, 3], 0.0)  # [nevt,]
+    )
+    pp3 = tfmath.maximum(pp + p[:, 3], 0.0)
     chi1 = tf.where(
         pp3 == 0,
         complex_tf(-nh, 0),
         complex_tf(
             nh * p[:, 1] / tfmath.sqrt(2.0 * pp * pp3), -p[:, 2] / tfmath.sqrt(2.0 * pp * pp3)
         ),
-    )  # [nevt,] complex
-    chi2 = complex_tf(tfmath.sqrt(pp3 * 0.5 / pp), 0.0)  # [nevt,] complex
-    chi = tf.stack([chi2, chi1], axis=0)  # [2, nevt] complex
+    )
+    chi2 = complex_tf(tfmath.sqrt(pp3 * 0.5 / pp), 0.0)
+    chi = tf.stack([chi2, chi1], axis=0)
     v = [complex_tf(0,0)] * 4
-    v[0] = complex_tf(sfomeg[1], 0.0) * chi[int_me(im)]  # [nevt,] complex
+    v[0] = complex_tf(sfomeg[1], 0.0) * chi[int_me(im)]
     v[1] = complex_tf(sfomeg[1], 0.0) * chi[int_me(ip)]
     v[2] = complex_tf(sfomeg[0], 0.0) * chi[int_me(im)]
     v[3] = complex_tf(sfomeg[0], 0.0) * chi[int_me(ip)]
-    return tf.stack(v, axis=0)  # [4, nevt] complex
+    return tf.stack(v, axis=0)
 
 
 _ox_massless_signature = [smom] + [sscalar]*2 + [svec]
@@ -475,7 +473,7 @@ def _ox_massless(p, nhel, nh, sqp0p3):
                     _ox_massless_sqp0p3_zero(p, nhel),
                     _ox_massless_sqp0p3_nonzero(p, nh, sqp0p3)
                    )
-    chi = tf.stack([complex_tf(sqp0p3, 0.0), chi1], axis=0)  # [2, nevt]
+    chi = tf.stack([complex_tf(sqp0p3, 0.0), chi1], axis=0)
     return tf.cond(nh == 1,
                    lambda: _ox_massless_nh_one(chi),
                    lambda: _ox_massless_nh_not_one(chi)
@@ -495,7 +493,7 @@ def _ox_massless_sqp0p3_zero(p, nhel):
     -------
         tf.Tensor, of shape=(None) and dtype DTYPECOMPLEX
     """
-    return complex_tf(-nhel * tfmath.sqrt(2.0 * p[:, 0]), 0.0)  # [nevt,] complex
+    return complex_tf(-nhel * tfmath.sqrt(2.0 * p[:, 0]), 0.0)
     # TODO: same as _ix_massless_sqp0p3_zero
 
 
@@ -513,7 +511,7 @@ def _ox_massless_sqp0p3_nonzero(p, nh, sqp0p3):
     -------
         tf.Tensor, of shape=(None) and dtype DTYPECOMPLEX
     """
-    return complex_tf(nh * p[:, 1] / sqp0p3, -p[:, 2] / sqp0p3)  # [nevt,] complex
+    return complex_tf(nh * p[:, 1] / sqp0p3, -p[:, 2] / sqp0p3)
     # TODO: same as _ix_massless_sqp0p3_nonzero
 
 
@@ -701,7 +699,7 @@ def _vx_no_BRST_check_massive_pp_zero(nhel, sqh, nsvahl, nevts):
     v[1] = tf.ones_like(v[0]) * complex_tf(-nhel * sqh, 0.0)
     v[2] = tf.ones_like(v[0]) * complex_tf(0.0, nsvahl * sqh)
     v[3] = tf.ones_like(v[0]) * complex_tf(hel0, 0.0)
-    return tf.stack(v, axis=0)  # [4,nevts] complex
+    return tf.stack(v, axis=0)
 
 
 @tf.function(input_signature=_vx_BRST_massive_signature)
@@ -737,7 +735,7 @@ def _vx_no_BRST_check_massive_pp_nonzero(
                                     p, nhel, sqh, nsvahl, nevts
                                                            )
                    )
-    return tf.concat([v2, v34, v5], axis=0)  # [4,nevts] complex
+    return tf.concat([v2, v34, v5], axis=0)
 
 
 _vx_BRST_massive_pp_nonzero_pt_nonzero_signature = [smom] + [sscalar]*4 + [svec]*3
