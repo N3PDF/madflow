@@ -162,10 +162,10 @@ def ixxxxx(p, fmass, nhel, nsf):
             v5 = tf.ones_like(v2) * complex_tf(0.0, 0.0)
             return tf.stack([v2, v3, v4, v5], axis=0)
 
-        return tf.where(nh == 1, nh_one(), nh_not_one())
+        return tf.cond(nh == 1, nh_one, nh_not_one)
 
     massive = fmass != 0
-    v = tf.where(massive, is_massive(), is_not_massive())
+    v = tf.cond(massive, is_massive, is_not_massive)
     fi = tf.concat([v0, v1, v], axis=0)
     return fi
 
@@ -266,10 +266,10 @@ def oxxxxx(p, fmass, nhel, nsf):
             v3 = tf.ones_like(v4) * complex_tf(0.0, 0.0)
             return tf.stack([v2, v3, v4, v5], axis=0)
 
-        return tf.where(nh == 1, nh_one(), nh_not_one())
+        return tf.cond(nh == 1, nh_one, nh_not_one)
 
     massive = fmass != 0
-    v = tf.where(massive, is_massive(), is_not_massive())
+    v = tf.cond(massive, is_massive, is_not_massive)
     fo = tf.concat([v0, v1, v], axis=0)
     return fo
 
@@ -319,7 +319,7 @@ def vxxxxx(p, vmass, nhel, nsv):
             return complex_me(tf.stack([vc2, vc3, vc4, vc5], axis=0))
 
         massless = vmass == 0
-        v = tf.where(massless, is_massless(), is_not_massless())
+        v = tf.cond(massless, is_massless, is_not_massless)
         return tf.concat([v0, v1, v], axis=0)  # [6,nevts] complex
 
     def is_not_BRST():
@@ -385,8 +385,8 @@ def vxxxxx(p, vmass, nhel, nsv):
             return tf.concat([v2, v34, v5], axis=0)
 
         massive = vmass != 0
-        v = tf.where(massive, is_massive(), is_not_massive())
+        v = tf.cond(massive, is_massive, is_not_massive)
         return tf.concat([v0, v1, v], axis=0)
 
     BRST = nhel == 4
-    return tf.where(BRST, is_BRST(), is_not_BRST())
+    return tf.cond(BRST, is_BRST, is_not_BRST)
