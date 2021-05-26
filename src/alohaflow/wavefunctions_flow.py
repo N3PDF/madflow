@@ -68,12 +68,12 @@ def ixxxxx(p, fmass, nhel, nsf):
     ip = (1 + nh) // 2
     im = (1 - nh) // 2
 
-    def true_branch():
+    def is_massive():
         pp = tfmath.minimum(
             p[:, 0], tfmath.sqrt(p[:, 1] ** 2 + p[:, 2] ** 2 + p[:, 3] ** 2)
         )  # [nevt,]
 
-        def true_fn():
+        def pp_zero():
             sqm = tfmath.sqrt(tfmath.abs(fmass))
             sqm = tf.stack(
                 [sqm, sign(sqm, fmass)]
@@ -85,7 +85,7 @@ def ixxxxx(p, fmass, nhel, nsf):
             v = tf.stack([v2, v3, v4, v5])  # [4,] complex
             return tf.reshape(v, [4, 1])
 
-        def false_fn():
+        def pp_not_zero():
             sf = tf.stack(
                 [(1 + nsf + (1 - nsf) * nh) * 0.5, (1 + nsf - (1 - nsf) * nh) * 0.5], axis=0
             )  # [2,]
@@ -112,38 +112,38 @@ def ixxxxx(p, fmass, nhel, nsf):
             return tf.stack([v2, v3, v4, v5], axis=0)  # [nevt, 4] complex
 
         cond = tf.expand_dims(pp == 0, 0)
-        return tf.where(cond, true_fn(), false_fn())  # [nevt, 4] complex
+        return tf.where(cond, pp_zero(), pp_not_zero())  # [nevt, 4] complex
 
-    def false_branch():
+    def is_not_massive():
         sqp0p3 = tfmath.sqrt(tfmath.maximum(p[:, 0] + p[:, 3], 0.0)) * nsf  # [nevt,]
 
-        def true_fn():
+        def sqp0p3_zero():
             return complex_tf(-nhel * tfmath.sqrt(2.0 * p[:, 0]), 0.0)  # [nevt,] complex
 
-        def false_fn():
+        def sqp0p3_not_zero():
             return complex_tf(nh * p[:, 1] / sqp0p3, p[:, 2] / sqp0p3)  # [nevt,] complex
 
-        chi1 = tf.where(sqp0p3 == 0, true_fn(), false_fn())
+        chi1 = tf.where(sqp0p3 == 0, sqp0p3_zero(), sqp0p3_not_zero())
         chi = tf.stack([complex_tf(sqp0p3, 0.0), chi1], axis=0)  # [2, nevt]
 
-        def true_fn():
+        def nh_one():
             v4 = chi[0]  # [nevt,] complex
             v5 = chi[1]  # [nevt,] complex
             v2 = tf.ones_like(v4) * complex_tf(0.0, 0.0)  # [nevt,] complex
             v3 = tf.ones_like(v4) * complex_tf(0.0, 0.0)  # [nevt,] complex
             return tf.stack([v2, v3, v4, v5], axis=0)
 
-        def false_fn():
+        def nh_not_one():
             v2 = chi[1]
             v3 = chi[0]
             v4 = tf.ones_like(v2) * complex_tf(0.0, 0.0)
             v5 = tf.ones_like(v2) * complex_tf(0.0, 0.0)
             return tf.stack([v2, v3, v4, v5], axis=0)
 
-        return tf.where(nh == 1, true_fn(), false_fn())
+        return tf.where(nh == 1, nh_one(), nh_not_one())
 
     massive = fmass != 0
-    v = tf.where(massive, true_branch(), false_branch())
+    v = tf.where(massive, is_massive(), is_not_massive())
     fi = tf.concat([v0, v1, v], axis=0)
     return fi
 
@@ -157,12 +157,12 @@ def oxxxxx(p, fmass, nhel, nsf):
     nh = nhel * nsf  # either +1 or -1
     sqp0p3 = tfmath.sqrt(tfmath.maximum(p[:, 0] + p[:, 3], 0.0)) * nsf  # [nevt,]
 
-    def true_branch():
+    def is_massive():
         pp = tfmath.minimum(
             p[:, 0], tfmath.sqrt(p[:, 1] ** 2 + p[:, 2] ** 2 + p[:, 3] ** 2)
         )  # [nevt,]
 
-        def true_fn():
+        def pp_zero():
             sqm = tfmath.sqrt(tfmath.abs(fmass))
             sqm = tf.stack(
                 [sqm, sign(sqm, fmass)]
@@ -176,7 +176,7 @@ def oxxxxx(p, fmass, nhel, nsf):
             v = tf.stack([v2, v3, v4, v5])  # [4,] complex
             return tf.reshape(v, [4, 1])
 
-        def false_fn():
+        def pp_not_zero():
             sf = tf.stack(
                 [(1 + nsf + (1 - nsf) * nh) * 0.5, (1 + nsf - (1 - nsf) * nh) * 0.5], axis=0
             )  # [2,]
@@ -205,36 +205,36 @@ def oxxxxx(p, fmass, nhel, nsf):
             return tf.stack([v2, v3, v4, v5], axis=0)  # [4, nevt] complex
 
         cond = tf.expand_dims(pp == 0, 0)
-        return tf.where(cond, true_fn(), false_fn())  # [4, nevt] complex
+        return tf.where(cond, pp_zero(), pp_not_zero())  # [4, nevt] complex
 
-    def false_branch():
-        def true_fn():
+    def is_not_massive():
+        def sqp0p3_zero():
             return complex_tf(-nhel * tfmath.sqrt(2.0 * p[:, 0]), 0.0)  # [nevt,] complex
 
-        def false_fn():
+        def sqp0p3_not_zero():
             return complex_tf(nh * p[:, 1] / sqp0p3, -p[:, 2] / sqp0p3)  # [nevt,] complex
 
-        chi1 = tf.where(sqp0p3 == 0, true_fn(), false_fn())
+        chi1 = tf.where(sqp0p3 == 0, sqp0p3_zero(), sqp0p3_not_zero())
         chi = tf.stack([complex_tf(sqp0p3, 0.0), chi1], axis=0)  # [2, nevt]
 
-        def true_fn():
+        def nh_one():
             v2 = chi[0]  # [nevt,] complex
             v3 = chi[1]  # [nevt,] complex
             v4 = tf.ones_like(v2) * complex_tf(0.0, 0.0)  # [nevt,] complex
             v5 = tf.ones_like(v2) * complex_tf(0.0, 0.0)  # [nevt,] complex
             return tf.stack([v2, v3, v4, v5], axis=0)
 
-        def false_fn():
+        def nh_not_one():
             v4 = chi[1]
             v5 = chi[0]
             v2 = tf.ones_like(v4) * complex_tf(0.0, 0.0)
             v3 = tf.ones_like(v4) * complex_tf(0.0, 0.0)
             return tf.stack([v2, v3, v4, v5], axis=0)
 
-        return tf.where(nh == 1, true_fn(), false_fn())
+        return tf.where(nh == 1, nh_one(), nh_not_one())
 
     massive = fmass != 0
-    v = tf.where(massive, true_branch(), false_branch())
+    v = tf.where(massive, is_massive(), is_not_massive())
     fo = tf.concat([v0, v1, v], axis=0)
     return fo
 
@@ -255,15 +255,15 @@ def vxxxxx(p, vmass, nhel, nsv):
     v0 = tf.expand_dims(complex_tf(p[:, 0] * nsv, p[:, 3] * nsv), 0)  # [1,nevts] complex
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nsv, p[:, 2] * nsv), 0)
 
-    def true_branch():
-        def true_f():
+    def is_BRST():
+        def is_massless():
             vc2 = tf.ones(nevts, dtype=DTYPE)
             vc3 = p[:, 1] / p[:, 0]
             vc4 = p[:, 2] / p[:, 0]
             vc5 = p[:, 3] / p[:, 0]
             return complex_me(tf.stack([vc2, vc3, vc4, vc5], axis=0))
 
-        def false_f():
+        def is_not_massless():
             vc2 = p[:, 0] / vmass
             vc3 = p[:, 1] / vmass
             vc4 = p[:, 2] / vmass
@@ -271,12 +271,12 @@ def vxxxxx(p, vmass, nhel, nsv):
             return complex_me(tf.stack([vc2, vc3, vc4, vc5], axis=0))
 
         massless = vmass == 0
-        v = tf.where(massless, true_f(), false_f())
+        v = tf.where(massless, is_massless(), is_not_massless())
         return tf.concat([v0, v1, v], axis=0)  # [6,nevts] complex
 
-    def false_branch():
-        def true_fn():
-            def true_fn():
+    def is_not_BRST():
+        def is_massive():
+            def pp_zero():
                 hel0 = 1.0 - tfmath.abs(nhel)
                 v2 = tf.ones(nevts, dtype=DTYPECOMPLEX)
                 v3 = tf.ones_like(v2) * complex_tf(-nhel * sqh, 0.0)
@@ -284,12 +284,12 @@ def vxxxxx(p, vmass, nhel, nsv):
                 v5 = tf.ones_like(v2) * complex_tf(hel0, 0.0)
                 return tf.stack([v2, v3, v4, v5], axis=0)  # [4,nevts] complex
 
-            def false_fn():
+            def pp_not_zero():
                 emp = p[:, 0] / (vmass * pp)
                 v2 = tf.expand_dims(complex_tf(hel0 * pp / vmass, 0.0), 0)
                 v5 = tf.expand_dims(complex_tf(hel0 * p[:, 3] * emp + nhel * pt / pp * sqh, 0), 0)
 
-                def true_f():
+                def pt_not_zero():
                     pzpt = p[:, 3] / (pp * pt) * sqh * nhel
                     v3 = complex_tf(
                         hel0 * p[:, 1] * emp - p[:, 1] * pzpt, -nsvahl * p[:, 2] / pt * sqh
@@ -299,7 +299,7 @@ def vxxxxx(p, vmass, nhel, nsv):
                     )
                     return tf.stack([v3, v4], axis=0)
 
-                def false_f():
+                def pt_zero():
                     v3 = tf.ones(nevts, dtype=DTYPECOMPLEX) * complex_tf(-nhel * sqh, 0.0)
                     v4 = complex_tf(
                         0.0, nsvahl * signvec(sqh, p[:, 3])
@@ -307,25 +307,25 @@ def vxxxxx(p, vmass, nhel, nsv):
                     return tf.stack([v3, v4], axis=0)
 
                 condition = tf.expand_dims(pt != 0, 0)
-                v34 = tf.where(condition, true_f(), false_f())
+                v34 = tf.where(condition, pt_not_zero(), pt_zero())
                 return tf.concat([v2, v34, v5], axis=0)  # [4,nevts] complex
 
             cond = tf.expand_dims(pp == 0, 0)
-            return tf.where(cond, true_fn(), false_fn())
+            return tf.where(cond, pp_zero(), pp_not_zero())
 
-        def false_fn():
+        def is_not_massive():
             pp = p[:, 0]
             pt = tfmath.sqrt(p[:, 1] ** 2 + p[:, 2] ** 2)
             v2 = tf.ones([1, nevts], dtype=DTYPECOMPLEX) * complex_tf(0.0, 0.0)
             v5 = tf.expand_dims(complex_tf(nhel * pt / pp * sqh, 0.0), 0)
 
-            def true_fn():
+            def pt_not_zero():
                 pzpt = p[:, 3] / (pp * pt) * sqh * nhel
                 v3 = complex_tf(-p[:, 1] * pzpt, -nsv * p[:, 2] / pt * sqh)
                 v4 = complex_tf(-p[:, 2] * pzpt, nsv * p[:, 1] / pt * sqh)
                 return tf.stack([v3, v4], axis=0)
 
-            def false_fn():
+            def pt_zero():
                 v3 = tf.ones(nevts, dtype=DTYPECOMPLEX) * complex_tf(-nhel * sqh, 0.0)
                 v4 = complex_tf(
                     0.0, nsv * signvec(sqh, p[:, 3])
@@ -333,12 +333,12 @@ def vxxxxx(p, vmass, nhel, nsv):
                 return tf.stack([v3, v4], axis=0)
 
             cond = tf.expand_dims(pt != 0, 0)
-            v34 = tf.where(cond, true_fn(), false_fn())
+            v34 = tf.where(cond, pt_not_zero(), pt_zero())
             return tf.concat([v2, v34, v5], axis=0)
 
         massive = vmass != 0
-        v = tf.where(massive, true_fn(), false_fn())
+        v = tf.where(massive, is_massive(), is_not_massive())
         return tf.concat([v0, v1, v], axis=0)
 
     BRST = nhel == 4
-    return tf.where(BRST, true_branch(), false_branch())
+    return tf.where(BRST, is_BRST(), is_not_BRST())

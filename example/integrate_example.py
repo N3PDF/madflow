@@ -295,7 +295,7 @@ if __name__ == "__main__":
         "-e", "--eager", help="Run eager", action="store_true"
     )
     arger.add_argument(
-        "-p", "--path", help="Path with the madgraph matrix element", type=Path
+        "-p", "--path", help="Path with the madflow pyOut exported matrix element", type=Path
     )
     arger.add_argument(
         "--run", help="Run folder name", type=str, default="run_01"
