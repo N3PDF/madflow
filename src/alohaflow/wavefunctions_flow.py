@@ -24,14 +24,12 @@ signvec_signature = [sscalar] + [svec]
 @tf.function(input_signature=sign_signature)
 def sign(x, y):
     """Fortran's sign transfer function"""
-    # dropping the checks for the moment
     return x * tf.math.sign(y)
 
 
 @tf.function(input_signature=signvec_signature)
 def signvec(x, y):
     """Fortran's sign transfer function"""
-    # dropping the checks for the moment
     return x * tf.math.sign(y)
 
 
@@ -272,7 +270,7 @@ def _ix_massless(p, nhel, nsf, nh):
     """
     sqp0p3 = tfmath.sqrt(tfmath.maximum(p[:, 0] + p[:, 3], 0.0)) * nsf
     chi1 = tf.where(sqp0p3 == 0,
-                    _ix_massless_sqp0p3_zero(p, nhel),
+                    _iox_massless_sqp0p3_zero(p, nhel),
                     _ix_massless_sqp0p3_nonzero(p, nh, sqp0p3)
                    )
     chi = tf.stack([complex_tf(sqp0p3, 0.0), chi1], axis=0)
@@ -282,9 +280,9 @@ def _ix_massless(p, nhel, nsf, nh):
                   )
 
 
-_ix_massless_sqp0p3_zero_signature = [smom] + [sscalar]
-@tf.function(input_signature=_ix_massless_sqp0p3_zero_signature)
-def _ix_massless_sqp0p3_zero(p, nhel):
+_iox_massless_sqp0p3_zero_signature = [smom] + [sscalar]
+@tf.function(input_signature=_iox_massless_sqp0p3_zero_signature)
+def _iox_massless_sqp0p3_zero(p, nhel):
     """
     Parameters
     ----------
@@ -294,6 +292,9 @@ def _ix_massless_sqp0p3_zero(p, nhel):
     Returns
     -------
         tf.Tensor, of shape=(None) and dtype DTYPECOMPLEX
+    
+    Note: this function is the same for input `ixxxxx` and output `oxxxxx`
+    waveforms
     """
     return complex_tf(-nhel * tfmath.sqrt(2.0 * p[:, 0]), 0.0)
 
@@ -469,32 +470,17 @@ def _ox_massless(p, nhel, nh, sqp0p3):
     -------
         tf.Tensor, of shape=(4,None) and dtype DTYPECOMPLEX
     """
-    chi1 = tf.where(sqp0p3 == 0,
-                    _ox_massless_sqp0p3_zero(p, nhel),
+    chi0 = tf.where(sqp0p3 == 0,
+                    _iox_massless_sqp0p3_zero(p, nhel),
                     _ox_massless_sqp0p3_nonzero(p, nh, sqp0p3)
                    )
-    chi = tf.stack([complex_tf(sqp0p3, 0.0), chi1], axis=0)
+    chi = tf.stack([chi0, complex_tf(sqp0p3, 0.0)], axis=0)
+    # output fermion has nh inverted wrt the input fermion, call the ix function
+    # exchanging true and false branches of tf.cond
     return tf.cond(nh == 1,
-                   lambda: _ox_massless_nh_one(chi),
-                   lambda: _ox_massless_nh_not_one(chi)
+                   lambda: _ix_massless_nh_not_one(chi),
+                   lambda: _ix_massless_nh_one(chi)
                   )
-
-
-_ox_massless_sqp0p3_zero_signature = [smom] + [sscalar]
-@tf.function(input_signature=_ox_massless_sqp0p3_zero_signature)
-def _ox_massless_sqp0p3_zero(p, nhel):
-    """
-    Parameters
-    ----------
-        p: tf.Tensor, of shape=(None,4)
-        nhel: tf.Tensorm of shape=()
-
-    Returns
-    -------
-        tf.Tensor, of shape=(None) and dtype DTYPECOMPLEX
-    """
-    return complex_tf(-nhel * tfmath.sqrt(2.0 * p[:, 0]), 0.0)
-    # TODO: same as _ix_massless_sqp0p3_zero
 
 
 _ox_massless_sqp0p3_nonzero_signature = [smom] + [sscalar] + [svec]
@@ -512,47 +498,6 @@ def _ox_massless_sqp0p3_nonzero(p, nh, sqp0p3):
         tf.Tensor, of shape=(None) and dtype DTYPECOMPLEX
     """
     return complex_tf(nh * p[:, 1] / sqp0p3, -p[:, 2] / sqp0p3)
-    # TODO: same as _ix_massless_sqp0p3_nonzero
-
-
-@tf.function(input_signature=[tf.TensorSpec(shape=[2,None], dtype=DTYPECOMPLEX)])
-def _ox_massless_nh_one(chi):
-    """
-    Parameters
-    ----------
-        chi: tf.Tensor, of shape=(2,None) and dtype DTYPECOMPLEX
-
-    Returns
-    -------
-        tf.Tensor, of shape=(4,None) and dtype DTYPECOMPLEX
-    """
-    v = [complex_tf(0,0)] * 4
-    v[0] = chi[0]
-    v[1] = chi[1]
-    v[2] = tf.ones_like(v[0]) * complex_tf(0.0, 0.0)
-    v[3] = tf.ones_like(v[0]) * complex_tf(0.0, 0.0)
-    return tf.stack(v, axis=0)
-    # TODO: same of _ix_massless_nh_not_one with chi.T
-
-
-@tf.function(input_signature=[tf.TensorSpec(shape=[2,None], dtype=DTYPECOMPLEX)])
-def _ox_massless_nh_not_one(chi):
-    """
-    Parameters
-    ----------
-        chi: tf.Tensor, of shape=(2,None) and dtype DTYPECOMPLEX
-
-    Returns
-    -------
-        tf.Tensor, of shape=(4,None) and dtype DTYPECOMPLEX
-    """
-    v = [complex_tf(0,0)] * 4
-    v[2] = chi[1]
-    v[3] = chi[0]
-    v[0] = tf.ones_like(v[2]) * complex_tf(0.0, 0.0)
-    v[1] = tf.ones_like(v[2]) * complex_tf(0.0, 0.0)
-    return tf.stack(v, axis=0)
-    # TODO: same of _ix_massless_nh_one with chi.T
 
 #===============================================================================
 # vxxxxx related functions
