@@ -38,6 +38,19 @@ script_path = Path(tempfile.mktemp(prefix="mad_script"))
 re_name = re.compile(r"\w{3,}")
 
 
+def _read_flav(flav_str):
+    flav_dict = {"g": 21, "d": 1, "u": 2, "s": 3, "c": 4, "b": 5}
+    particle = flav_dict.get(flav_str[0])
+    if particle is None:
+        raise ValueError(
+            f"Could not understand the incoming flavour: {flav_str} "
+            "You can skip this error by using --no_pdf"
+        )
+    if flav_str[-1] == "~":
+        particle = -particle
+    return particle
+
+
 def _import_module_from_path(path, module_name):
     spec = importlib.util.spec_from_file_location(module_name, path)
     module = importlib.util.module_from_spec(spec)
@@ -49,6 +62,9 @@ if __name__ == "__main__":
     arger = argparse.ArgumentParser(__doc__)
     arger.add_argument("-v", "--verbose", help="Print extra info", action="store_true")
     arger.add_argument("-p", "--pdf", help="PDF set", type=str, default="NNPDF31_nnlo_as_0118")
+    arger.add_argument(
+        "--no_pdf", help="Don't use a PDF for the initial state", action="store_true"
+    )
     arger.add_argument("-c", "--enable_cuts", help="Enable the cuts", action="store_true")
     arger.add_argument(
         "--madgraph_process",
@@ -62,6 +78,14 @@ if __name__ == "__main__":
     arger.add_argument("-g", "--variable_g", help="Use variable g_s", action="store_true")
 
     args = arger.parse_args()
+
+    # Naive reading of the process to understand the flavours that are initiating the process
+    if not args.no_pdf:
+        initiation = args.madgraph_process.strip().split(" ")
+        flav_1 = _read_flav(initiation[0])
+        flav_2 = _read_flav(initiation[1])
+        if args.verbose:
+            print(f" > PDF {args.pdf} will be called with flavours idxs: {flav_1} and {flav_2}")
 
     # Prepare the madgraph script
     madgraph_script = f"""generate {args.madgraph_process}
@@ -136,10 +160,10 @@ output pyout {out_path}"""
         phasespace.register_cut("pt", particle=3, min_val=60.0)
         phasespace.register_cut("pt", particle=2, min_val=60.0)
 
-    def luminosity(x1, x2, flavours, q2array):
+    def luminosity(x1, x2, q2array):
         """Returns f(x1)*f(x2) for the given flavours"""
-        hadron_1 = pdf.xfxQ2(flavours, x1, q2array)
-        hadron_2 = pdf.xfxQ2(flavours, x2, q2array)
+        hadron_1 = pdf.xfxQ2(int_me([flav_1]), x1, q2array)
+        hadron_2 = pdf.xfxQ2(int_me([flav_2]), x2, q2array)
         return (hadron_1 * hadron_2) / x1 / x2
 
     def cross_section(xrand, **kwargs):
@@ -158,7 +182,7 @@ output pyout {out_path}"""
             alpha_s = None
 
         # Get the luminosity per event
-        pdf_result = luminosity(x1, x2, int_me([21]), q2array)
+        pdf_result = luminosity(x1, x2, q2array)
 
         # Compute the cross section
         smatrix = matrix.smatrix(all_ps, *model_params.evaluate(alpha_s))
