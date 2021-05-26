@@ -50,7 +50,6 @@ def signvec(x, y):
 def sxxxxx(p, nss):
     """Defines a scalar."""
     # Note: here p[:,i] selects the momentum dimension and is a [nevt,] tensor
-    nevts = tf.shape(p, out_type=DTYPEINT)[0]
     v0 = tf.expand_dims(complex_tf(p[:, 0] * nss, p[:, 3] * nss), 0)  # [nevt,] complex
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nss, p[:, 2] * nss), 0)  # [nevt,] complex
     v = tf.expand_dims(complex_tf(1.0, 0.0), 0)
@@ -63,7 +62,6 @@ def ixxxxx(p, fmass, nhel, nsf):
     """Defines an inflow fermion."""
     # print("ixxxxx")
     # Note: here p[:,i] selects the momentum dimension and is a [nevt,] tensor
-    nevts = tf.shape(p, out_type=DTYPEINT)[0]
     v0 = tf.expand_dims(complex_tf(-p[:, 0] * nsf, -p[:, 3] * nsf), 0)  # [nevt,] complex
     v1 = tf.expand_dims(complex_tf(-p[:, 1] * nsf, -p[:, 2] * nsf), 0)  # [nevt,] complex
     nh = nhel * nsf  # either +1 or -1
@@ -154,7 +152,6 @@ def ixxxxx(p, fmass, nhel, nsf):
 def oxxxxx(p, fmass, nhel, nsf):
     """ initialize an outgoing fermion"""
     # print("oxxxxx")
-    nevts = tf.shape(p, out_type=DTYPEINT)[0]
     v0 = tf.expand_dims(complex_tf(p[:, 0] * nsf, p[:, 3] * nsf), 0)  # [nevt,] complex
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nsf, p[:, 2] * nsf), 0)  # [nevt,] complex
     nh = nhel * nsf  # either +1 or -1
