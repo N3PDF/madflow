@@ -40,12 +40,12 @@ def sxxxxx(p, nss):
     
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        nss: tf.Tensor, of shape=()
+        p: tf.Tensor, scalar boson four-momenta of shape=(None,4)
+        nss: tf.Tensor, final|initial state of shape=(), values=(+1|-1)
     
     Returns
     -------
-        tf.Tensor, of shape=(3,None)    
+        tf.Tensor, scalar wavefunction of shape=(3,None)                     phi   
     """
     v0 = tf.expand_dims(complex_tf(p[:, 0] * nss, p[:, 3] * nss), 0)
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nss, p[:, 2] * nss), 0)
@@ -61,24 +61,22 @@ def ixxxxx(p, fmass, nhel, nsf):
 
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        fmass: tf.Tensor, of shape=()
-        nhel: tf.Tensor, of shape=()
-        nsf: tf.Tensor, of shape=()
+        p: tf.Tensor, fermion four-momenta of shape=(None,4)
+        fmass: tf.Tensor, fermion mass of shape=()
+        nhel: tf.Tensor, fermion helicity of shape=()
+        nsf: tf.Tensor, particle|anti-particle of shape=(), values=(+1|-1)
     
     Returns
     -------
-        tf.Tensor, of shape=(6,None)    
+        tf.Tensor, fermion wavefunction of shape=(6,None)                   |fi>    
     """
     v0 = tf.expand_dims(complex_tf(-p[:, 0] * nsf, -p[:, 3] * nsf), 0)
     v1 = tf.expand_dims(complex_tf(-p[:, 1] * nsf, -p[:, 2] * nsf), 0)
     nh = nhel * nsf
-    ip = (1 + nh) // 2
-    im = (1 - nh) // 2
 
     massive = fmass != 0
     v = tf.cond(massive,
-                lambda: _ix_massive(p, fmass, nsf, nh, ip, im),
+                lambda: _ix_massive(p, fmass, nsf, nh),
                 lambda: _ix_massless(p, nhel, nsf, nh)
                )
     return tf.concat([v0, v1, v], axis=0)
@@ -92,24 +90,23 @@ def oxxxxx(p, fmass, nhel, nsf):
 
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        fmass: tf.Tensor, of shape=()
-        nhel: tf.Tensor, of shape=()
-        nsf: tf.Tensor, of shape=()
+        p: tf.Tensor, fermion four-momenta of shape=(None,4)
+        fmass: tf.Tensor, fermion mass of shape=()
+        nhel: tf.Tensor, fermion helicity of shape=()
+        nsf: tf.Tensor, particle|anti-particle of shape=(), values=(+1|-1)
     
     Returns
     -------
-        tf.Tensor, of shape=(6,None)
+        tf.Tensor, fermion wavefunction of shape=(6,None)                   <fo|
     """
     v0 = tf.expand_dims(complex_tf(p[:, 0] * nsf, p[:, 3] * nsf), 0)
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nsf, p[:, 2] * nsf), 0)
     nh = nhel * nsf
-    sqp0p3 = tfmath.sqrt(tfmath.maximum(p[:, 0] + p[:, 3], 0.0)) * nsf
 
     massive = fmass != 0
     v = tf.cond(massive,
                 lambda: _ox_massive(p, fmass, nhel, nsf, nh),
-                lambda: _ox_massless(p, nhel, nh, sqp0p3)
+                lambda: _ox_massless(p, nhel, nsf, nh)
                )
     return tf.concat([v0, v1, v], axis=0)
 
@@ -122,14 +119,14 @@ def vxxxxx(p, vmass, nhel, nsv):
 
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        fmass: tf.Tensor, of shape=()
-        nhel: tf.Tensor, of shape=()
-        nsv: tf.Tensor, of shape=()
+        p: tf.Tensor, vector boson four-momenta of shape=(None,4)
+        vmass: tf.Tensor, boson mass of shape=()
+        nhel: tf.Tensor, boson helicity of shape=(), 0 is forbidden if vmass=0.0
+        nsv: tf.Tensor, final|initial state of shape=(), values=(+1|-1)
     
     Returns
     -------
-        tf.Tensor, of shape=(6,None)
+        tf.Tensor, vector wavefunction of shape=(6,None)         epsilon^{mu(v)}
     """
     nevts = tf.shape(p, out_type=DTYPEINT)[0]
     hel0 = 1.0 - tfmath.abs(nhel)
@@ -155,18 +152,16 @@ def vxxxxx(p, vmass, nhel, nsv):
 
 #===============================================================================
 # ixxxxx related functions
-_ix_massive_signature = [smom] + [sscalar]*5
+_ix_massive_signature = [smom] + [sscalar]*3
 @tf.function(input_signature=_ix_massive_signature)
-def _ix_massive(p, fmass, nsf, nh, ip, im):
+def _ix_massive(p, fmass, nsf, nh):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        fmass: tf.Tensor, of shape=()
-        nsf: tf.Tensor, of shape=()
-        nh: tf.Tensor, of shape=()
-        ip: tf.Tensor, of shape=()
-        im: tf.Tensor, of shape=()
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        fmass: tf.Tensor, fermion mass of shape=()
+        nsf: tf.Tensor, particle|anti-particle of shape=()
+        nh: tf.Tensor, helicity times particle|anti-particle of shape=()
 
     Returns
     -------
@@ -175,37 +170,13 @@ def _ix_massive(p, fmass, nsf, nh, ip, im):
     pp = tfmath.minimum(
         p[:, 0], tfmath.sqrt(p[:, 1] ** 2 + p[:, 2] ** 2 + p[:, 3] ** 2)
     )
+    ip = (1 + nh) // 2
+    im = (1 - nh) // 2
+
     cond = tf.expand_dims(pp == 0, 0)
     return tf.where(cond,
-                    _ix_massive_pp_zero(fmass, nsf, ip, im),
+                    _ox_massive_pp_zero(fmass, nsf, im, ip),
                     _ix_massive_pp_nonzero(p, fmass, nsf, nh, ip, im, pp))
-
-
-_ix_massive_pp_zero_signature = [sscalar]*4
-@tf.function(input_signature=_ix_massive_pp_zero_signature)
-def _ix_massive_pp_zero(fmass, nsf, ip, im):
-    """
-    Parameters
-    ----------
-        fmass: tf.Tensor, of shape=()
-        nsf: tf.Tensor, of shape=()
-        ip: tf.Tensor, of shape=()
-        im: tf.Tensor, of shape=()
-
-    Returns
-    -------
-        tf.Tensor, of shape=(4,1) and dtype DTYPECOMPLEX
-    """
-    sqm = tfmath.sqrt(tfmath.abs(fmass))
-    sqm = tf.stack(
-        [sqm, sign(sqm, fmass)]
-    )  # [fmass, fmass] ---> TODO: why calling sign on the result of a tfmath.sqrt ????
-    v = [complex_tf(0,0)] * 4
-    v[0] = complex_tf(ip * sqm[int_me(ip)], 0.0)
-    v[1] = complex_tf(im * nsf * sqm[int_me(ip)], 0.0)
-    v[2] = complex_tf(ip * nsf * sqm[int_me(im)], 0.0)
-    v[3] = complex_tf(im * sqm[int_me(im)], 0.0)
-    return tf.reshape(tf.stack(v), [4,1])
 
 
 _ix_massive_pp_nonzero_signature = [smom] + [sscalar]*5 + [svec]
@@ -214,13 +185,13 @@ def _ix_massive_pp_nonzero(p, fmass, nsf, nh, ip, im, pp):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        fmass: tf.Tensor, of shape=()
-        nsf: tf.Tensor, of shape=()
-        nh: tf.Tensor, of shape=()
-        ip: tf.Tensor, of shape=()
-        im: tf.Tensor, of shape=()
-        pp: tf.Tensor, of shape=(None)
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        fmass: tf.Tensor, fermion mass of shape=()
+        nsf: tf.Tensor, particle|anti-particle of shape=()
+        nh: tf.Tensor, helicity times particle|anti-particle of shape=()
+        ip: tf.Tensor, positive nh projector of shape=()
+        im: tf.Tensor, negative nh projector of shape=()
+        pp: tf.Tensor, minimum of energy|three-momentum modulus of shape=(None)
 
     Returns
     -------
@@ -259,10 +230,10 @@ def _ix_massless(p, nhel, nsf, nh):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        nhel: tf.Tensorm of shape=()
-        nsf: tf.Tensorm of shape=()
-        nh: tf.Tensorm of shape=()
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        nhel: tf.Tensor, fermion helicity of shape=()
+        nsf: tf.Tensor, particle|anti-particle of shape=()
+        nh: tf.Tensor, helicity times particle|anti-particle of shape=()
 
     Returns
     -------
@@ -270,7 +241,7 @@ def _ix_massless(p, nhel, nsf, nh):
     """
     sqp0p3 = tfmath.sqrt(tfmath.maximum(p[:, 0] + p[:, 3], 0.0)) * nsf
     chi1 = tf.where(sqp0p3 == 0,
-                    _iox_massless_sqp0p3_zero(p, nhel),
+                    _ix_massless_sqp0p3_zero(p, nhel),
                     _ix_massless_sqp0p3_nonzero(p, nh, sqp0p3)
                    )
     chi = tf.stack([complex_tf(sqp0p3, 0.0), chi1], axis=0)
@@ -280,14 +251,14 @@ def _ix_massless(p, nhel, nsf, nh):
                   )
 
 
-_iox_massless_sqp0p3_zero_signature = [smom] + [sscalar]
-@tf.function(input_signature=_iox_massless_sqp0p3_zero_signature)
-def _iox_massless_sqp0p3_zero(p, nhel):
+_ix_massless_sqp0p3_zero_signature = [smom] + [sscalar]
+@tf.function(input_signature=_ix_massless_sqp0p3_zero_signature)
+def _ix_massless_sqp0p3_zero(p, nhel):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        nhel: tf.Tensorm of shape=()
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        nhel: tf.Tensor, fermion helicity of shape=()
 
     Returns
     -------
@@ -305,9 +276,9 @@ def _ix_massless_sqp0p3_nonzero(p, nh, sqp0p3):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        nh: tf.Tensorm of shape=()
-        sqp0p3: tf.Tensorm of shape=(None)
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        nh: tf.Tensor, helicity times particle|anti-particle of shape=()
+        sqp0p3: tf.Tensor, max(E+pz,0)*nsf of shape=(None)
 
     Returns
     -------
@@ -361,11 +332,11 @@ def _ox_massive(p, fmass, nhel, nsf, nh):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        fmass: tf.Tensor, of shape=()
-        nhel: tf.Tensor, of shape=()
-        nsf: tf.Tensor, of shape=()
-        nh: tf.Tensor, of shape=()
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        fmass: tf.Tensor, fermion mass of shape=()
+        nhel: tf.Tensor, fermion helicity of shape=()
+        nsf: tf.Tensor, particle|anti-particle of shape=()
+        nh: tf.Tensor, helicity times particle|anti-particle of shape=()
 
     Returns
     -------
@@ -374,23 +345,26 @@ def _ox_massive(p, fmass, nhel, nsf, nh):
     pp = tfmath.minimum(
         p[:, 0], tfmath.sqrt(p[:, 1] ** 2 + p[:, 2] ** 2 + p[:, 3] ** 2)
     )
+    ip = -((1 - nh) // 2) * nhel
+    im = (1 + nh) // 2 * nhel
+
     cond = tf.expand_dims(pp == 0, 0)
     return tf.where(cond,
-                    _ox_massive_pp_zero(fmass, nhel, nsf, nh),
+                    _ox_massive_pp_zero(fmass, nhel, ip, im),
                     _ox_massive_pp_nonzero(p, fmass, nsf, nh, pp)
                    )
 
 
 _ox_massive_pp_zero_signature = [sscalar]*4
 @tf.function(input_signature=_ox_massive_pp_zero_signature)
-def _ox_massive_pp_zero(fmass, nhel, nsf, nh):
+def _ox_massive_pp_zero(fmass, nsf, ip, im):
     """
     Parameters
     ----------
-        fmass: tf.Tensor, of shape=()
-        nhel: tf.Tensor, of shape=()
-        nsf: tf.Tensor, of shape=()
-        nh: tf.Tensor, of shape=()
+        fmass: tf.Tensor, fermion mass of shape=()
+        nsf: tf.Tensor, particle|anti-particle of shape=()
+        ip: tf.Tensor, positive nh projector of shape=()
+        im: tf.Tensor, negative nh projector of shape=()
 
     Returns
     -------
@@ -400,8 +374,7 @@ def _ox_massive_pp_zero(fmass, nhel, nsf, nh):
     sqm = tf.stack(
         [sqm, sign(sqm, fmass)]
     )  # [fmass, fmass] ---> why calling sign on the result of a tfmath.sqrt ????
-    ip = -((1 - nh) // 2) * nhel
-    im = (1 + nh) // 2 * nhel
+
     v = [complex_tf(0,0)] * 4
     v[0] = complex_tf(im * sqm[int_me(tfmath.abs(im))], 0.0)
     v[1] = complex_tf(ip * nsf * sqm[int_me(tfmath.abs(im))], 0.0)
@@ -416,11 +389,11 @@ def _ox_massive_pp_nonzero(p, fmass, nsf, nh, pp):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        fmass: tf.Tensor, of shape=()
-        nsf: tf.Tensor, of shape=()
-        nh: tf.Tensor, of shape=()
-        pp: tf.Tensor, of shape=(None)
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        fmass: tf.Tensor, fermion mass of shape=()
+        nsf: tf.Tensor, particle|anti-particle of shape=()
+        nh: tf.Tensor, helicity times particle|anti-particle of shape=()
+        pp: tf.Tensor, minimum of energy|three-momentum modulus of shape=(None)
 
     Returns
     -------
@@ -455,49 +428,33 @@ def _ox_massive_pp_nonzero(p, fmass, nsf, nh, pp):
     return tf.stack(v, axis=0)
 
 
-_ox_massless_signature = [smom] + [sscalar]*2 + [svec]
+_ox_massless_signature = [smom] + [sscalar]*3
 @tf.function(input_signature=_ox_massless_signature)
-def _ox_massless(p, nhel, nh, sqp0p3):
+def _ox_massless(p, nhel, nsf, nh):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        nhel: tf.Tensorm of shape=()
-        nh: tf.Tensorm of shape=()
-        sqp0p3: tf.Tensor, of shape=(None)
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        nhel: tf.Tensor, fermion helicity of shape=()
+        nsf: tf.Tensor, particle|anti-particle of shape=()
+        nh: tf.Tensor, helicity times particle|anti-particle of shape=()
 
     Returns
     -------
         tf.Tensor, of shape=(4,None) and dtype DTYPECOMPLEX
     """
+    sqp0p3 = tfmath.sqrt(tfmath.maximum(p[:, 0] + p[:, 3], 0.0)) * nsf
+    mult = tf.expand_dims(float_me([1,1,-1,1]), 0)
     chi0 = tf.where(sqp0p3 == 0,
-                    _iox_massless_sqp0p3_zero(p, nhel),
-                    _ox_massless_sqp0p3_nonzero(p, nh, sqp0p3)
+                    _ix_massless_sqp0p3_zero(p, nhel),
+                    _ix_massless_sqp0p3_nonzero(p*mult, nh, sqp0p3)
                    )
     chi = tf.stack([chi0, complex_tf(sqp0p3, 0.0)], axis=0)
-    # output fermion has nh inverted wrt the input fermion, call the ix function
-    # exchanging true and false branches of tf.cond
+    # ongoing fermion has nh inverted wrt the ingoing fermion
     return tf.cond(nh == 1,
                    lambda: _ix_massless_nh_not_one(chi),
                    lambda: _ix_massless_nh_one(chi)
                   )
-
-
-_ox_massless_sqp0p3_nonzero_signature = [smom] + [sscalar] + [svec]
-@tf.function(input_signature=_ox_massless_sqp0p3_nonzero_signature)
-def _ox_massless_sqp0p3_nonzero(p, nh, sqp0p3):
-    """
-    Parameters
-    ----------
-        p: tf.Tensor, of shape=(None,4)
-        nh: tf.Tensorm of shape=()
-        sqp0p3: tf.Tensorm of shape=(None)
-
-    Returns
-    -------
-        tf.Tensor, of shape=(None) and dtype DTYPECOMPLEX
-    """
-    return complex_tf(nh * p[:, 1] / sqp0p3, -p[:, 2] / sqp0p3)
 
 #===============================================================================
 # vxxxxx related functions
@@ -508,9 +465,9 @@ def _vx_BRST_check(p, vmass, nevts):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        vmass: tf.Tensor, of shape=()
-        nevts: tf.Tensor, of shape=() and dtype DTYPEINT
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        vmass: tf.Tensor, boson mass of shape=()
+        nevts: tf.Tensor, number of events of shape=() and dtype DTYPEINT
     
     Returns
     -------
@@ -529,8 +486,8 @@ def _vx_BRST_check_massless(p, nevts):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        nevts: tf.Tensor, of shape=() and dtype DTYPEINT
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        nevts: tf.Tensor, number of events of shape=() and dtype DTYPEINT
     
     Returns
     -------
@@ -550,8 +507,8 @@ def _vx_BRST_check_massive(p, vmass):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        vmass: tf.Tensor, of shape=()
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        vmass: tf.Tensor, boson mass of shape=()
     
     Returns
     -------
@@ -571,16 +528,17 @@ def _vx_no_BRST_check(p, vmass, nhel, nsv, hel0, sqh, nsvahl, pp, pt, nevts):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        vmass: tf.Tensor, of shape=()
-        nhel: tf.Tensor, of shape=()
-        nsv: tf.Tensor, of shape=()
-        hel0: tf.Tensor, of shape=()
-        sqh: tf.Tensor, of shape=()
-        nsvahl: tf.Tensor, of shape=()
-        pp: tf.Tensor, of shape=(None)
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        vmass: tf.Tensor, boson mass of shape=()
+        nhel: tf.Tensor, boson helicity of shape=()
+        nsv: tf.Tensor, final|initial state of shape=()
+        hel0: tf.Tensor, zero helicity of shape=()
+        sqh: tf.Tensor, sqrt(1/2) of shape=()
+        nsvahl: tf.Tensor, helicity times particle|anti-particle absolute value
+                of shape=()
+        pp: tf.Tensor, minimum of energy|three-momentum modulus of shape=(None)
         pt: tf.Tensor, of shape=(None)
-        nevts: tf.Tensor, of shape=() and dtype DTYPEINT
+        nevts: tf.Tensor, number of events of shape=() and dtype DTYPEINT
     
     Returns
     -------
@@ -600,15 +558,16 @@ def _vx_no_BRST_check_massive(p, vmass, nhel, hel0, sqh, nsvahl, pp, pt, nevts):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        vmass: tf.Tensor, of shape=()
-        nhel: tf.Tensor, of shape=()
-        hel0: tf.Tensor, of shape=()
-        sqh: tf.Tensor, of shape=()
-        nsvahl: tf.Tensor, of shape=()
-        pp: tf.Tensor, of shape=(None)
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        vmass: tf.Tensor, boson mass of shape=()
+        nhel: tf.Tensor, boson helicity of shape=()
+        hel0: tf.Tensor, zero helicity of shape=()
+        sqh: tf.Tensor, sqrt(1/2) of shape=()
+        nsvahl: tf.Tensor, helicity times particle|anti-particle absolute value
+                of shape=()
+        pp: tf.Tensor, minimum of energy|three-momentum modulus of shape=(None)
         pt: tf.Tensor, of shape=(None)
-        nevts: tf.Tensor, of shape=() and dtype DTYPEINT
+        nevts: tf.Tensor, number of events of shape=() and dtype DTYPEINT
     
     Returns
     -------
@@ -629,10 +588,11 @@ def _vx_no_BRST_check_massive_pp_zero(nhel, sqh, nsvahl, nevts):
     """
     Parameters
     ----------
-        nhel: tf.Tensor, of shape=()
-        sqh: tf.Tensor, of shape=()
-        nsvahl: tf.Tensor, of shape=()
-        nevts: tf.Tensor, of shape=() and dtype DTYPEINT
+        nhel: tf.Tensor, boson helicity of shape=()
+        sqh: tf.Tensor, sqrt(1/2) of shape=()
+        nsvahl: tf.Tensor, helicity times particle|anti-particle absolute value
+                of shape=()
+        nevts: tf.Tensor, number of events of shape=() and dtype DTYPEINT
     
     Returns
     -------
@@ -654,15 +614,16 @@ def _vx_no_BRST_check_massive_pp_nonzero(
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        vmass: tf.Tensor, of shape=()
-        nhel: tf.Tensor, of shape=()
-        hel0: tf.Tensor, of shape=()
-        sqh: tf.Tensor, of shape=()
-        nsvahl: tf.Tensor, of shape=()
-        pp: tf.Tensor, of shape=(None)
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        vmass: tf.Tensor, boson mass of shape=()
+        nhel: tf.Tensor, boson helicity of shape=()
+        hel0: tf.Tensor, zero helicity of shape=()
+        sqh: tf.Tensor, sqrt(1/2) of shape=()
+        nsvahl: tf.Tensor, helicity times particle|anti-particle absolute value
+                of shape=()
+        pp: tf.Tensor, minimum of energy|three-momentum modulus of shape=(None)
         pt: tf.Tensor, of shape=(None)
-        nevts: tf.Tensor, of shape=() and dtype DTYPEINT
+        nevts: tf.Tensor, number of events of shape=() and dtype DTYPEINT
     
     Returns
     -------
@@ -691,11 +652,12 @@ def _vx_no_BRST_check_massive_pp_nonzero_pt_nonzero(
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        hel0: tf.Tensor, of shape=()
-        sqh: tf.Tensor, of shape=()
-        nsvahl: tf.Tensor, of shape=()
-        pp: tf.Tensor, of shape=(None)
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        hel0: tf.Tensor, zero helicity of shape=()
+        sqh: tf.Tensor, sqrt(1/2) of shape=()
+        nsvahl: tf.Tensor, helicity times particle|anti-particle absolute value
+                of shape=()
+        pp: tf.Tensor, minimum of energy|three-momentum modulus of shape=(None)
         pt: tf.Tensor, of shape=(None)
         emp: tf.Tensor, of shape=(None)
     
@@ -720,11 +682,12 @@ def _vx_no_BRST_check_massive_pp_nonzero_pt_zero(p, nhel, sqh, nsvahl, nevts):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        nhel: tf.Tensor, of shape=()
-        sqh: tf.Tensor, of shape=()
-        nsvahl: tf.Tensor, of shape=()
-        nevts: tf.Tensor, of shape=() and dtype DTYPEINT
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        nhel: tf.Tensor, boson helicity of shape=()
+        sqh: tf.Tensor, sqrt(1/2) of shape=()
+        nsvahl: tf.Tensor, helicity times particle|anti-particle absolute value
+                of shape=()
+        nevts: tf.Tensor, number of events of shape=() and dtype DTYPEINT
     
     Returns
     -------
@@ -744,11 +707,11 @@ def _vx_no_BRST_check_massless(p, nhel, nsv, sqh, nevts):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        nhel: tf.Tensor, of shape=()
-        nsv: tf.Tensor, of shape=()
-        sqh: tf.Tensor, of shape=()
-        nevts: tf.Tensor, of shape=() and dtype DTYPEINT
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        nhel: tf.Tensor, boson helicity of shape=()
+        nsv: tf.Tensor, final|initial state of shape=()
+        sqh: tf.Tensor, sqrt(1/2) of shape=()
+        nevts: tf.Tensor, number of events of shape=() and dtype DTYPEINT
     
     Returns
     -------
@@ -771,11 +734,11 @@ def _vx_no_BRST_check_massless_pt_nonzero(p, nhel, nsv, sqh, pp, pt):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        nhel: tf.Tensor, of shape=()
-        nsv: tf.Tensor, of shape=()
-        sqh: tf.Tensor, of shape=()
-        pp: tf.Tensor, of shape=(None)
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        nhel: tf.Tensor, boson helicity of shape=()
+        nsv: tf.Tensor, final|initial state of shape=()
+        sqh: tf.Tensor, sqrt(1/2) of shape=()
+        pp: tf.Tensor, minimum of energy|three-momentum modulus of shape=(None)
         pt: tf.Tensor, of shape=(None)
     
     Returns
@@ -795,11 +758,11 @@ def _vx_no_BRST_check_massless_pt_zero(p, nhel, nsv, sqh, nevts):
     """
     Parameters
     ----------
-        p: tf.Tensor, of shape=(None,4)
-        nhel: tf.Tensor, of shape=()
-        nsv: tf.Tensor, of shape=()
-        sqh: tf.Tensor, of shape=()
-        nevts: tf.Tensor, of shape=() and dtype DTYPEINT
+        p: tf.Tensor, four-momenta of shape=(None,4)
+        nhel: tf.Tensor, boson helicity of shape=()
+        nsv: tf.Tensor, final|initial state of shape=()
+        sqh: tf.Tensor, sqrt(1/2) of shape=()
+        nevts: tf.Tensor, number of events of shape=() and dtype DTYPEINT
     
     Returns
     -------
