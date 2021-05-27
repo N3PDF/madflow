@@ -39,11 +39,11 @@ DEFAULT_PDF = "NNPDF31_nnlo_as_0118"
 # Note that if another process is run, the imports below
 # must be changed accordingly, it can be made into options later on
 re_name = re.compile(r"\w{3,}")
+_flav_dict = {"g": 21, "d": 1, "u": 2, "s": 3, "c": 4, "b": 5, "t": 6}
 
 
 def _read_flav(flav_str):
-    flav_dict = {"g": 21, "d": 1, "u": 2, "s": 3, "c": 4, "b": 5}
-    particle = flav_dict.get(flav_str[0])
+    particle = _flav_dict.get(flav_str[0])
     if particle is None:
         raise ValueError(
             f"Could not understand the incoming flavour: {flav_str} "
@@ -179,9 +179,10 @@ output pyout {out_path}"""
 
         # Compute the value of muF==muR if needed
         if args.variable_g:
-            mt1 = phasespace.mt2(all_ps[:, 2, :])
-            mt2 = phasespace.mt2(all_ps[:, 3, :])
-            q2array = (mt1 + mt2) / 2.0
+            full_mt = 0.0
+            for i in range(nparticles - 2):
+                full_mt += phasespace.mt2(all_ps[:, i + 2, :])
+            q2array = full_mt / 2.0
             alpha_s = pdf.alphasQ2(q2array)
         else:
             q2array = tf.ones_like(x1) * q2
@@ -215,7 +216,10 @@ set run_card dsqrt_q2fact2 {scale}
 """
 
         if args.enable_cuts:
-            cuts = "set run_card pt_min_pdg {6: 60}"
+            outgoing_particles = args.madgraph_process.rsplit(" ", nparticles-2)[1:]
+            dict_cuts = {_flav_dict[i[0]]: 60 for i in outgoing_particles}
+            # All pt must be above 60
+            cuts = f"set run_card pt_min_pdg {dict_cuts}"
         else:
             cuts = ""
 
@@ -235,7 +239,7 @@ set run_card lhaid 303600
 
         mad_final = time.time()
 
-        print(f"\nFinal vegasflow result: {res.numpy():.6} +- {err:.4}")
+        print(f"\nFinal madflow result: {res.numpy():.6} +- {err:.4}")
 
         print(f"> Madgraph took: {mad_final-mad_start:.4}s to run")
 
