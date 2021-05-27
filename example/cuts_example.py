@@ -15,11 +15,13 @@ It is also possible to use a variable coupling with muF = muR = pt of the top wi
 """
 import re
 import sys
+import time
 import importlib
 import argparse
 import tempfile
 import subprocess as sp
 from pathlib import Path
+import numpy as np
 
 from vegasflow import vegas_wrapper
 from pdfflow import mkPDF, float_me, int_me, run_eager
@@ -32,6 +34,7 @@ import tensorflow as tf
 # (won't be removed on output so they can be inspected)
 out_path = Path(tempfile.mkdtemp(prefix="mad"))
 script_path = Path(tempfile.mktemp(prefix="mad_script"))
+DEFAULT_PDF = "NNPDF31_nnlo_as_0118"
 
 # Note that if another process is run, the imports below
 # must be changed accordingly, it can be made into options later on
@@ -61,7 +64,7 @@ def _import_module_from_path(path, module_name):
 if __name__ == "__main__":
     arger = argparse.ArgumentParser(__doc__)
     arger.add_argument("-v", "--verbose", help="Print extra info", action="store_true")
-    arger.add_argument("-p", "--pdf", help="PDF set", type=str, default="NNPDF31_nnlo_as_0118")
+    arger.add_argument("-p", "--pdf", help="PDF set", type=str, default=DEFAULT_PDF)
     arger.add_argument(
         "--no_pdf", help="Don't use a PDF for the initial state", action="store_true"
     )
@@ -76,6 +79,9 @@ if __name__ == "__main__":
         "-m", "--massive_particles", help="Number of massive particles", type=int, default=2
     )
     arger.add_argument("-g", "--variable_g", help="Use variable g_s", action="store_true")
+    arger.add_argument(
+        "--run_madgraph", help="Whether to run madgraph as well", action="store_true"
+    )
 
     args = arger.parse_args()
 
@@ -127,7 +133,7 @@ output pyout {out_path}"""
     # Set up the parameters of the process
     nparticles = int(matrix.nexternal)
     ndim = (nparticles - 2) * 4 + 2
-    sqrts = 7e3
+    sqrts = 13e3
     massive_particles = args.massive_particles
     non_massive = nparticles - massive_particles - 2
     # Assume that the massive particles go first
@@ -191,4 +197,48 @@ output pyout {out_path}"""
             ret = tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
         return ret
 
-    _ = vegas_wrapper(cross_section, ndim, 5, int(1e5))
+    flow_start = time.time()
+    res, err = vegas_wrapper(cross_section, ndim, 20, int(5e5))
+    flow_final = time.time()
+
+    if args.run_madgraph:
+        # Prepare the madgraph_script
+        if args.variable_g:
+            scale = "set run_card dynamical_scale_choice 3"
+        else:
+            qsqrt = np.sqrt(q2)
+            scale = f"""set run_card fixed_ren_scale true
+set run_card fixed_fac_scale true
+set run_card scale {scale}
+set run_card dsqrt_q2fact1 {scale}
+set run_card dsqrt_q2fact2 {scale}
+"""
+
+        if args.enable_cuts:
+            cuts = "set run_card pt_min_pdg {6: 60}"
+        else:
+            cuts = ""
+
+        madgraph_script = f"""generate {args.madgraph_process}
+launch
+set run_card nevents 300000
+set run_card pdlabel lhapdf
+set run_card lhaid 303600
+{scale}
+{cuts}
+"""
+        mad_start = time.time()
+
+        script_path = Path(tempfile.mktemp(prefix="mad_script"))
+        script_path.write_text(madgraph_script)
+        sp.run([mg5_exe, "-f", script_path], check=True)
+
+        mad_final = time.time()
+
+        print(f"\nFinal vegasflow result: {res.numpy():.6} +- {err:.4}")
+
+        print(f"> Madgraph took: {mad_final-mad_start:.4}s to run")
+
+        if args.pdf != DEFAULT_PDF:
+            print(f"Note that Madgraph runs with {DEFAULT_PDF} while you chose {args.pdf}")
+    print(f"> Madflow took: {flow_final-flow_start:.4}s")
