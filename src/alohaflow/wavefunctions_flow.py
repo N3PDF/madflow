@@ -48,12 +48,13 @@ def sxxxxx(p, nss):
 
     Returns
     -------
-        phi: tf.Tensor, scalar wavefunction of shape=(None,3)
+        phi: tf.Tensor, scalar wavefunction of shape=(3,None)
     """
     v0 = tf.expand_dims(complex_tf(p[:, 0] * nss, p[:, 3] * nss), 1)
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nss, p[:, 2] * nss), 1)
     v = tf.expand_dims(complex_tf(1.0, 0.0), 1)
-    return tf.concat([v0, v1, v], axis=1)
+    phi = tf.concat([v0, v1, v], axis=1)
+    return tf.transpose(phi)
 
 
 @tf.function(input_signature=wave_signature)
@@ -71,7 +72,7 @@ def ixxxxx(p, fmass, nhel, nsf):
 
     Returns
     -------
-        |fi>: tf.Tensor, fermion wavefunction of shape=(None,6)
+        |fi>: tf.Tensor, fermion wavefunction of shape=(6,None)
     """
     v0 = tf.expand_dims(complex_tf(-p[:, 0] * nsf, -p[:, 3] * nsf), 1)
     v1 = tf.expand_dims(complex_tf(-p[:, 1] * nsf, -p[:, 2] * nsf), 1)
@@ -82,7 +83,8 @@ def ixxxxx(p, fmass, nhel, nsf):
                 lambda: _ix_massive(p, fmass, nsf, nh),
                 lambda: _ix_massless(p, nhel, nsf, nh)
                )
-    return tf.concat([v0, v1, v], axis=1)
+    fi = tf.concat([v0, v1, v], axis=1)
+    return tf.transpose(fi)
 
 
 @tf.function(input_signature=wave_signature)
@@ -100,7 +102,7 @@ def oxxxxx(p, fmass, nhel, nsf):
 
     Returns
     -------
-         <fo|: tf.Tensor, fermion wavefunction of shape=(None,6)
+         <fo|: tf.Tensor, fermion wavefunction of shape=(6,None)
     """
     v0 = tf.expand_dims(complex_tf(p[:, 0] * nsf, p[:, 3] * nsf), 1)
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nsf, p[:, 2] * nsf), 1)
@@ -111,7 +113,8 @@ def oxxxxx(p, fmass, nhel, nsf):
                 lambda: _ox_massive(p, fmass, nhel, nsf, nh),
                 lambda: _ox_massless(p, nhel, nsf, nh)
                )
-    return tf.concat([v0, v1, v], axis=1)
+    fo = tf.concat([v0, v1, v], axis=1)
+    return tf.transpose(fo)
 
 
 @tf.function(input_signature=wave_signature)
@@ -129,7 +132,7 @@ def vxxxxx(p, vmass, nhel, nsv):
 
     Returns
     -------
-        epsilon^{mu(v)}: tf.Tensor, vector wavefunction of shape=(None,6)
+        epsilon^{mu(v)}: tf.Tensor, vector wavefunction of shape=(6,None)
     """
     hel0 = 1.0 - tfmath.abs(nhel)
 
@@ -148,7 +151,8 @@ def vxxxxx(p, vmass, nhel, nsv):
                            p, vmass, nhel, nsv, hel0, nsvahl, pp, pt
                                      )
                )
-    return tf.concat([v0, v1, v], axis=1)
+    eps = tf.concat([v0, v1, v], axis=1)
+    return tf.transpose(eps)
 
 
 #===============================================================================
@@ -745,3 +749,5 @@ def _vx_no_BRST_check_massless_pt_zero(p, nhel, nsv):
     v[0] = tf.ones_like(p[:,0], dtype=DTYPECOMPLEX) * complex_tf(-nhel * SQH, 0.0)
     v[1] = complex_tf(0.0, nsv * signvec(SQH, p[:, 3]))
     return tf.stack(v, axis=1)
+
+# TODO: still missing the proper casting of integers inside inner functions
