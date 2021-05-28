@@ -165,7 +165,7 @@ output pyout {out_path}"""
     pdf = mkPDF(args.pdf + "/0")
 
     # Create the pase space and register the cuts
-    phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses)
+    phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
     if args.enable_cuts:
         if args.verbose:
             print(f"Masses: {masses}")

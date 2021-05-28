@@ -291,6 +291,43 @@ def ramboflow(xrand, nparticles, com_sqrts, masses=None):
     return final_p, wgt, x1, x2
 
 
+def _boost_to_lab(p_com, x1, x2):
+    """Boost the momenta back from the COM frame of the initial partons
+    to the lab frame
+
+    Parameters
+    ----------
+        p_comp: tensor (nevents, nparticles, 4)
+            phase space point for all particles for all events (E, px, py, pz)
+            in the center of mass frame
+        x1: tensor (nevents)
+            momentum fraction of parton 1
+        x2: tensor (nevents)
+            momentum fraction of parton 2
+
+    Return
+    ------
+        tensor (nevents, nparticles, 4)
+            phase space point for all particles for all events (E, px, py, pz)
+            in the center of mass frame
+    """
+    # Boost the momenta back from the COM of pa + pb
+    eta = -0.5 * tf.math.log(x1 / x2)
+    cth = tf.math.cosh(eta)
+    sth = tf.math.sinh(eta)
+    # Generate the boost matrix
+    zeros = tf.zeros_like(x1)
+    ones = tf.ones_like(x1)
+    bE = tf.stack([cth, zeros, zeros, -sth], axis=1)
+    bX = tf.stack([zeros, ones, zeros, zeros], axis=1)
+    bY = tf.stack([zeros, zeros, ones, zeros], axis=1)
+    bZ = tf.stack([-sth, zeros, zeros, cth], axis=1)
+
+    bmat = tf.stack([bE, bX, bY, bZ], axis=1)
+    # Apply boost
+    return tf.keras.backend.batch_dot(p_com, bmat, axes=2)
+
+
 class PhaseSpaceGenerator:
     """Phase space generator class
     able to not only generate momenta but also apply cuts
@@ -305,9 +342,11 @@ class PhaseSpaceGenerator:
             mass of the outgoing particles
         algorithm: str
             algoirhtm to be used (by default ramboflow)
+        com_output: bool
+            whether the output should be on the com frame (default, true) or the lb frame (false)
     """
 
-    def __init__(self, nparticles, com_sqrts, masses=None, algorithm="ramboflow"):
+    def __init__(self, nparticles, com_sqrts, masses=None, com_output=True, algorithm="ramboflow"):
         if masses is None:
             masses = [0.0] * (nparticles - 2)
         if len(masses) != (nparticles - 2):
@@ -320,6 +359,7 @@ class PhaseSpaceGenerator:
         self._nparticles = nparticles
         self._cuts = []
         self._cuts_info = []
+        self._com_output = com_output
 
         if algorithm == "ramboflow":
             self._ps_gen = ramboflow
@@ -445,4 +485,8 @@ class PhaseSpaceGenerator:
             idx = int_me(tf.where(passing_values))
         else:
             idx = float_me(1.0)
+
+        if not self._com_output:
+            ps = _boost_to_lab(ps, x1, x2)
+
         return ps, wgt, x1, x2, idx
