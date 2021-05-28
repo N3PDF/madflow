@@ -86,6 +86,7 @@ if __name__ == "__main__":
     arger.add_argument(
         "--pt_cut", help="Minimum pt for the outgoint particles", type=float, default=60
     )
+    arger.add_argument("--histograms", help="Generate LHE files/histograms", action="store_true")
 
     args = arger.parse_args()
 
@@ -225,19 +226,22 @@ output pyout {out_path}"""
     vegas.compile(integrand)
     vegas.run_integration(6)
 
-    proc_name = args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")
-    with LheWriter(Path("."), proc_name, False, 0) as lhe_writer:
-        vegas.events_per_run = int(1e6)
-        vegas.freeze_grid()
-        integrand = generate_integrand(lhe_writer)
-        vegas.compile(integrand)
+    vegas.events_per_run = int(1e6)
+    vegas.freeze_grid()
+
+    if args.histograms:
+        proc_name = args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")
+        with LheWriter(Path("."), proc_name, False, 0) as lhe_writer:
+            integrand = generate_integrand(lhe_writer)
+            vegas.compile(integrand)
+            res, err = vegas.run_integration(10)
+            flow_final = time.time()
+            lhe_writer.store_result((res, err))
+            proc_folder = Path(f"Events/{proc_name}")
+            print(f"Written LHE file to {proc_folder}")
+    else:
         res, err = vegas.run_integration(10)
         flow_final = time.time()
-        lhe_writer.store_result((res, err))
-
-    proc_folder = Path(f"Events/{proc_name}")
-    print(f"Written LHE file to {proc_folder}")
-
 
     if args.run_madgraph:
         # Prepare the madgraph_script
@@ -285,7 +289,7 @@ set run_card lhaid 303600
             print(f"Note that Madgraph runs with {DEFAULT_PDF} while you chose {args.pdf}")
     print(f"> Madflow took: {flow_final-flow_start:.4}s")
 
-    if args.run_madgraph:
+    if args.run_madgraph and args.histograms:
         generate_histograms = [
             "./compare_mg5_hists.py",
             "--madflow",
