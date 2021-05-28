@@ -23,14 +23,14 @@ p_signature = tf.TensorSpec(shape=[None, 4], dtype=DTYPE)
 ps_signature = tf.TensorSpec(shape=[None, None, 4], dtype=DTYPE)
 
 
-@tf.function(input_signature=2 * [p_signature])
+@tf.function(input_signature=2 * [ps_signature])
 def _fourdot(f1, f2):
-    ener = f1[:, 0] * f2[:, 0]
-    pmom = tf.reduce_sum(f1[:, 1:] * f2[:, 1:], axis=1)
+    ener = f1[..., 0] * f2[..., 0]
+    pmom = tf.reduce_sum(f1[..., 1:] * f2[..., 1:], axis=-1)
     return ener - pmom
 
 
-@tf.function(input_signature=[p_signature])
+@tf.function(input_signature=[ps_signature])
 def _invariant_mass(fm):
     return _fourdot(fm, fm)
 
@@ -388,9 +388,9 @@ class PhaseSpaceGenerator:
 
     @staticmethod
     def pt(ps_point):
-        """Compute the pt of the ps point (nevents,4)"""
-        px = ps_point[:, 1]
-        py = ps_point[:, 2]
+        """Compute the pt of the ps point (nevents, [:], 4)"""
+        px = ps_point[..., 1]
+        py = ps_point[..., 2]
         return tf.math.sqrt(px ** 2 + py ** 2)
 
     def register_cut(self, variable, particle=None, min_val=None, max_val=None):

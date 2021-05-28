@@ -191,10 +191,8 @@ output pyout {out_path}"""
 
             # Compute the value of muF==muR if needed
             if args.variable_g:
-                full_mt = 0.0
-                for i in range(2, nparticles):
-                    full_mt += phasespace.mt2(all_ps[:, i, :])
-                q2array = full_mt / 2.0
+                full_mt = tf.reduce_sum(phasespace.mt(all_ps[:, 2:nparticles, :]), axis=-1)
+                q2array = (full_mt / 2.0) ** 2
                 alpha_s = pdf.alphasQ2(q2array)
             else:
                 q2array = tf.ones_like(x1) * q2
@@ -268,6 +266,7 @@ set run_card dsqrt_q2fact2 {qsqrt}
 output {out_path}
 launch
 set run_card nevents 300000
+set run_card systematics none
 set run_card pdlabel lhapdf
 set run_card lhaid 303600
 {scale}
