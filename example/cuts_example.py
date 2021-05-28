@@ -208,8 +208,9 @@ output pyout {out_path}"""
 
             if lhewriter is not None:
                 # Fill up the LH grid
-                wg = tf.gather(weight, idx)[:,0]
-                tf.py_function(func=lhewriter.lhe_parser, inp=[all_ps, ret * wg], Tout=DTYPE)
+                if args.enable_cuts:
+                    weight = tf.gather(weight, idx)[:, 0]
+                tf.py_function(func=lhewriter.lhe_parser, inp=[all_ps, ret * weight], Tout=DTYPE)
 
             if args.enable_cuts:
                 ret = tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
@@ -222,21 +223,21 @@ output pyout {out_path}"""
     vegas = VegasFlow(ndim, int(5e4))
     integrand = generate_integrand()
     vegas.compile(integrand)
-    vegas.run_integration(5)
+    vegas.run_integration(6)
 
-    proc_name = (
-        args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")
-    )
+    proc_name = args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")
     with LheWriter(Path("."), proc_name, False, 0) as lhe_writer:
         vegas.events_per_run = int(1e6)
         vegas.freeze_grid()
         integrand = generate_integrand(lhe_writer)
         vegas.compile(integrand)
         res, err = vegas.run_integration(10)
+        flow_final = time.time()
         lhe_writer.store_result((res, err))
-    print(f"Written LHE file to Events/{proc_name}")
 
-    flow_final = time.time()
+    proc_folder = Path(f"Events/{proc_name}")
+    print(f"Written LHE file to {proc_folder}")
+
 
     if args.run_madgraph:
         # Prepare the madgraph_script
@@ -246,9 +247,9 @@ output pyout {out_path}"""
             qsqrt = np.sqrt(q2)
             scale = f"""set run_card fixed_ren_scale true
 set run_card fixed_fac_scale true
-set run_card scale {scale}
-set run_card dsqrt_q2fact1 {scale}
-set run_card dsqrt_q2fact2 {scale}
+set run_card scale {qsqrt}
+set run_card dsqrt_q2fact1 {qsqrt}
+set run_card dsqrt_q2fact2 {qsqrt}
 """
 
         if args.enable_cuts:
@@ -260,6 +261,7 @@ set run_card dsqrt_q2fact2 {scale}
             cuts = ""
 
         madgraph_script = f"""generate {args.madgraph_process}
+output {out_path}
 launch
 set run_card nevents 300000
 set run_card pdlabel lhapdf
@@ -282,3 +284,13 @@ set run_card lhaid 303600
         if args.pdf != DEFAULT_PDF:
             print(f"Note that Madgraph runs with {DEFAULT_PDF} while you chose {args.pdf}")
     print(f"> Madflow took: {flow_final-flow_start:.4}s")
+
+    if args.run_madgraph:
+        generate_histograms = [
+            "./compare_mg5_hists.py",
+            "--madflow",
+            proc_folder.as_posix(),
+            "--mg5",
+            out_path.as_posix(),
+        ]
+        sp.run(generate_histograms, check=True)
