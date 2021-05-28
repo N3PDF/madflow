@@ -26,8 +26,9 @@ import numpy as np
 from vegasflow import VegasFlow
 from pdfflow import mkPDF, float_me, int_me, run_eager
 
-from alohaflow.config import get_madgraph_path
+from alohaflow.config import get_madgraph_path, DTYPE
 from alohaflow.phasespace import ramboflow, PhaseSpaceGenerator
+from alohaflow.lhe_writer import LheWriter
 import tensorflow as tf
 
 # Create some temporary directories and files
@@ -82,7 +83,9 @@ if __name__ == "__main__":
     arger.add_argument(
         "--run_madgraph", help="Whether to run madgraph as well", action="store_true"
     )
-    arger.add_argument("--pt_cut", help="Minimum pt for the outgoint particles", type=float, default=60)
+    arger.add_argument(
+        "--pt_cut", help="Minimum pt for the outgoint particles", type=float, default=60
+    )
 
     args = arger.parse_args()
 
@@ -177,40 +180,62 @@ output pyout {out_path}"""
         hadron_2 = pdf.xfxQ2(int_me([flav_2]), x2, q2array)
         return (hadron_1 * hadron_2) / x1 / x2
 
-    def cross_section(xrand, **kwargs):
-        """Compute the cross section"""
-        # Generate the phase space point
-        all_ps, wts, x1, x2, idx = phasespace(xrand)
+    def generate_integrand(lhewriter=None):
+        """Generate a cross section with (or without) a LHE parser"""
 
-        # Compute the value of muF==muR if needed
-        if args.variable_g:
-            full_mt = 0.0
-            for i in range(2, nparticles):
-                full_mt += phasespace.mt2(all_ps[:, i, :])
-            q2array = full_mt / 2.0
-            alpha_s = pdf.alphasQ2(q2array)
-        else:
-            q2array = tf.ones_like(x1) * q2
-            alpha_s = None
+        def cross_section(xrand, weight=1.0, **kwargs):
+            """Compute the cross section"""
+            # Generate the phase space point
+            all_ps, wts, x1, x2, idx = phasespace(xrand)
 
-        # Get the luminosity per event
-        pdf_result = luminosity(x1, x2, q2array)
+            # Compute the value of muF==muR if needed
+            if args.variable_g:
+                full_mt = 0.0
+                for i in range(2, nparticles):
+                    full_mt += phasespace.mt2(all_ps[:, i, :])
+                q2array = full_mt / 2.0
+                alpha_s = pdf.alphasQ2(q2array)
+            else:
+                q2array = tf.ones_like(x1) * q2
+                alpha_s = None
 
-        # Compute the cross section
-        smatrix = matrix.smatrix(all_ps, *model_params.evaluate(alpha_s))
-        ret = smatrix * pdf_result * wts
-        if args.enable_cuts:
-            ret = tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
-        return ret
+            # Get the luminosity per event
+            pdf_result = luminosity(x1, x2, q2array)
+
+            # Compute the cross section
+            smatrix = matrix.smatrix(all_ps, *model_params.evaluate(alpha_s))
+            ret = smatrix * pdf_result * wts
+
+            if lhewriter is not None:
+                # Fill up the LH grid
+                wg = tf.gather(weight, idx)[:,0]
+                tf.py_function(func=lhewriter.lhe_parser, inp=[all_ps, ret * wg], Tout=DTYPE)
+
+            if args.enable_cuts:
+                ret = tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
+
+            return ret
+
+        return cross_section
 
     flow_start = time.time()
-    vegas = VegasFlow(ndim, int(1e5))
-    vegas.compile(cross_section)
+    vegas = VegasFlow(ndim, int(5e4))
+    integrand = generate_integrand()
+    vegas.compile(integrand)
     vegas.run_integration(5)
 
-    vegas.events_per_run = int(1e6)
-    vegas.freeze_grid()
-    res, err = vegas.run_integration(10)
+    proc_name = (
+        args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")
+    )
+    with LheWriter(Path("."), proc_name, False, 0) as lhe_writer:
+        vegas.events_per_run = int(1e6)
+        vegas.freeze_grid()
+        integrand = generate_integrand(lhe_writer)
+        vegas.compile(integrand)
+        res, err = vegas.run_integration(10)
+        lhe_writer.store_result((res, err))
+    print(f"Written LHE file to Events/{proc_name}")
+
     flow_final = time.time()
 
     if args.run_madgraph:
@@ -227,7 +252,7 @@ set run_card dsqrt_q2fact2 {scale}
 """
 
         if args.enable_cuts:
-            outgoing_particles = args.madgraph_process.rsplit(" ", nparticles-2)[1:]
+            outgoing_particles = args.madgraph_process.rsplit(" ", nparticles - 2)[1:]
             dict_cuts = {_flav_dict[i[0]]: args.pt_cut for i in outgoing_particles}
             # All pt must be above PT_CUT
             cuts = f"set run_card pt_min_pdg {dict_cuts}"
