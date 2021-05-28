@@ -105,8 +105,6 @@ def oxxxxx(p, fmass, nhel, nsf):
     v0 = tf.expand_dims(complex_tf(p[:, 0] * nsf, p[:, 3] * nsf), 1)
     v1 = tf.expand_dims(complex_tf(p[:, 1] * nsf, p[:, 2] * nsf), 1)
 
-    nhel = nhel
-    nsf = nsf
     nh = nhel * nsf
 
     massive = fmass != 0
@@ -142,8 +140,6 @@ def vxxxxx(p, vmass, nhel, nsv):
     pp = tfmath.minimum(p[:, 0], tfmath.sqrt(pt2 + p[:, 3] ** 2))
     pt = tfmath.minimum(pp, tfmath.sqrt(pt2))
 
-    nhel = nhel
-    nsv = nsv
     hel0 = 1 - tfmath.abs(nhel)
     nsvahl = nsv * tfmath.abs(nhel)
 
@@ -592,11 +588,10 @@ def _vx_no_BRST_check_massive_pp_zero(nhel, nsvahl, nevts):
         tf.Tensor, of shape=(None,4) and dtype DTYPECOMPLEX
     """
     hel0 = 1.0 - tfmath.abs(nhel)
-    v = [complex_tf(0,0)] * 4
-    v[0] = tf.ones(nevts, dtype=DTYPECOMPLEX)
-    v[1] = tf.ones_like(v[0]) * complex_tf(-nhel * SQH, 0.0)
-    v[2] = tf.ones_like(v[0]) * complex_tf(0.0, nsvahl * SQH)
-    v[3] = tf.ones_like(v[0]) * complex_tf(hel0, 0.0)
+    v = [[complex_tf(1,0)]] * 4
+    v[1] = [complex_tf(-nhel * SQH, 0.0)]
+    v[2] = [complex_tf(0.0, nsvahl * SQH)]
+    v[3] = [complex_tf(hel0, 0.0)]
     return tf.stack(v, axis=1)
 
 
