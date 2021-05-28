@@ -199,6 +199,12 @@ class PyOutExporter(export_python.ProcessExporterPython):
                 couplings.remove(c.name)
                 couplings_dep.append(c.name)
 
+            # now replace the parameters that depend on G with the call to the corresponding function
+            for p in self.params_dep:
+                if p.name == "mdl_sqrt__aS" : continue
+                model_parameter_lines_dep = \
+                        model_parameter_lines_dep.replace(p.name, '%s(G)' % p.name)
+
             # and of the independent ones
             for c in self.coups_indep:
                 if not c.name in couplings: continue
@@ -490,7 +496,11 @@ class PyOutExporter(export_python.ProcessExporterPython):
         intparam_lines += '\n'
         intparam_lines += '    #PS-dependent parameters\n'
         for param in self.params_dep:
-            intparam_lines += '    %s = %s\n' % (param.name, param.expr)
+            if param.name == "mdl_sqrt__aS" :
+                intparam_lines += '    %s = %s\n' % (param.name, param.expr)
+            else:
+                intparam_lines += '    %s = lambda G: complex_me(%s)\n' % (param.name, param.expr)
+
         intparam_lines += '\n'
                 
         return intparam_lines
