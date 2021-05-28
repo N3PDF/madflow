@@ -562,26 +562,24 @@ def _vx_no_BRST_check_massive(p, vmass, nhel, hel0, nsvahl, pp, pt):
     -------
         tf.Tensor, of shape=(None,4) and dtype DTYPECOMPLEX
     """
-    nevts = tf.shape(p, out_type=DTYPEINT)[0]
     cond = tf.expand_dims(pp == 0, 1)
     return tf.where(cond,
-                    _vx_no_BRST_check_massive_pp_zero(nhel, nsvahl, nevts),
+                    _vx_no_BRST_check_massive_pp_zero(nhel, nsvahl),
                     _vx_no_BRST_check_massive_pp_nonzero(
                         p, vmass, nhel, hel0, nsvahl, pp, pt
                                                     )
                    )
 
 
-_vx_BRST_massive_pp_zero_signature = [sscalar]*2 + [sscalar_int]
+_vx_BRST_massive_pp_zero_signature = [sscalar]*2
 @tf.function(input_signature=_vx_BRST_massive_pp_zero_signature)
-def _vx_no_BRST_check_massive_pp_zero(nhel, nsvahl, nevts):
+def _vx_no_BRST_check_massive_pp_zero(nhel, nsvahl):
     """
     Parameters
     ----------
         nhel: tf.Tensor, boson helicity of shape=()
         nsvahl: tf.Tensor, helicity times particle|anti-particle absolute value
                 of shape=()
-        nevts: tf.Tensor, number of events of shape=() and dtype DTYPEINT
 
     Returns
     -------
