@@ -23,7 +23,7 @@ import subprocess as sp
 from pathlib import Path
 import numpy as np
 
-from vegasflow import vegas_wrapper
+from vegasflow import VegasFlow
 from pdfflow import mkPDF, float_me, int_me, run_eager
 
 from alohaflow.config import get_madgraph_path
@@ -82,6 +82,7 @@ if __name__ == "__main__":
     arger.add_argument(
         "--run_madgraph", help="Whether to run madgraph as well", action="store_true"
     )
+    arger.add_argument("--pt_cut", help="Minimum pt for the outgoint particles", type=float, default=60)
 
     args = arger.parse_args()
 
@@ -163,8 +164,12 @@ output pyout {out_path}"""
     # Create the pase space and register the cuts
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses)
     if args.enable_cuts:
-        phasespace.register_cut("pt", particle=3, min_val=60.0)
-        phasespace.register_cut("pt", particle=2, min_val=60.0)
+        if args.verbose:
+            print(f"Masses: {masses}")
+        for i in range(2, nparticles):
+            if args.verbose:
+                print(f"Appling cut of pt > {args.pt_cut} to particle {i}")
+            phasespace.register_cut("pt", particle=i, min_val=args.pt_cut)
 
     def luminosity(x1, x2, q2array):
         """Returns f(x1)*f(x2) for the given flavours"""
@@ -180,8 +185,8 @@ output pyout {out_path}"""
         # Compute the value of muF==muR if needed
         if args.variable_g:
             full_mt = 0.0
-            for i in range(nparticles - 2):
-                full_mt += phasespace.mt2(all_ps[:, i + 2, :])
+            for i in range(2, nparticles):
+                full_mt += phasespace.mt2(all_ps[:, i, :])
             q2array = full_mt / 2.0
             alpha_s = pdf.alphasQ2(q2array)
         else:
@@ -199,7 +204,13 @@ output pyout {out_path}"""
         return ret
 
     flow_start = time.time()
-    res, err = vegas_wrapper(cross_section, ndim, 20, int(5e5))
+    vegas = VegasFlow(ndim, int(1e5))
+    vegas.compile(cross_section)
+    vegas.run_integration(5)
+
+    vegas.events_per_run = int(1e6)
+    vegas.freeze_grid()
+    res, err = vegas.run_integration(10)
     flow_final = time.time()
 
     if args.run_madgraph:
@@ -217,8 +228,8 @@ set run_card dsqrt_q2fact2 {scale}
 
         if args.enable_cuts:
             outgoing_particles = args.madgraph_process.rsplit(" ", nparticles-2)[1:]
-            dict_cuts = {_flav_dict[i[0]]: 60 for i in outgoing_particles}
-            # All pt must be above 60
+            dict_cuts = {_flav_dict[i[0]]: args.pt_cut for i in outgoing_particles}
+            # All pt must be above PT_CUT
             cuts = f"set run_card pt_min_pdg {dict_cuts}"
         else:
             cuts = ""
