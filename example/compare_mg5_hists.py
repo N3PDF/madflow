@@ -115,8 +115,11 @@ def main():
     arger.add_argument(
         "--nbins", help="Path to the mg5_aMC output folder", type=int, default=30
     )
+    arger.add_argument(
+        "--run", help="Madflow run folder name", type=str, default="run_01"
+    )
     args = arger.parse_args()
-    path_flow = args.madflow.joinpath('Events/run_01/unweighted_events.lhe.gz')
+    path_flow = args.madflow.joinpath(f'Events/{args.run}/unweighted_events.lhe.gz')
     path_mg5 = args.mg5.joinpath('Events/run_01/unweighted_events.lhe.gz')
     if not (path_flow.exists() and path_mg5.exists()):
         raise FileNotFoundError(f"LHE files with unweighted events do not exist")
