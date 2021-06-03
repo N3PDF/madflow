@@ -94,6 +94,7 @@ def main(args=None):
         flav_2 = _read_flav(initiation[1])
         if args.verbose:
             print(f" > PDF {args.pdf} will be called with flavours idxs: {flav_1} and {flav_2}")
+        pdf = mkPDF(args.pdf + "/0")
 
     # Prepare the madgraph script
     madgraph_script = f"""generate {args.madgraph_process}
@@ -160,7 +161,6 @@ output pyout {out_path}"""
         wgts = matrix.smatrix(ps, *model_params.evaluate(alpha_s))
         print(f"Weights: \n{wgts.numpy()}")
 
-    pdf = mkPDF(args.pdf + "/0")
 
     # Create the pase space and register the cuts
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
@@ -196,7 +196,10 @@ output pyout {out_path}"""
                 alpha_s = None
 
             # Get the luminosity per event
-            pdf_result = luminosity(x1, x2, q2array)
+            if args.no_pdf:
+                pdf_result = float_me(1.0)
+            else:
+                pdf_result = luminosity(x1, x2, q2array)
 
             # Compute the cross section
             smatrix = matrix.smatrix(all_ps, *model_params.evaluate(alpha_s))

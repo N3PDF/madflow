@@ -1,3 +1,7 @@
+# Madflow
+
+References: https://arxiv.org/abs/2105.10529
+
 ## Install `madflow`
 
 #### From PyPI
@@ -25,8 +29,8 @@ Below are the instructions for MG5_aMC 3.1.0, for a more recent release please v
 
 ```bash
 wget https://launchpad.net/mg5amcnlo/3.0/3.1.x/+download/MG5_aMC_v3.1.0.tar.gz
-tar xfvz MG5_aMC_v3.1.0.tar.gz
-export MADGRAPH_PATH=${PWD}/MG5_aMC_v3.1.0
+tar xfz MG5_aMC_v3.1.0.tar.gz
+export MADGRAPH_PATH=${PWD}/MG5_aMC_v3_1_0
 ```
 
 #### LHAPDF
@@ -56,7 +60,8 @@ Using this script is possible to run any process at Leading Order, integrated wi
 
 ```bash
   madflow --help
-
+```
+```bash
     [-h] [-v] [-p PDF] [--no_pdf] [-c] [--madgraph_process MADGRAPH_PROCESS] [-m MASSIVE_PARTICLES] [-g] [--pt_cut PT_CUT] [--histograms]
 
     optional arguments:
