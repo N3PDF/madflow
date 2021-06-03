@@ -22,6 +22,7 @@ from madgraph import MadGraph5Error, InvalidCmd, MG5DIR
 import madgraph.iolibs.export_python as export_python
 import madgraph.iolibs.helas_call_writers as helas_call_writers
 import madgraph.iolibs.files as files
+import madgraph.iolibs.export_v4 as export_v4
 import madgraph.core.color_algebra as color
 import aloha
 import aloha.create_aloha as create_aloha
@@ -91,6 +92,16 @@ class PyOutExporter(export_python.ProcessExporterPython):
     # if no grouping on can decide to merge uu~ and u~u anyway:
     sa_symmetry = False
 
+    params_ext = [] 
+    params_dep = []
+    params_indep = []
+
+    coups_dep = []
+    coups_indep = []
+
+    PS_dependent_key = ['aS','MU_R']
+
+
     def __init__(self, dir_path, *args, **opts): 
         os.mkdir(dir_path)
         self.dir_path = dir_path
@@ -108,6 +119,8 @@ class PyOutExporter(export_python.ProcessExporterPython):
         """Write the matrix element calculation method for the processes"""
 
         replace_dict = {}
+        # setup the various coupling lists
+        self.refactorize()
 
         # Extract version number and date from VERSION file
         info_lines = self.get_mg5_info_lines()
@@ -162,34 +175,79 @@ class PyOutExporter(export_python.ProcessExporterPython):
             ncolor = max(1, len(matrix_element.get('color_basis')))
             replace_dict['ncolor'] = ncolor
 
+            # informations on initial states
+            initial_states = [p.get_initial_ids() for \
+                                            p in matrix_element.get('processes')]
+            mirror = bool(matrix_element.get_mirror_processes())
+            replace_dict['initial_states'] = ','.join([str(ini) for ini in initial_states])
+            replace_dict['mirror'] = mirror
+
             # Extract model parameter lines
             parameters, couplings = \
                                  self.get_model_parameters(matrix_element)
 
-            model_parameter_lines =  "\n    ".join([\
-                         "%(param)s = model.get(\'parameter_dict\')[\"%(param)s\"]"\
-                         % {"param": param} for param in parameters]) + \
-                                     "\n    " + "\n    ".join([\
-                         "%(coup)s = model.get(\'coupling_dict\')[\"%(coup)s\"]"\
-                              % {"coup": coup} for coup in couplings])
+            model_parameter_lines = '    # External (param_card) parameters\n    '
+            model_parameter_lines +=  "\n    ".join([\
+                         "%(param)s = param_card['%(block)s'].get(%(id)s).value"\
+                         % {"param": param.name, 'block': param.lhablock, 'id': param.lhacode[0]} for param in self.params_ext]) + '\n\n'
+
+            model_parameter_lines += self.get_intparam_definition()
+
+            # read param card
+
+            # write the expression of the PS-dependent couplings
+            couplings_dep = []
+            model_parameter_lines_dep = ''
+
+            model_parameter_lines_dep += '\n    # PS-dependent couplings\n'
+            for c in self.coups_dep:
+                if not c.name in couplings: continue
+                model_parameter_lines_dep += '    %s = lambda G: complex_me(%s)\n' % (c.name, c.expr)
+                couplings.remove(c.name)
+                couplings_dep.append(c.name)
+
+            # now replace the parameters that depend on G with the call to the corresponding function
+            for p in self.params_dep:
+                if p.name == "mdl_sqrt__aS" : continue
+                model_parameter_lines_dep = \
+                        model_parameter_lines_dep.replace(p.name, '%s(G)' % p.name)
+
+            # and of the independent ones
+            for c in self.coups_indep:
+                if not c.name in couplings: continue
+                model_parameter_lines += '    %s = %s\n' % (c.name, c.expr)
 
             if aloha.complex_mass:
-                paramsignature = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(parameters+couplings))
-                paramtuple = ",".join(["complex_me(%s)" % p for p in parameters+couplings]) 
+                paramsignature_const = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(parameters+couplings))
+                paramtuple_const = ",".join(["complex_me(%s)" % p for p in parameters+couplings]) 
 
             else:
-                paramsignature = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPE)'] * len(parameters) + 
+                paramsignature_const = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPE)'] * len(parameters) + 
                                                     ['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(couplings))
-                paramtuple = ",".join(["float_me(%s)" % p for p in parameters] + ["complex_me(%s)" % p for p in couplings]) 
+                paramtuple_const = ",".join(["float_me(%s)" % p for p in parameters] + ["complex_me(%s)" % p for p in couplings]) 
 
-            params = ",".join([p for p in parameters + couplings])
-            paramnames = ",".join(["\"%s\"" % p for p in parameters + couplings])
+            paramtuple_func = ",".join(["%s" % p for p in couplings_dep]) 
 
-            replace_dict['model_parameters'] = model_parameter_lines
-            replace_dict['paramsignature'] = paramsignature
+            if paramsignature_const:
+                paramsignature_const += ','
+
+            paramsignature_func = ",\n        ".join(['tf.TensorSpec(shape=[None], dtype=DTYPECOMPLEX)'] * len(couplings_dep))
+
+            params = ",".join([p for p in parameters + couplings + couplings_dep])
+
+            paramnames_const = ",".join(["\"%s\"" % p for p in parameters + couplings])
+            paramnames_func = ",".join(["\"%s\"" % p for p in couplings_dep])
+
+            replace_dict['model_parameters'] = model_parameter_lines + model_parameter_lines_dep
+            # replace cmath->numpy(np) inside the model paramaters
+            replace_dict['model_parameters'] = replace_dict['model_parameters'].replace('cmath', 'np')
+            replace_dict['paramsignature_const'] = paramsignature_const
+            replace_dict['paramsignature_func'] = paramsignature_func
             replace_dict['params'] = params
-            replace_dict['paramnames'] = paramnames
-            replace_dict['paramtuple'] = paramtuple
+            replace_dict['paramnames_const'] = paramnames_const
+            replace_dict['paramnames_func'] = paramnames_func
+            replace_dict['paramtuple_const'] = paramtuple_const
+            replace_dict['paramtuple_func'] = paramtuple_func
 
             # Extract color data lines
             color_matrix_lines = self.get_color_matrix_lines(matrix_element)
@@ -420,7 +478,81 @@ class PyOutExporter(export_python.ProcessExporterPython):
 
 
     def finalize(self, matrix_elements, history, mg5options, flaglist):
-        """ do nothing at the moment"""
-        pass
+        """ creates the cards (at the moment just the param_card"""
+        cardpath = pjoin(self.dir_path, 'Cards')
+        if not os.path.isdir(cardpath):
+            os.mkdir(pjoin(cardpath))
+            export_v4.UFO_model_to_mg4.create_param_card_static(self.model, pjoin(cardpath, 'param_card.dat'))
+
+        # Write command history as proc_card_mg5
+        if history and os.path.isdir(pjoin(self.dir_path, 'Cards')):
+            output_file = pjoin(self.dir_path, 'Cards', 'proc_card_mg5.dat')
+            history.write(output_file)
 
 
+    def get_intparam_definition(self):
+        """create the lines analogous to the intparam_definition.inc
+        of the fortran output
+        """
+        intparam_lines = ''
+
+        intparam_lines += '    #PS-independent parameters\n'
+        for param in self.params_indep:
+            intparam_lines += '    %s = %s\n' % (param.name, param.expr)
+
+        intparam_lines += '\n'
+        intparam_lines += '    #PS-dependent parameters\n'
+        for param in self.params_dep:
+            if param.name == "mdl_sqrt__aS" :
+                intparam_lines += '    %s = %s\n' % (param.name, param.expr)
+            else:
+                intparam_lines += '    %s = lambda G: complex_me(%s)\n' % (param.name, param.expr)
+
+        intparam_lines += '\n'
+                
+        return intparam_lines
+
+
+
+    def refactorize(self, wanted_couplings = []):    
+        """modify the couplings to fit with MG4 convention """
+            
+        # Keep only separation in alphaS        
+        keys = list(self.model['parameters'].keys())
+        keys.sort(key=len)
+        for key in keys:
+            to_add = [o for o in self.model['parameters'][key] if o.name]
+
+            if key == ('external',):
+                self.params_ext += to_add
+            elif any([(k in key) for k in self.PS_dependent_key]):
+                self.params_dep += to_add
+            else:
+                self.params_indep += to_add
+        # same for couplings
+        keys = list(self.model['couplings'].keys())
+        keys.sort(key=len)
+        for key, coup_list in self.model['couplings'].items():
+            if any([(k in key) for k in self.PS_dependent_key]):
+                self.coups_dep += [c for c in coup_list if
+                                   (not wanted_couplings or c.name in \
+                                    wanted_couplings)]
+            else:
+                self.coups_indep += [c for c in coup_list if
+                                     (not wanted_couplings or c.name in \
+                                      wanted_couplings)]
+                
+        # MG4 use G and not aS as it basic object for alphas related computation
+        #Pass G in the  independant list
+        if 'G' in self.params_dep:
+            index = self.params_dep.index('G')
+            G = self.params_dep.pop(index)
+        #    G.expr = '2*cmath.sqrt(as*pi)'
+        #    self.params_indep.insert(0, self.params_dep.pop(index))
+        # No need to add it if not defined   
+            
+        if 'aS' not in self.params_ext:
+            logger.critical('aS not define as external parameter adding it!')
+            #self.model['parameters']['aS'] = base_objects.ParamCardVariable('aS', 0.138,'DUMMY',(1,))
+            self.params_indep.append( base_objects. ModelVariable('aS', '0.138','real'))
+            self.params_indep.append( base_objects. ModelVariable('G', '4.1643','real'))

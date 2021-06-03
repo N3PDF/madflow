@@ -10,14 +10,17 @@ from alohaflow.config import (
     complex_me
 )
 from alohaflow.wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
+from alohaflow.parameters import Model
 
 import os
 import sys
+import numpy as np
 
 import tensorflow as tf
 import collections
 
-ModelParamTuple = collections.namedtuple("Model", [%(paramnames)s])
+ModelParamTupleConst = collections.namedtuple("constants", [%(paramnames_const)s])
+ModelParamTupleFunc = collections.namedtuple("functions", [%(paramnames_func)s])
 
 root_path = '%(root_path)s'
 sys.path.insert(0, root_path)
@@ -25,26 +28,32 @@ sys.path.insert(0, os.path.join(root_path, 'madgraph'))
 sys.path.insert(0, os.path.join(root_path, 'aloha', 'template_files'))
 
 import models.import_ufo as import_ufo
+import models.check_param_card as param_card_reader
 
 %(aloha_imports)s
 
 
-def get_model_param(model):
+def get_model_param(model, param_card_path):
+    param_card = param_card_reader.ParamCard(param_card_path)
     %(model_parameters)s
-    return ModelParamTuple(%(paramtuple)s)
+    constants = ModelParamTupleConst(%(paramtuple_const)s)
+    functions = ModelParamTupleFunc(%(paramtuple_func)s)
+    return Model(constants, functions)
 
 
 
 smatrix_signature = [
         tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
-        %(paramsignature)s
+        %(paramsignature_const)s
+        %(paramsignature_func)s
         ]
 
 
 matrix_signature = [
         tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
         tf.TensorSpec(shape=[%(nexternal)d], dtype=DTYPE),
-        %(paramsignature)s
+        %(paramsignature_const)s
+        %(paramsignature_func)s
         ]
 
 
@@ -52,6 +61,8 @@ class Matrix_%(process_string)s(object):
     nexternal = float_me(%(nexternal)d)
     ndiags = float_me(%(ndiags)d)
     ncomb = float_me(%(ncomb)d)
+    initial_states = [%(initial_states)s]
+    mirror_initial_states = %(mirror)s
     %(helicity_lines)s
     %(den_factor_line)s
 
@@ -155,7 +166,7 @@ if __name__ == "__main__":
         print(f"No model sm found at {model_sm}, test cannot continue")
         sys.exit(0)
     model = import_ufo.import_model(model_sm.as_posix())
-    model_params = get_model_param(model)
+    model_params = get_model_param(model, 'Cards/param_card.dat')
 
     # Define th phase space
     # The structure asked by the matrix elements is
@@ -194,7 +205,8 @@ if __name__ == "__main__":
 
     all_ps = tf.concat([inc_p1, inc_p2, outgoing_4m], axis=par_ax)
 
-    wgt_set = matrix.smatrix(all_ps, *model_params)
+    model_params.freeze_alpha_s(0.118)
+    wgt_set = matrix.smatrix(all_ps, *model_params.evaluate(None))
 
     print("All good!")
     for i, (p, wgt) in enumerate(zip(all_ps, wgt_set)):
