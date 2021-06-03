@@ -5,9 +5,10 @@
     When a complete set of momenta is output the structure is (n_events, n_particles, n_dim)
 """
 
-from .config import float_me, DTYPE, run_eager
+from .config import float_me, int_me, DTYPE, run_eager
 
 import numpy as np
+import copy
 import tensorflow as tf
 
 import logging
@@ -20,6 +21,18 @@ logger = logging.getLogger(__name__)
 events_signature = tf.TensorSpec(shape=[None, 1], dtype=DTYPE)
 p_signature = tf.TensorSpec(shape=[None, 4], dtype=DTYPE)
 ps_signature = tf.TensorSpec(shape=[None, None, 4], dtype=DTYPE)
+
+
+@tf.function(input_signature=2 * [ps_signature])
+def _fourdot(f1, f2):
+    ener = f1[..., 0] * f2[..., 0]
+    pmom = tf.reduce_sum(f1[..., 1:] * f2[..., 1:], axis=-1)
+    return ener - pmom
+
+
+@tf.function(input_signature=[ps_signature])
+def _invariant_mass(fm):
+    return _fourdot(fm, fm)
 
 
 @tf.function(
@@ -94,7 +107,7 @@ def _massive_xfactor(sqrts, masses, massless_energies):
 
 @tf.function(input_signature=[p_signature, p_signature])
 def _conformal_transformation(input_q, bquad):
-    """ Perform the conformal transformation q->p """
+    """Perform the conformal transformation q->p"""
     bvec = bquad[:, 1:]
     gamma = -bquad[:, 0:1]
     a = 1.0 / (1.0 + gamma)
@@ -197,3 +210,283 @@ def rambo(xrand, n_particles, sqrts, masses=None, check_physical=False):
     wt += (2 * n_particles - 3) * tf.math.log(xfactor[:, 0]) + tf.math.log(wt2 / wt3 * sqrts[:, 0])
     wt = tf.exp(wt) / tf.pow(2 * PI, 3 * n_particles - 4)
     return massive_p, wt
+
+
+def _get_x1x2(xarr, shat_min, s_in):
+    """Receives two random numbers and return the
+    value of the invariant mass of the center of mass
+    as well as the jacobian of the x1,x2 -> tau-y transformation
+    and the values of x1 and x2.
+
+    The xarr array is of shape (batch_size, 2)
+    """
+    taumin = shat_min / s_in
+    taumax = float_me(1.0)
+    # Pick tau
+    delta_tau = taumax - taumin
+    tau = xarr[:, 0] * delta_tau + taumin
+    wgt = delta_tau
+    x1 = tf.pow(tau, xarr[:, 1])
+    x2 = tau / x1
+    wgt *= -1.0 * tf.math.log(tau)
+    shat = x1 * x2 * s_in
+    return shat, wgt, x1, x2
+
+
+def ramboflow(xrand, nparticles, com_sqrts, masses=None):
+    """Takes as input an array of nevent x ndim random points and outputs
+    an array of momenta (nevents x nparticles x 4) in the C.O.M.
+
+    The two first particles are the two incoming particles which are always
+    massless. The masses of the outgoing particles is given by the list ``masses``
+    if not given all outgoing particles are taken as massless
+
+    Parameters
+    ----------
+        xrand: tensor (nevents, (nparticles-2)*4+2)
+            random numbers to generate momenta
+        nparticles: int
+            number of external particles
+        com_sqrts: float
+            center of mass energy
+        masses: lust (nparticles-2)
+            masses of the outgoing particles
+
+    Return
+    ------
+        final_p: tensor (nevents, nparticles, 4)
+            phase space point for all particles for all events (E, px, py, pz)
+        wgt: tensor (nevents)
+            weight of the phase space points
+        x1: tensor (nevents)
+            momentum fraction of parton 1
+        x2: tensor (nevents)
+            momentum fraction of parton 2
+    """
+    if masses is None:
+        shat_min = float_me(0.0)
+    else:
+        shat_min = float_me(np.sum(masses) ** 2)
+
+    # Sample the initial state
+    shat, wgt, x1, x2 = _get_x1x2(xrand[:, :2], shat_min, com_sqrts ** 2)
+    roots = tf.sqrt(shat)
+
+    # Sample the outgoing states
+    p_out, wtps = rambo(xrand[:, 2:], int(nparticles - 2), roots, masses=masses)
+    wgt *= wtps
+
+    # Now stack the input states on top
+    zeros = tf.zeros_like(x1)
+    ein = roots / 2.0
+    pa = tf.expand_dims(tf.stack([ein, zeros, zeros, ein], axis=1), 1)
+    pb = tf.expand_dims(tf.stack([ein, zeros, zeros, -ein], axis=1), 1)
+
+    final_p = tf.concat([pa, pb, p_out], axis=1)
+
+    # Add the flux factor
+    wgt *= float_me(389379365.6)  # GeV to pb
+    wgt /= 2 * shat
+
+    return final_p, wgt, x1, x2
+
+
+def _boost_to_lab(p_com, x1, x2):
+    """Boost the momenta back from the COM frame of the initial partons
+    to the lab frame
+
+    Parameters
+    ----------
+        p_comp: tensor (nevents, nparticles, 4)
+            phase space point for all particles for all events (E, px, py, pz)
+            in the center of mass frame
+        x1: tensor (nevents)
+            momentum fraction of parton 1
+        x2: tensor (nevents)
+            momentum fraction of parton 2
+
+    Return
+    ------
+        tensor (nevents, nparticles, 4)
+            phase space point for all particles for all events (E, px, py, pz)
+            in the center of mass frame
+    """
+    # Boost the momenta back from the COM of pa + pb
+    eta = -0.5 * tf.math.log(x1 / x2)
+    cth = tf.math.cosh(eta)
+    sth = tf.math.sinh(eta)
+    # Generate the boost matrix
+    zeros = tf.zeros_like(x1)
+    ones = tf.ones_like(x1)
+    bE = tf.stack([cth, zeros, zeros, -1.0*sth], axis=1)
+    bX = tf.stack([zeros, ones, zeros, zeros], axis=1)
+    bY = tf.stack([zeros, zeros, ones, zeros], axis=1)
+    bZ = tf.stack([-1.0*sth, zeros, zeros, cth], axis=1)
+
+    bmat = tf.stack([bE, bX, bY, bZ], axis=1)
+    # Apply boost
+    return tf.keras.backend.batch_dot(p_com, bmat, axes=2)
+
+
+class PhaseSpaceGenerator:
+    """Phase space generator class
+    able to not only generate momenta but also apply cuts
+
+    Parameters
+    ----------
+        nparticles: int
+            number of external particles
+        com_sqrts: float
+            com energy
+        masses: list(float)
+            mass of the outgoing particles
+        algorithm: str
+            algoirhtm to be used (by default ramboflow)
+        com_output: bool
+            whether the output should be on the com frame (default, true) or the lb frame (false)
+    """
+
+    def __init__(self, nparticles, com_sqrts, masses=None, com_output=True, algorithm="ramboflow"):
+        if masses is None:
+            masses = [0.0] * (nparticles - 2)
+        if len(masses) != (nparticles - 2):
+            raise ValueError(
+                "Missmatch in PhaseSpaceGenerator between particles and masses"
+                f" {len(masses)} given for {nparticles-2} outgoing particles"
+            )
+        self._sqrts = float_me(com_sqrts)
+        self._masses = masses
+        self._nparticles = nparticles
+        self._cuts = []
+        self._cuts_info = []
+        self._com_output = com_output
+
+        if algorithm == "ramboflow":
+            self._ps_gen = ramboflow
+        else:
+            raise ValueError(f"PS algorithm {algorithm} not understood")
+
+    def clear_cuts(self):
+        """Clear all cuts, if not running on eager mode, we need to regenerate call"""
+        self._cuts = []
+        self._cuts_info = []
+        orig_function = self.__call__.python_function
+        orig_signature = self.__call__.input_signature
+        self.__call__ = tf.function(orig_function, input_signature=orig_signature)
+
+    @staticmethod
+    def mt2(ps_point):
+        """Transverse mass squared of the given ps point (nevents, 4)"""
+        pt2 = PhaseSpaceGenerator.pt(ps_point) ** 2
+        m2 = _invariant_mass(ps_point)
+        return m2 + pt2
+
+    @staticmethod
+    def mt(ps_point):
+        """Transverse mass of the given ps point"""
+        return tf.math.sqrt(PhaseSpaceGenerator.mt2(ps_point))
+
+    @staticmethod
+    def pt(ps_point):
+        """Compute the pt of the ps point (nevents, [:], 4)"""
+        px = ps_point[..., 1]
+        py = ps_point[..., 2]
+        return tf.math.sqrt(px ** 2 + py ** 2)
+
+    def register_cut(self, variable, particle=None, min_val=None, max_val=None):
+        """Register the cut for the given variable for the given particle (if needed)
+        The variables must be done as a string and be a valid method of this class
+        the min and max values are the values between which the variable must be found
+
+        Warning:
+            at this point the user is trusted to use the argument 'particle'
+            whenever the variable applies to
+
+        The cut functions will return a tensor of the idx of the accepted events
+        and a tensor of booleans
+
+        Parameters
+        ----------
+            variable: str
+                name of the variable to which the cut applies
+            particle: int
+                particle index to which the cut applies
+            min_val: float
+                minimum accepted value of the variable
+            max_val: float
+                maximum accepted value of the variable
+        """
+        try:
+            fun = getattr(self, variable)
+        except AttributeError:
+            raise ValueError(f"{variable} is not implemented")
+
+        if particle is not None and particle >= self._nparticles:
+            raise ValueError(f"Cannot apply cuts to particle {particle}, python idx starts at 0!")
+        if min_val is None and max_val is None:
+            logger.warning(f"Cut for {variable} has no min or max val, ignoring")
+
+        def cut_function(phase_space):
+            if particle is not None:
+                phase_space = phase_space[:, particle, :]
+            variable_value = fun(phase_space)
+
+            if min_val is not None:
+                min_pass = variable_value > float_me(min_val)
+                if max_val is None:
+                    return min_pass
+            if max_val is not None:
+                max_pass = variable_value < float_me(max_val)
+                if min_val is None:
+                    return max_pass
+            return tf.logical_and(min_pass, max_pass)
+
+        if particle is None:
+            cut_fun = tf.function(cut_function, input_signature=[p_signature])
+            self._cuts_info.append(f"{min_val} < {variable}({particle}) < {max_val}")
+        else:
+            cut_fun = tf.function(cut_function, input_signature=[ps_signature])
+            self._cuts_info.append(f"{min_val} < {variable} < {max_val}")
+        self._cuts.append(cut_fun)
+
+    @tf.function(input_signature=[tf.TensorSpec(shape=[None, None], dtype=DTYPE)])
+    def __call__(self, xrand):
+        """
+            Generate phase space points according to the xrand random input
+
+        Parameters
+        ----------
+            xrand: tensor (nevents, (nparticles-2)*4+2)
+                random numbers to generate momenta
+
+        Return  (if there are cuts, the output nevents =/= input nevents)
+        ------
+            final_p: tensor (nevents, nparticles, 4)
+                phase space point for all particles for all events (E, px, py, pz)
+            wgt: tensor (nevents)
+                weight of the phase space points
+            x1: tensor (nevents)
+                momentum fraction of parton 1
+            x2: tensor (nevents)
+                momentum fraction of parton 2
+            idx: tensor (nevents)
+                if there are cuts, index of the passing events, (1,) otherwise
+        """
+        ps, wgt, x1, x2 = self._ps_gen(xrand, self._nparticles, self._sqrts, self._masses)
+
+        # Apply all cuts
+        if self._cuts:
+            stripes = [cut(ps) for cut in self._cuts]
+            passing_values = tf.math.reduce_all(stripes, axis=0)
+            ps = tf.boolean_mask(ps, passing_values, axis=0)
+            wgt = tf.boolean_mask(wgt, passing_values)
+            x1 = tf.boolean_mask(x1, passing_values)
+            x2 = tf.boolean_mask(x2, passing_values)
+            idx = int_me(tf.where(passing_values))
+        else:
+            idx = float_me(1.0)
+
+        if not self._com_output:
+            ps = _boost_to_lab(ps, x1, x2)
+
+        return ps, wgt, x1, x2, idx
