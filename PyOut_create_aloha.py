@@ -220,7 +220,7 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
 
         # the signature
         shape_dict = {'list_complex' : '[None,None]',
-                      'complex' : '[]',
+                      'complex' : '[None]',
                       'double' : '[]'}
         type_dict = {'list_complex' : 'DTYPECOMPLEX',
                       'complex' : 'DTYPECOMPLEX',
