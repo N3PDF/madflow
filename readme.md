@@ -39,8 +39,11 @@ While `LHAPDF` is not strictly necessary to use the `madflow` library or run any
 having access to the `lhapdf` python wrapper can be convenient in order to manage the different PDFsets.
 Please install the latest version from the LHAPDF [site](https://lhapdf.hepforge.org/).
 
-Otherwise, you can manually install the [PDF sets](https://lhapdf.hepforge.org/pdfsets.html) in a suitable directory.
-TODO: update pdfflow to use environment variables as well.
+Otherwise, if your installed version of `pdfflow` is equal or greater than `1.3`,
+you can manually install the [PDF sets](https://lhapdf.hepforge.org/pdfsets.html) in a suitable directory
+and ensure that either the `PDFFLOW_DATA_PATH` or `LHAPDF_DATA_PATH` environment variables are pointing to it.
+
+You can check your installed version of `pdfflow` with: `python -c 'import pdfflow ; print(pdfflow.__version__);'`
 
 ## Install plugin in MG5_aMC
 
