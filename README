@@ -6,3 +6,12 @@ to generate a process, run MG5_aMC as usual, and specify pyout as output format
 
 generate g g > t t~
 output pyout FOLDER_NAME
+
+## Install plugin in madgraph
+
+In order to install the madflow plugin in madgraph, it is necessary to link the `madgraph_plugin` folder inside the `PLUGIN` directory of Madgraph.
+For instance, if the environmental variable `$MADGRAPH_PATH` is pointing to the madgraph root:
+
+```bash
+    ~$ ln -s ${PWD}/madgraph_plugin ${MADGRAPH_PATH}/PLUGIN/pyout
+```
