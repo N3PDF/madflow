@@ -5,7 +5,7 @@
 """
 
 import collections
-from alohaflow.config import (
+from madflow.config import (
     int_me,
     float_me,
     DTYPE,
@@ -15,7 +15,7 @@ from alohaflow.config import (
     complex_tf,
     complex_me,
 )
-from alohaflow.wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
+from madflow.wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
 import tensorflow as tf
 
 ModelParamTuple = collections.namedtuple("Model", ["mdl_MT", "mdl_WT", "GC_10", "GC_11"])

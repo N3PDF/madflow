@@ -26,9 +26,9 @@ import numpy as np
 from vegasflow import VegasFlow
 from pdfflow import mkPDF, float_me, int_me, run_eager
 
-from alohaflow.config import get_madgraph_path, DTYPE
-from alohaflow.phasespace import ramboflow, PhaseSpaceGenerator
-from alohaflow.lhe_writer import LheWriter
+from madflow.config import get_madgraph_path, DTYPE
+from madflow.phasespace import ramboflow, PhaseSpaceGenerator
+from madflow.lhe_writer import LheWriter
 import tensorflow as tf
 
 # Create some temporary directories and files

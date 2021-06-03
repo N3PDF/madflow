@@ -1,5 +1,5 @@
 """
-    Default settings for alohaFlow
+    Default settings for madflow
 
     Since this program is to be installed together with VegasFlow
     it is allow to take the configuration from there
@@ -47,7 +47,7 @@ module_name = __name__.split(".")[0]
 logger = logging.getLogger(module_name)
 
 DEFAULT_LOG_LEVEL = "2"
-log_level_idx = os.environ.get("ALOHAFLOW_LOG_LEVEL", DEFAULT_LOG_LEVEL)
+log_level_idx = os.environ.get("MADFLOW_LOG_LEVEL", DEFAULT_LOG_LEVEL)
 log_dict = {"0": logging.ERROR, "1": logging.WARNING, "2": logging.INFO, "3": logging.DEBUG}
 bad_log_warning = None
 if log_level_idx not in log_dict:

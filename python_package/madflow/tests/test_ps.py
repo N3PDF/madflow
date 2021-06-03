@@ -1,7 +1,7 @@
 """ Tests phase space routines
 """
-from alohaflow.config import DTYPE
-import alohaflow.phasespace as ps
+from madflow.config import DTYPE
+import madflow.phasespace as ps
 import numpy as np
 import tensorflow as tf
 

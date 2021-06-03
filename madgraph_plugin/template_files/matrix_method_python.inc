@@ -1,5 +1,5 @@
 
-from alohaflow.config import (
+from madflow.config import (
     int_me,
     float_me,
     DTYPE,
@@ -9,8 +9,8 @@ from alohaflow.config import (
     complex_tf,
     complex_me
 )
-from alohaflow.wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
-from alohaflow.parameters import Model
+from madflow.wavefunctions_flow import oxxxxx, ixxxxx, vxxxxx, sxxxxx
+from madflow.parameters import Model
 
 import os
 import sys

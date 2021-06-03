@@ -1,4 +1,4 @@
-from alohaflow.config import get_madgraph_path
+from madflow.config import get_madgraph_path
 import sys, os, six, gzip, copy
 from time import time as tm
 import math
