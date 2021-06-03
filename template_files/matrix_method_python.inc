@@ -61,6 +61,8 @@ class Matrix_%(process_string)s(object):
     nexternal = float_me(%(nexternal)d)
     ndiags = float_me(%(ndiags)d)
     ncomb = float_me(%(ncomb)d)
+    initial_states = [%(initial_states)s]
+    mirror_initial_states = %(mirror)s
     %(helicity_lines)s
     %(den_factor_line)s
 

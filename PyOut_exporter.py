@@ -175,6 +175,13 @@ class PyOutExporter(export_python.ProcessExporterPython):
             ncolor = max(1, len(matrix_element.get('color_basis')))
             replace_dict['ncolor'] = ncolor
 
+            # informations on initial states
+            initial_states = [p.get_initial_ids() for \
+                                            p in matrix_element.get('processes')]
+            mirror = bool(matrix_element.get_mirror_processes())
+            replace_dict['initial_states'] = ','.join([str(ini) for ini in initial_states])
+            replace_dict['mirror'] = mirror
+
             # Extract model parameter lines
             parameters, couplings = \
                                  self.get_model_parameters(matrix_element)
