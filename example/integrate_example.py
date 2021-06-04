@@ -28,7 +28,7 @@ from pdfflow import mkPDF
 from pdfflow.functions import _condition_to_idx
 from pdfflow.configflow import fzero, fone, DTYPE
 
-from alohaflow.lhe_writer import LheWriter
+from madflow.lhe_writer import LheWriter
 
 import tensorflow as tf
 

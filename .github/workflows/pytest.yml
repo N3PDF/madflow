@@ -26,8 +26,8 @@ jobs:
         pip install pylint
         # Error out only in actual errors
         # TODO some of the errors here are actual minor style problems that needs to be solved *eventually*
-        pylint src/*/*.py -E -d E1123,E1120,E0401,E402,E0102
-        pylint src/*/*.py --exit-zero
+        pylint python_package/*/*.py -E -d E1123,E1120,E0401,E402,E0102
+        pylint python_package/*/*.py --exit-zero
     - name: Test with pytest
       run: |
         pip install pytest pdfflow

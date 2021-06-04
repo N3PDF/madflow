@@ -7,7 +7,7 @@ to the integration with the corresponding cuts
 The matrix element run by default is: g g > t t~
 
 ```
-    ~$ ./cuts_example.py --madgraph_process "g g > g g"
+    ~$ madflow --madgraph_process "g g > t t~"
 ```
 
 It is possible to apply some mock cuts (pt > 60) with the option  `-c`
@@ -62,7 +62,7 @@ def _import_module_from_path(path, module_name):
     return module
 
 
-if __name__ == "__main__":
+def main(args=None):
     arger = argparse.ArgumentParser(__doc__)
     arger.add_argument("-v", "--verbose", help="Print extra info", action="store_true")
     arger.add_argument("-p", "--pdf", help="PDF set", type=str, default=DEFAULT_PDF)
@@ -81,14 +81,11 @@ if __name__ == "__main__":
     )
     arger.add_argument("-g", "--variable_g", help="Use variable g_s", action="store_true")
     arger.add_argument(
-        "--run_madgraph", help="Whether to run madgraph as well", action="store_true"
-    )
-    arger.add_argument(
         "--pt_cut", help="Minimum pt for the outgoint particles", type=float, default=60
     )
     arger.add_argument("--histograms", help="Generate LHE files/histograms", action="store_true")
 
-    args = arger.parse_args()
+    args = arger.parse_args(args)
 
     # Naive reading of the process to understand the flavours that are initiating the process
     if not args.no_pdf:
@@ -97,6 +94,7 @@ if __name__ == "__main__":
         flav_2 = _read_flav(initiation[1])
         if args.verbose:
             print(f" > PDF {args.pdf} will be called with flavours idxs: {flav_1} and {flav_2}")
+        pdf = mkPDF(args.pdf + "/0")
 
     # Prepare the madgraph script
     madgraph_script = f"""generate {args.madgraph_process}
@@ -163,7 +161,6 @@ output pyout {out_path}"""
         wgts = matrix.smatrix(ps, *model_params.evaluate(alpha_s))
         print(f"Weights: \n{wgts.numpy()}")
 
-    pdf = mkPDF(args.pdf + "/0")
 
     # Create the pase space and register the cuts
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
@@ -199,7 +196,10 @@ output pyout {out_path}"""
                 alpha_s = None
 
             # Get the luminosity per event
-            pdf_result = luminosity(x1, x2, q2array)
+            if args.no_pdf:
+                pdf_result = float_me(1.0)
+            else:
+                pdf_result = luminosity(x1, x2, q2array)
 
             # Compute the cross section
             smatrix = matrix.smatrix(all_ps, *model_params.evaluate(alpha_s))
@@ -241,59 +241,8 @@ output pyout {out_path}"""
         res, err = vegas.run_integration(10)
         flow_final = time.time()
 
-    if args.run_madgraph:
-        # Prepare the madgraph_script
-        if args.variable_g:
-            scale = "set run_card dynamical_scale_choice 3"
-        else:
-            qsqrt = np.sqrt(q2)
-            scale = f"""set run_card fixed_ren_scale true
-set run_card fixed_fac_scale true
-set run_card scale {qsqrt}
-set run_card dsqrt_q2fact1 {qsqrt}
-set run_card dsqrt_q2fact2 {qsqrt}
-"""
-
-        if args.enable_cuts:
-            outgoing_particles = args.madgraph_process.rsplit(" ", nparticles - 2)[1:]
-            dict_cuts = {_flav_dict[i[0]]: args.pt_cut for i in outgoing_particles}
-            # All pt must be above PT_CUT
-            cuts = f"set run_card pt_min_pdg {dict_cuts}"
-        else:
-            cuts = ""
-
-        madgraph_script = f"""generate {args.madgraph_process}
-output {out_path}
-launch
-set run_card nevents 300000
-set run_card systematics none
-set run_card pdlabel lhapdf
-set run_card lhaid 303600
-{scale}
-{cuts}
-"""
-        mad_start = time.time()
-
-        script_path = Path(tempfile.mktemp(prefix="mad_script"))
-        script_path.write_text(madgraph_script)
-        sp.run([mg5_exe, "-f", script_path], check=True)
-
-        mad_final = time.time()
-
-        print(f"\nFinal madflow result: {res.numpy():.6} +- {err:.4}")
-
-        print(f"> Madgraph took: {mad_final-mad_start:.4}s to run")
-
-        if args.pdf != DEFAULT_PDF:
-            print(f"Note that Madgraph runs with {DEFAULT_PDF} while you chose {args.pdf}")
     print(f"> Madflow took: {flow_final-flow_start:.4}s")
 
-    if args.run_madgraph and args.histograms:
-        generate_histograms = [
-            "./compare_mg5_hists.py",
-            "--madflow",
-            proc_folder.as_posix(),
-            "--mg5",
-            out_path.as_posix(),
-        ]
-        sp.run(generate_histograms, check=True)
+
+if __name__ == "__main__":
+    main()

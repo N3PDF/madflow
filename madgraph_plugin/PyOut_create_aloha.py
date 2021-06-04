@@ -211,7 +211,7 @@ class ALOHAWriterForTensorFlow(aloha_writers.ALOHAWriterForPython):
            
         out = StringIO()
 
-        out.write('from alohaflow.config import DTYPE, DTYPEINT, complex_tf, complex_me, DTYPECOMPLEX\n')
+        out.write('from madflow.config import DTYPE, DTYPEINT, complex_tf, complex_me, DTYPECOMPLEX\n')
         out.write('import tensorflow as tf\n\n')
 
         arguments = self.define_argument_list(couplings) 

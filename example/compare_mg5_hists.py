@@ -10,7 +10,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-from alohaflow.lhe_writer import EventFileFlow, FourMomentumFlow
+from madflow.lhe_writer import EventFileFlow, FourMomentumFlow
 
 
 def top_hists(lhe, nbins=50, printings=False):

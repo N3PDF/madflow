@@ -8,7 +8,7 @@
     For the example below the matrix element generated is
     ``g g > t t~``
 
-    >>> from alohaflow.utilities import one_matrix_integration
+    >>> from madflow.utilities import one_matrix_integration
     >>> from pdfflow import mkPDF
     >>> pdf = mkPDF("NNPDF31_nnlo_as_0118/0")
     >>> one_matrix_integration(matrix, model_params, pdf=pdf, flavours=(0,), out_masses=[173.0, 173.0])

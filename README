@@ -1,8 +1,0 @@
-copy/link this directory inside the PLUGIN folder of any (recent)
-version of MG5_aMC (2.8+)
-
-to generate a process, run MG5_aMC as usual, and specify pyout as output format 
-./bin/mg5
-
-generate g g > t t~
-output pyout FOLDER_NAME
