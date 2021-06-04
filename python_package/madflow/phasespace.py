@@ -484,7 +484,7 @@ class PhaseSpaceGenerator:
             x2 = tf.boolean_mask(x2, passing_values)
             idx = int_me(tf.where(passing_values))
         else:
-            idx = float_me(1.0)
+            idx = int_me(1.0)
 
         if not self._com_output:
             ps = _boost_to_lab(ps, x1, x2)

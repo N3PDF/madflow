@@ -29,7 +29,6 @@ import logging
 import numpy as np
 
 from madflow.config import get_madgraph_path, get_madgraph_exe, DTYPE, DTYPEINT, float_me, int_me, run_eager, guess_events_limit
-run_eager(True)
 from madflow.phasespace import PhaseSpaceGenerator
 from madflow.lhe_writer import LheWriter
 
@@ -237,20 +236,20 @@ def madflow_main(args=None, quick_return=False):
     # Create the phase space
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
 
-    # Test the matrix elements
-    test_events = 5
-    test_xrand = tf.random.uniform(shape=(test_events, ndim), dtype=tf.float64)
-    test_ps, _, _, _, _ = phasespace(test_xrand)
-    test_alpha = float_me([0.118] * test_events)
-    for matrix, model in zip(matrices, models):
-        wgts = matrix.smatrix(test_ps, *model.evaluate(test_alpha))
-        logger.info("Testing %s: %s", matrix, wgts.numpy())
-
     # Register the cuts with the phase space
     if args.pt_cut is not None:
         for i in range(2, nparticles):
             logger.info("Applying cut of pt > %.2f to particle %d", args.pt_cut, i)
             phasespace.register_cut("pt", particle=i, min_val=args.pt_cut)
+
+    # Test the matrix elements
+    test_events = 10
+    test_xrand = tf.random.uniform(shape=(test_events, ndim), dtype=tf.float64)
+    test_ps, test_wt, _, _, _ = phasespace(test_xrand)
+    test_alpha = float_me([0.118] * len(test_wt))
+    for matrix, model in zip(matrices, models):
+        wgts = matrix.smatrix(test_ps, *model.evaluate(test_alpha))
+        logger.info("Testing %s: %s", matrix, wgts.numpy())
 
     @tf.function(input_signature=3 * [tf.TensorSpec(shape=[None], dtype=DTYPE)])
     def luminosity_function(x1, x2, q2array):
@@ -313,7 +312,7 @@ def madflow_main(args=None, quick_return=False):
 
     events_per_iteration = int(1e6)
     events_limit = guess_events_limit(nparticles)
-    frozen_limit = events_limit*5
+    frozen_limit = events_limit*2
     if nparticles >= 5 and args.frozen_iter == 0:
         logger.warning("With this many particles (> 5) it is recommended to run with frozen iterations")
 
