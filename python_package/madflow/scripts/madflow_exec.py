@@ -27,9 +27,8 @@ import subprocess as sp
 from pathlib import Path
 import numpy as np
 
-from madflow.config import get_madgraph_path, get_madgraph_exe, DTYPE, float_me, int_me, run_eager
+from madflow.config import get_madgraph_path, get_madgraph_exe, DTYPE, float_me, int_me
 
-run_eager(True)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -141,7 +140,7 @@ def _generate_initial_states(matrices):
     return initial_flavours
 
 
-def main(args=None):
+def madflow_main(args=None):
     arger = argparse.ArgumentParser(__doc__)
     arger.add_argument("-v", "--verbose", help="Print extra info", action="store_true")
     arger.add_argument("-p", "--pdf", help="PDF set", type=str, default=DEFAULT_PDF)
@@ -174,6 +173,9 @@ def main(args=None):
         const=30.0,
     )
     arger.add_argument("--histograms", help="Generate LHE files/histograms", action="store_true")
+    arger.add_argument(
+        "-i", "--iterations", help="Iterations of vegasfow to run", type=int, default=5
+    )
 
     args = arger.parse_args(args)
 
@@ -260,15 +262,18 @@ def main(args=None):
 
             # Get the luminosity per event
             if not args.no_pdf:
-                proton_1 = pdf.xfxQ2(int_me(hadron_1), x1, q2array)
-                proton_2 = pdf.xfxQ2(int_me(hadron_2), x2, q2array)
+                raw_proton_1 = pdf.xfxQ2(int_me(hadron_1), x1, q2array)
+                raw_proton_2 = pdf.xfxQ2(int_me(hadron_2), x2, q2array)
+                # Ensure they have the right shape, just in case
+                proton_1 = tf.reshape(raw_proton_1, (-1, len(hadron_1)))
+                proton_2 = tf.reshape(raw_proton_2, (-1, len(hadron_2)))
 
             # Compute each matrix element
             ret = 0.0
             for i, (matrix, model) in enumerate(zip(matrices, models)):
                 smatrix = matrix.smatrix(all_ps, *model.evaluate(alpha_s))
                 if args.no_pdf:
-                    luminosity = flaot_me(1.0)
+                    luminosity = float_me(1.0)
                 else:
                     p1 = tf.gather(proton_1, gather_1[i], axis=1)
                     p2 = tf.gather(proton_2, gather_2[i], axis=1)
@@ -292,11 +297,10 @@ def main(args=None):
 
         return cross_section
 
-    flow_start = time.time()
     vegas = VegasFlow(ndim, int(5e4))
     integrand = generate_integrand()
     vegas.compile(integrand)
-    vegas.run_integration(6)
+    vegas.run_integration(args.iterations-2)
 
     vegas.events_per_run = int(1e6)
     vegas.freeze_grid()
@@ -306,15 +310,22 @@ def main(args=None):
         with LheWriter(Path("."), proc_name, False, 0) as lhe_writer:
             integrand = generate_integrand(lhe_writer)
             vegas.compile(integrand)
-            res, err = vegas.run_integration(10)
+            res, err = vegas.run_integration(args.iterations)
             flow_final = time.time()
             lhe_writer.store_result((res, err))
             proc_folder = Path(f"Events/{proc_name}")
             logger.info(f"Written LHE file to {proc_folder}")
     else:
-        res, err = vegas.run_integration(10)
-        flow_final = time.time()
+        proc_folder = None
+        res, err = vegas.run_integration(args.iterations)
 
+    return args, (res, err), proc_folder
+
+
+def main():
+    flow_start = time.time()
+    _ = madflow_main()
+    flow_final = time.time()
     logger.info(f"> Madflow took: {flow_final-flow_start:.4}s")
 
 
