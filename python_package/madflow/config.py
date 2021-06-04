@@ -127,7 +127,7 @@ def guess_events_limit(nparticles):
         logger.warning("Using the memory of GPU#%d: %d MiB to limit the events per device", memories.index(memory), memory)
 
     # NOTE: this is based on heuristics in some of the available cards
-    if memory < 8000:
+    if memory < 13000:
         events_limit = int(1e5)
     else:
         events_limit = int(5e5)
