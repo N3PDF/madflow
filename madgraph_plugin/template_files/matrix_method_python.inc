@@ -74,6 +74,9 @@ class Matrix_%(process_string)s(object):
         pass
         ##self.jamp = []
 
+    def __str__(self):
+        return "%(process_string)s"
+
     @tf.function(input_signature=smatrix_signature)
     def smatrix(self,all_ps,%(params)s):
         #  

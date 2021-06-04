@@ -28,7 +28,8 @@ from pathlib import Path
 import logging
 import numpy as np
 
-from madflow.config import get_madgraph_path, get_madgraph_exe, DTYPE, float_me, int_me
+from madflow.config import get_madgraph_path, get_madgraph_exe, DTYPE, DTYPEINT, float_me, int_me, run_eager, guess_events_limit
+run_eager(True)
 from madflow.phasespace import PhaseSpaceGenerator
 from madflow.lhe_writer import LheWriter
 
@@ -89,8 +90,8 @@ output pyout {output_folder}"""
             "For more information visit https://github.com/N3PDF/madflow"
         )
 
-    logger.info(parsed_output)
-    logger.debug("Matrix files written to: %s", output_folder)
+    logger.debug(parsed_output)
+    logger.info("Matrix files written to: %s", output_folder)
 
 
 def _import_matrices(output_folder):
@@ -233,8 +234,19 @@ def madflow_main(args=None, quick_return=False):
         for model in models:
             models.freeze_alpha_s(alpha_s)
 
-    # Create the phase space and register the cuts
+    # Create the phase space
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
+
+    # Test the matrix elements
+    test_events = 5
+    test_xrand = tf.random.uniform(shape=(test_events, ndim), dtype=tf.float64)
+    test_ps, _, _, _, _ = phasespace(test_xrand)
+    test_alpha = float_me([0.118] * test_events)
+    for matrix, model in zip(matrices, models):
+        wgts = matrix.smatrix(test_ps, *model.evaluate(test_alpha))
+        logger.info("Testing %s: %s", matrix, wgts.numpy())
+
+    # Register the cuts with the phase space
     if args.pt_cut is not None:
         for i in range(2, nparticles):
             logger.info("Applying cut of pt > %.2f to particle %d", args.pt_cut, i)
@@ -252,7 +264,7 @@ def madflow_main(args=None, quick_return=False):
     def generate_integrand(lhewriter=None):
         """Generate a cross section with (or without) a LHE parser"""
 
-        def cross_section(xrand, weight=1.0, **kwargs):
+        def cross_section(xrand, n_dim=ndim, weight=1.0):
             """Compute the cross section"""
             # Generate the phase space point
             all_ps, wts, x1, x2, idx = phasespace(xrand)
@@ -299,39 +311,36 @@ def madflow_main(args=None, quick_return=False):
 
         return cross_section
 
-    events_per_iteration = int(1e5)
-    events_limit = events_per_iteration
-    if nparticles > 5:
-        # For more than 5 particles it will be more difficult to fit that many events...
-        events_limit = int(1e4)
+    events_per_iteration = int(1e6)
+    events_limit = guess_events_limit(nparticles)
+    frozen_limit = events_limit*5
+    if nparticles >= 5 and args.frozen_iter == 0:
+        logger.warning("With this many particles (> 5) it is recommended to run with frozen iterations")
 
     vegas = VegasFlow(ndim, events_per_iteration, events_limit=events_limit)
     integrand = generate_integrand()
     vegas.compile(integrand)
 
-    warmup_iterations = args.iterations // 2
+    if args.frozen_iter == 0:
+        warmup_iterations = args.iterations // 2
+    else:
+        warmup_iterations = max(args.iterations - args.frozen_iter, 2)
     logger.info(
         "Running %d warm-up iterations of %d events each", warmup_iterations, events_per_iteration
     )
     vegas.run_integration(warmup_iterations)
 
     if args.frozen_iter > 0:
-        vegas.events_per_run = events_limit
-        vegas.n_events = events_per_iteration * 10
+        vegas.events_per_run = frozen_limit
         vegas.freeze_grid()
         final_iterations = args.frozen_iter
-        logger.info(
-            "Running %d iterations of %d events each with the grid frozen",
-            final_iterations,
-            events_per_iteration * 10,
-        )
     else:
         final_iterations = args.iterations // 2
-        logger.info(
-            "Running %d production iterations of %d events each",
-            final_iterations,
-            events_per_iteration,
-        )
+    logger.info(
+        "Running %d iterations of %d events each with the grid frozen",
+        final_iterations,
+        events_per_iteration,
+    )
 
     if args.histograms:
         proc_name = args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")

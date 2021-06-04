@@ -8,6 +8,7 @@
 """
 import os
 import logging
+import subprocess as sp
 from pathlib import Path
 
 # Read the madfflow environment variables
@@ -96,3 +97,41 @@ def get_madgraph_exe(madpath=None):
     if not mg5_exe.exists():
         raise ValueError(f"Madgraph executablec ould not be found at {mg5_exe}")
     return mg5_exe
+
+
+def guess_events_limit(nparticles):
+    """ Given a number of particles, reads GPU memory to guess
+    what should be the event limit.
+    Use the smallest available GPU as the limit (but print warning in that case)
+    """
+    gpu_physical_devices = tf.config.list_physical_devices('GPU')
+    memories = []
+    for gpu in gpu_physical_devices:
+        gpu_idx = gpu.name.rsplit(":", 1)[-1]
+        nvidia_run = f"nvidia-smi --id={gpu_idx} --query-gpu=memory.total --format=csv,noheader,nounits"
+        try:
+            out = int(sp.run(nvidia_run, check=True, shell=True, capture_output=True, text=True).stdout)
+            memories.append(out)
+        except sp.CalledProcessError:
+            logger.error("Could not read the memory of GPU %d", gpu_idx)
+        except ValueError:
+            logger.error("Could not read the memory of GPU %d", gpu_idx)
+
+    if not memories:
+        return None
+
+    if len(set(memories)) == 1:
+        memory = memories[0]
+    else:
+        memory = min(memories)
+        logger.warning("Using the memory of GPU#%d: %d MiB to limit the events per device", memories.index(memory), memory)
+
+    # NOTE: this is based on heuristics in some of the available cards
+    if memory < 8000:
+        events_limit = int(1e5)
+    else:
+        events_limit = int(5e5)
+
+    if nparticles > 5:
+        events_limit //= 10
+    return events_limit
