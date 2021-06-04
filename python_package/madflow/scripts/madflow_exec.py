@@ -25,22 +25,20 @@ import argparse
 import tempfile
 import subprocess as sp
 from pathlib import Path
+import logging
 import numpy as np
 
 from madflow.config import get_madgraph_path, get_madgraph_exe, DTYPE, float_me, int_me
-
-import logging
-
-logger = logging.getLogger(__name__)
+from madflow.phasespace import PhaseSpaceGenerator
+from madflow.lhe_writer import LheWriter
 
 from vegasflow import VegasFlow
 from pdfflow import mkPDF
 
-from madflow.phasespace import ramboflow, PhaseSpaceGenerator
-from madflow.lhe_writer import LheWriter
 import tensorflow as tf
 
 DEFAULT_PDF = "NNPDF31_nnlo_as_0118"
+logger = logging.getLogger(__name__)
 
 # Note that if another process is run, the imports below
 # must be changed accordingly, it can be made into options later on
@@ -102,24 +100,22 @@ def _import_matrices(output_folder):
     re_name = re.compile(r"\w{3,}")
     matrices = []
     models = []
-    for matrix_file in output_folder.glob("matrix_*.py"):
+    for i, matrix_file in enumerate(output_folder.glob("matrix_*.py")):
         matrix_name = re_name.findall(matrix_file.name)[0]
         matrix_module = _import_module_from_path(matrix_file, matrix_name)
         # Import specifically the matrix element
         matrix_element = getattr(matrix_module, matrix_name.capitalize())
+        matrices.append(matrix_element())
 
-        # Read the parameters of the model
-        # TODO (do one per matrix element... for now, it might be shared)
+        # Read the parameters of the model, shared among matrix elements
         model_sm = get_madgraph_path() / "models/sm"
         model = matrix_module.import_ufo.import_model(model_sm.as_posix())
         # Instantiate matrix element and models
         model_params = matrix_module.get_model_param(
             model, (output_folder / "Cards/param_card.dat").as_posix()
         )
-        matrix = matrix_element()
-
-        matrices.append(matrix)
         models.append(model_params)
+
     return matrices, models
 
 
@@ -205,10 +201,6 @@ def madflow_main(args=None, quick_return=False):
             gather_1.append([hadron_1.index(i) for i in p1])
             gather_2.append([hadron_2.index(i) for i in p2])
 
-    matrix = matrices[0]
-    model_params = models[0]
-    flav_1, flav_2 = initial_flavours[0]
-
     ### Set up some parameters for the process
     sqrts = 13e3
     # The number of particles is the same for all matrices
@@ -219,7 +211,6 @@ def madflow_main(args=None, quick_return=False):
     # For this script the massive particles go always first
     # as the output should always be to particles and not wrappers
     # _if_ the number of masses is below the number of massive particle
-    # assume they are all the same mass (usually the top anyway)
     param_masses = models[0].get_masses()
     if len(param_masses) < massive_particles:
         param_masses *= massive_particles
@@ -240,7 +231,7 @@ def madflow_main(args=None, quick_return=False):
         logger.info("Setting alpha_s = %.4f.", alpha_s)
         # Fix all models
         for model in models:
-            model.freeze_alpha_s(alpha_s)
+            models.freeze_alpha_s(alpha_s)
 
     # Create the phase space and register the cuts
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
@@ -248,6 +239,15 @@ def madflow_main(args=None, quick_return=False):
         for i in range(2, nparticles):
             logger.info("Applying cut of pt > %.2f to particle %d", args.pt_cut, i)
             phasespace.register_cut("pt", particle=i, min_val=args.pt_cut)
+
+    @tf.function(input_signature=3 * [tf.TensorSpec(shape=[None], dtype=DTYPE)])
+    def luminosity_function(x1, x2, q2array):
+        raw_proton_1 = pdf.xfxQ2(int_me(hadron_1), x1, q2array)
+        raw_proton_2 = pdf.xfxQ2(int_me(hadron_2), x2, q2array)
+        # Ensure they have the right shape, just in case
+        proton_1 = tf.reshape(raw_proton_1, (-1, len(hadron_1)))
+        proton_2 = tf.reshape(raw_proton_2, (-1, len(hadron_2)))
+        return proton_1, proton_2
 
     def generate_integrand(lhewriter=None):
         """Generate a cross section with (or without) a LHE parser"""
@@ -267,20 +267,16 @@ def madflow_main(args=None, quick_return=False):
                 alpha_s = None
 
             # Get the luminosity per event
-            if not args.no_pdf:
-                raw_proton_1 = pdf.xfxQ2(int_me(hadron_1), x1, q2array)
-                raw_proton_2 = pdf.xfxQ2(int_me(hadron_2), x2, q2array)
-                # Ensure they have the right shape, just in case
-                proton_1 = tf.reshape(raw_proton_1, (-1, len(hadron_1)))
-                proton_2 = tf.reshape(raw_proton_2, (-1, len(hadron_2)))
+            if args.no_pdf:
+                luminosity = float_me(1.0)
+            else:
+                proton_1, proton_2 = luminosity_function(x1, x2, q2array)
 
             # Compute each matrix element
             ret = 0.0
             for i, (matrix, model) in enumerate(zip(matrices, models)):
                 smatrix = matrix.smatrix(all_ps, *model.evaluate(alpha_s))
-                if args.no_pdf:
-                    luminosity = float_me(1.0)
-                else:
+                if not args.no_pdf:
                     p1 = tf.gather(proton_1, gather_1[i], axis=1)
                     p2 = tf.gather(proton_2, gather_2[i], axis=1)
                     # Sum all input channels together for now
@@ -312,15 +308,30 @@ def madflow_main(args=None, quick_return=False):
     vegas = VegasFlow(ndim, events_per_iteration, events_limit=events_limit)
     integrand = generate_integrand()
     vegas.compile(integrand)
-    vegas.run_integration(args.iterations // 2)
+
+    warmup_iterations = args.iterations // 2
+    logger.info(
+        "Running %d warm-up iterations of %d events each", warmup_iterations, events_per_iteration
+    )
+    vegas.run_integration(warmup_iterations)
 
     if args.frozen_iter > 0:
         vegas.events_per_run = events_limit
-        vegas.n_events = events_per_iteration*10
+        vegas.n_events = events_per_iteration * 10
         vegas.freeze_grid()
         final_iterations = args.frozen_iter
+        logger.info(
+            "Running %d iterations of %d events each with the grid frozen",
+            final_iterations,
+            events_per_iteration * 10,
+        )
     else:
         final_iterations = args.iterations // 2
+        logger.info(
+            "Running %d production iterations of %d events each",
+            final_iterations,
+            events_per_iteration,
+        )
 
     if args.histograms:
         proc_name = args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")
@@ -328,10 +339,9 @@ def madflow_main(args=None, quick_return=False):
             integrand = generate_integrand(lhe_writer)
             vegas.compile(integrand)
             res, err = vegas.run_integration(final_iterations)
-            flow_final = time.time()
             lhe_writer.store_result((res, err))
             proc_folder = Path(f"Events/{proc_name}")
-            logger.info(f"Written LHE file to {proc_folder}")
+            logger.info("Written LHE file to %s", proc_folder)
     else:
         proc_folder = None
         res, err = vegas.run_integration(final_iterations)
