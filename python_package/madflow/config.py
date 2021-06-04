@@ -46,7 +46,7 @@ from pdfflow.configflow import (
 )
 
 # Configure logging
-_log_level = LOG_DICT["2"]
+_log_level = LOG_DICT[_log_level_idx]
 logger = logging.getLogger(__name__.split(".")[0])
 logger.setLevel(_log_level)
 
@@ -92,7 +92,7 @@ def get_madgraph_path(madpath=None):
 def get_madgraph_exe(madpath=None):
     """ Return the path to the madgraph executable """
     madpath = get_madgraph_path(madpath)
-    mg5_exe = mg5_path / "bin/mg5_aMC"
+    mg5_exe = madpath / "bin/mg5_aMC"
     if not mg5_exe.exists():
         raise ValueError(f"Madgraph executablec ould not be found at {mg5_exe}")
     return mg5_exe
