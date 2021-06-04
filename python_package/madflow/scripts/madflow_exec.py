@@ -69,13 +69,13 @@ def _import_module_from_path(path, module_name):
 def _generate_madgraph_process(process, output_folder):
     """Given a process string in the madgraph format
     ex: g g > t t~
-    generate the madgraph process file in the appropiate folder
+    generate the madgraph process file in the appropriate folder
     """
     madgraph_script = f"""generate {process}
 output pyout {output_folder}"""
     script_path = Path(tempfile.mktemp(prefix="mad_script_"))
     script_path.write_text(madgraph_script)
-    logger.debug("Writing madgaph output script at %s", script_path)
+    logger.debug("Writing madgraph output script at %s", script_path)
 
     mg5_command = [get_madgraph_exe(), "-f", script_path]
     mg5_p = sp.run(mg5_command, capture_output=True, check=True)
@@ -242,11 +242,11 @@ def madflow_main(args=None, quick_return=False):
         for model in models:
             model.freeze_alpha_s(alpha_s)
 
-    # Create the pase space and register the cuts
+    # Create the phase space and register the cuts
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
     if args.pt_cut is not None:
         for i in range(2, nparticles):
-            logger.info("Appling cut of pt > %.2f to particle %d", args.pt_cut, i)
+            logger.info("Applying cut of pt > %.2f to particle %d", args.pt_cut, i)
             phasespace.register_cut("pt", particle=i, min_val=args.pt_cut)
 
     def generate_integrand(lhewriter=None):
@@ -291,7 +291,7 @@ def madflow_main(args=None, quick_return=False):
             ret *= wts
 
             if lhewriter is not None:
-                # Fill up the LH grid
+                # Fill up the LHE grid
                 if args.pt_cut is not None:
                     weight = tf.gather(weight, idx)[:, 0]
                 tf.py_function(func=lhewriter.lhe_parser, inp=[all_ps, ret * weight], Tout=DTYPE)
@@ -303,13 +303,20 @@ def madflow_main(args=None, quick_return=False):
 
         return cross_section
 
-    vegas = VegasFlow(ndim, int(1e5))
+    events_per_iteration = int(1e5)
+    events_limit = events_per_iteration
+    if nparticles > 5:
+        # For more than 5 particles it will be more difficult to fit that many events...
+        events_limit = int(1e4)
+
+    vegas = VegasFlow(ndim, events_per_iteration, events_limit=events_limit)
     integrand = generate_integrand()
     vegas.compile(integrand)
     vegas.run_integration(args.iterations // 2)
 
     if args.frozen_iter > 0:
-        vegas.events_per_run = int(1e6)
+        vegas.events_per_run = events_limit
+        vegas.n_events = events_per_iteration*10
         vegas.freeze_grid()
         final_iterations = args.frozen_iter
     else:

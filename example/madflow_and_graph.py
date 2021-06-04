@@ -3,7 +3,7 @@
     Run madgraph and madflow side to side
 
     First it runs madflow with whatever arguments and then
-    uses said arguments to generate the appropiate madgraph call
+    uses said arguments to generate the appropriate madgraph call
 
     To ensure you get all available output, do
     export MADFLOW_LOG_LEVEL=3
