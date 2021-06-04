@@ -44,6 +44,7 @@ set run_card dsqrt_q2fact2 {qsqrt}
     if args.pt_cut is None:
         cuts = ""
     else:
+        nparticles = len(args.madgraph_process.strip().split()) - 1
         outgoing_particles = args.madgraph_process.rsplit(" ", nparticles - 2)[1:]
         dict_cuts = {_flav_dict[i[0]]: args.pt_cut for i in outgoing_particles}
         # All pt must be above PT_CUT

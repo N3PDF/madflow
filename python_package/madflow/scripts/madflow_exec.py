@@ -14,7 +14,7 @@ It is possible to apply some mock cuts (pt_min) with the option  `--pt_cut` (def
 By default the PDF and the strong coupling is computed for muF = muR = sum(mT)/2 but
 a fixed value of the scale can be given with --fixed_scale (defaults to 91.46).
 
-LHE files can be procued with the `--histograms` flag.
+LHE files can be produced with the `--histograms` flag.
 """
 import re
 import sys
@@ -140,7 +140,7 @@ def _generate_initial_states(matrices):
     return initial_flavours
 
 
-def madflow_main(args=None):
+def madflow_main(args=None, quick_return=False):
     arger = argparse.ArgumentParser(__doc__)
     arger.add_argument("-v", "--verbose", help="Print extra info", action="store_true")
     arger.add_argument("-p", "--pdf", help="PDF set", type=str, default=DEFAULT_PDF)
@@ -178,6 +178,8 @@ def madflow_main(args=None):
     )
 
     args = arger.parse_args(args)
+    if quick_return:
+        return args, None, None
 
     out_path = Path(tempfile.mkdtemp(prefix="mad_"))
     _generate_madgraph_process(args.madgraph_process, out_path)
@@ -218,8 +220,9 @@ def madflow_main(args=None):
     param_masses = models[0].get_masses()
     if len(param_masses) < massive_particles:
         param_masses *= massive_particles
+    param_masses = [i.numpy() for i in param_masses]
     masses = param_masses + [0.0] * non_massive
-    logger.debug("Masses: %s", [i.numpy() for i in masses])
+    logger.debug("Masses: %s", masses)
     ###################################################
 
     if args.fixed_scale is None:
