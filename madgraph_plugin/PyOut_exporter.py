@@ -99,6 +99,8 @@ class PyOutExporter(export_python.ProcessExporterPython):
     coups_dep = []
     coups_indep = []
 
+    refactorized = False
+
     PS_dependent_key = ['aS','MU_R']
 
 
@@ -119,8 +121,6 @@ class PyOutExporter(export_python.ProcessExporterPython):
         """Write the matrix element calculation method for the processes"""
 
         replace_dict = {}
-        # setup the various coupling lists
-        self.refactorize()
 
         # Extract version number and date from VERSION file
         info_lines = self.get_mg5_info_lines()
@@ -414,6 +414,9 @@ class PyOutExporter(export_python.ProcessExporterPython):
 
         self.aloha_names = self.write_alohas()
 
+        # setup the various coupling lists
+        self.refactorize()
+
         python_matrix_elements = self.get_python_matrix_methods()
 
         for matrix_element in self.matrix_elements:
@@ -517,6 +520,11 @@ class PyOutExporter(export_python.ProcessExporterPython):
     def refactorize(self, wanted_couplings = []):    
         """modify the couplings to fit with MG4 convention """
             
+        # make sure to call this function only once
+        if self.refactorized:
+            return
+        
+        self.refactorized = True
         # Keep only separation in alphaS        
         keys = list(self.model['parameters'].keys())
         keys.sort(key=len)
