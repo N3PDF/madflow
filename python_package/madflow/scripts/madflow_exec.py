@@ -174,7 +174,10 @@ def madflow_main(args=None, quick_return=False):
     )
     arger.add_argument("--histograms", help="Generate LHE files/histograms", action="store_true")
     arger.add_argument(
-        "-i", "--iterations", help="Iterations of vegasfow to run", type=int, default=5
+        "-i", "--iterations", help="Iterations of vegasfow to run", type=int, default=10
+    )
+    arger.add_argument(
+        "-f", "--frozen_iter", help="Iterations with frozen grid", type=int, default=0
     )
 
     args = arger.parse_args(args)
@@ -300,27 +303,31 @@ def madflow_main(args=None, quick_return=False):
 
         return cross_section
 
-    vegas = VegasFlow(ndim, int(5e4))
+    vegas = VegasFlow(ndim, int(1e5))
     integrand = generate_integrand()
     vegas.compile(integrand)
-    vegas.run_integration(args.iterations-2)
+    vegas.run_integration(args.iterations // 2)
 
-    vegas.events_per_run = int(1e6)
-    vegas.freeze_grid()
+    if args.frozen_iter > 0:
+        vegas.events_per_run = int(1e6)
+        vegas.freeze_grid()
+        final_iterations = args.frozen_iter
+    else:
+        final_iterations = args.iterations // 2
 
     if args.histograms:
         proc_name = args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")
         with LheWriter(Path("."), proc_name, False, 0) as lhe_writer:
             integrand = generate_integrand(lhe_writer)
             vegas.compile(integrand)
-            res, err = vegas.run_integration(args.iterations)
+            res, err = vegas.run_integration(final_iterations)
             flow_final = time.time()
             lhe_writer.store_result((res, err))
             proc_folder = Path(f"Events/{proc_name}")
             logger.info(f"Written LHE file to {proc_folder}")
     else:
         proc_folder = None
-        res, err = vegas.run_integration(args.iterations)
+        res, err = vegas.run_integration(final_iterations)
 
     return args, (res, err), proc_folder
 

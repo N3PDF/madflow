@@ -73,7 +73,6 @@ set run_card lhaid 303600
     logger.info("Madgraph took: %.4fs", time() - end_madflow)
     logger.info("Madflow took: %.4fs", end_madflow - start_madflow)
 
-
     if args.histograms:
         generate_histograms = [
             "./compare_mg5_hists.py",
