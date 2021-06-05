@@ -316,6 +316,8 @@ def madflow_main(args=None, quick_return=False):
         events_limit = args.events_per_device
     else:
         events_limit = guess_events_limit(nparticles)
+        if events_limit is None: # CPU case
+            events_limit = events_per_iteration
     frozen_limit = events_limit*2
     if nparticles >= 5 and args.frozen_iter == 0:
         logger.warning("With this many particles (> 5) it is recommended to run with frozen iterations")
