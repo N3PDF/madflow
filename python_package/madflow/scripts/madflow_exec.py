@@ -189,9 +189,13 @@ def madflow_main(args=None, quick_return=False):
         "--events_per_device", help="How many events to send to each device", type=int
     )
     arger.add_argument(
+        "-o",
         "--output",
         help="Output folder for the madgraph output",
         type=Path,
+    )
+    arger.add_argument(
+        "--dry_run", help="Generate the madgraph output but don't run anything", action="store_true"
     )
 
     args = arger.parse_args(args)
@@ -211,6 +215,8 @@ def madflow_main(args=None, quick_return=False):
                 sys.exit(0)
 
     _generate_madgraph_process(args.madgraph_process, output_path)
+    if args.dry_run:
+        return None, None, None
     matrices, models = _import_matrices(output_path)
 
     if args.no_pdf:

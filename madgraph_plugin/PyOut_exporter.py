@@ -440,21 +440,24 @@ class PyOutExporter(export_python.ProcessExporterPython):
         
     def write_leading_order_wrapper(self, outfile):
         imports = ''
-        tree_level = ''
-        masses = ''
+        tree_level = '\n'
+        masses = '\n'
 
         for name, proc, mass in zip(self.me_names, self.proc_names, self.mass_lists):
 
-            imports += 'from %(me)s import %(me)s, model_params as model_%(proc)s\n' % {'me': name, 'proc': proc}
-            tree_level += '"%(proc)s" : (%(me)s, model_%(proc)s)\n'  % {'me': name, 'proc': proc}
-            masses += ('"%s" : [' % proc) + \
+            me_class = name.capitalize()
+            info_dict = {'me': name, 'proc': proc, 'me_class': me_class}
+            imports += 'from %(me)s import %(me_class)s, get_model_param as model_%(proc)s\n' % info_dict
+            tree_level += '    "%(proc)s": (%(me_class)s, model_%(proc)s),\n'  % info_dict
+            masses += ('    "%s": [' % proc) + \
                     ", ".join(['"%s"' % m for m in mass]) + \
-                    ']\n'
+                    '],\n'
 
         replace_dict = {}
         replace_dict['matrix_element_imports'] = imports
         replace_dict['tree_level_keys'] = tree_level
         replace_dict['masses'] = masses
+        replace_dict['process_title'] = "placeholder_title"
 
         template = open(os.path.join(plugin_path, \
                        'template_files/leading_order.inc')).read()

@@ -79,6 +79,17 @@ class Model:
                 masses.append(val)
         return masses
 
+    def parse_parameter(self, parameter_name):
+        """Parse a (constant) parameter given its string name"""
+        if parameter_name == "ZERO":
+            return 0.0
+
+        if hasattr(self._tuple_constants, parameter_name):
+            return getattr(self._tuple_constants, parameter_name)
+        if hasattr(self._tuple_functions, parameter_name):
+            return getattr(self._tuple_functions, parameter_name)
+        raise AttributeError(f"The model class does not contain parameter {parameter_name}")
+
     def evaluate(self, alpha_s=None):
         """Evaluate alpha_s, if the model is frozen
         returns the frozen values"""
