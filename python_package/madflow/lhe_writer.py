@@ -174,13 +174,18 @@ class LheWriter:
             - probs: np.array, matrix elements relative luminosities of
                      shape=(num matrices,)
 
+        Returns
+        -------
+            - pids: list, of PDGs
+            - status_vec: list, of particle status (-1|+1 for final|initial state)
         """
         ME = np.random.choice(len(probs), p=probs)
         initials = self.initial_states[ME]
         idx = int(np.random.rand() * len(initials))
         initial = initials[idx]
-        status = [-1] * len(initial) + [1] * len(self.final_states)
-        return initial + self.final_states, status
+        status_vec = [-1] * len(initial) + [1] * len(self.final_states)
+        pids = initial + self.final_states
+        return pids, status_vec
 
     def lhe_parser(self, all_ps, res, all_lumis):
         """
