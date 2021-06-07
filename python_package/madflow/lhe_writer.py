@@ -3,6 +3,7 @@ import sys, os, six, gzip, copy
 from time import time as tm
 import math
 import numpy as np
+import tensorflow as tf
 from pathlib import Path
 from multiprocessing.pool import ThreadPool as Pool
 
@@ -124,14 +125,7 @@ class LheWriter:
         self.no_unweight = no_unweight
         self.event_target = event_target
         self.initial_states = initial_states
-        
-        # just for now assume that we have one initial state only
-        self.initial_states = self.initial_states[0][0]
-        
-        self.final_states = [6,-6] # t, t~
-        self.pids = self.initial_states + self.final_states
-        self.status = [-1]*len(self.initial_states) + [1]*len(self.final_states)
-
+        self.final_states = [6, -6]  # t, t~
         self.pool = Pool(processes=1)
 
         # create LHE file directory tree
@@ -170,7 +164,25 @@ class LheWriter:
             )
             logger.info(log)
 
-    def lhe_parser(self, all_ps, res):
+    def lumis_to_pids(self, probs):
+        """
+        Draw a random number to select event initial state. Probabilities are
+        weighted according to matrix elements luminosity relative importance.
+
+        Parameters
+        ----------
+            - probs: np.array, matrix elements relative luminosities of
+                     shape=(num matrices,)
+
+        """
+        ME = np.random.choice(len(probs), p=probs)
+        initials = self.initial_states[ME]
+        idx = int(np.random.rand() * len(initials))
+        initial = initials[idx]
+        status = [-1] * len(initial) + [1] * len(self.final_states)
+        return initial + self.final_states, status
+
+    def lhe_parser(self, all_ps, res, all_lumis):
         """
         Takes care of storing and dumping LHE info from the integrator.
         To be passed as argument to generate the Vegasflow custom integrand.
@@ -179,46 +191,53 @@ class LheWriter:
         ----------
             all_ps: tf.Tensor, phase space points of shape=(nevents,nexternal,ndims)
             res: tf.Tensor, weights of shape=(nevents,)
+            all_lumis: tf.Tensor, luminosity values of shape=(nevents, len(matrices))
         """
-        _, nexternal, _ = all_ps.shape
-        events_info = [
-            {
-                "nexternal": nexternal,
-                "ievent": 1,
-                "wgt": wgt,
-                "aqcd": 0.0,  # alpha strong value, get this from vegasflow?
-                "scale": 0.0,  # Q^2 scale for pdfs, get this from vegasflow?
-                "aqed": 0.0,  # alpha EW value    , get this from vegasflow?
-                "tag": "",
-                "comment": "",
-            }
-            for wgt in res.numpy()
-        ]
+        all_lumis = all_lumis / tf.reduce_sum(all_lumis, axis=1, keepdims=True)
 
-        # we are missing the virtual particles
-        particles_info = [
-            [
+        events_info = []
+        particles_info = []
+        for wgt, ps_external, lumis in zip(
+            res.numpy(), all_ps.numpy(), all_lumis.numpy()
+        ):
+            pids, status_vec = self.lumis_to_pids(lumis)
+            nexternal = len(status_vec)
+            events_info.append(
                 {
-                    "pid": pid,
-                    "status": status,
-                    "mother1": 0,
-                    "mother2": 0,
-                    "color1": 0,
-                    "color2": 0,
-                    "E": ps[0],
-                    "px": ps[1],
-                    "py": ps[2],
-                    "pz": ps[3],
-                    "mass": np.sqrt(
-                        ps[0] ** 2 - ps[1] ** 2 - ps[2] ** 2 - ps[3] ** 2
-                    ),  # vectorize this?
-                    "vtim": 0,
-                    "helicity": 0,
+                    "nexternal": nexternal,
+                    "ievent": 1,
+                    "wgt": wgt,
+                    "aqcd": 0.0,  # alpha strong value, get this from vegasflow?
+                    "scale": 0.0,  # Q^2 scale for pdfs, get this from vegasflow?
+                    "aqed": 0.0,  # alpha EW value , get this from vegasflow?
+                    "tag": "",
+                    "comment": "",
                 }
-                for pid, status, ps in zip(self.pids, self.status, ps_external)
-            ]
-            for ps_external in all_ps.numpy()
-        ]
+            )
+
+            # we are missing the virtual particles
+            particles_info.append(
+                [
+                    {
+                        "pid": pid,
+                        "status": status,
+                        "mother1": 0,
+                        "mother2": 0,
+                        "color1": 0,
+                        "color2": 0,
+                        "E": ps[0],
+                        "px": ps[1],
+                        "py": ps[2],
+                        "pz": ps[3],
+                        "mass": np.sqrt(
+                            ps[0] ** 2 - ps[1] ** 2 - ps[2] ** 2 - ps[3] ** 2
+                        ),  # vectorize this?
+                        "vtim": 0,
+                        "helicity": 0,
+                    }
+                    for pid, status, ps in zip(pids, status_vec, ps_external)
+                ]
+            )
 
         self.dump(events_info, particles_info)
 

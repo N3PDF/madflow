@@ -201,6 +201,7 @@ def madflow_main(args=None, quick_return=False):
     out_path = Path(tempfile.mkdtemp(prefix="mad_"))
     _generate_madgraph_process(args.madgraph_process, out_path)
     matrices, models = _import_matrices(out_path)
+    num_matrices = len(matrices)
 
     if args.no_pdf:
         initial_flavours = [None]
@@ -305,6 +306,7 @@ def madflow_main(args=None, quick_return=False):
 
             # Compute each matrix element
             ret = 0.0
+            lumis = tf.TensorArray(DTYPE, size=num_matrices)
             for i, (matrix, model) in enumerate(zip(matrices, models)):
                 smatrix = matrix.smatrix(all_ps, *model.evaluate(alpha_s))
                 if not args.no_pdf:
@@ -312,7 +314,11 @@ def madflow_main(args=None, quick_return=False):
                     p2 = tf.gather(proton_2, gather_2[i], axis=1)
                     # Sum all input channels together for now
                     luminosity = tf.reduce_sum(p1 * p2, axis=1) / x1 / x2
+                    lumis = lumis.write(i, luminosity)
                 ret += luminosity * smatrix
+
+            # stack all the luminosities
+            lumis = tf.transpose(lumis.stack())
 
             # Final cross section
             ret *= wts
@@ -322,7 +328,9 @@ def madflow_main(args=None, quick_return=False):
                 if args.pt_cut is not None:
                     weight = tf.gather(weight, idx)[:, 0]
                 tf.py_function(
-                    func=lhewriter.lhe_parser, inp=[all_ps, ret * weight], Tout=DTYPE
+                    func=lhewriter.lhe_parser,
+                    inp=[all_ps, ret * weight, lumis],
+                    Tout=DTYPE,
                 )
 
             if args.pt_cut is not None:
@@ -332,7 +340,7 @@ def madflow_main(args=None, quick_return=False):
 
         return cross_section
 
-    events_per_iteration = int(1e6)
+    events_per_iteration = int(1e3)
     if args.events_per_device:
         events_limit = args.events_per_device
     else:
