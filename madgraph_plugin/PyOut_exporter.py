@@ -99,6 +99,10 @@ class PyOutExporter(export_python.ProcessExporterPython):
     coups_dep = []
     coups_indep = []
 
+    me_names = []
+    proc_names = []
+    mass_lists = []
+
     refactorized = False
 
     PS_dependent_key = ['aS','MU_R']
@@ -423,11 +427,41 @@ class PyOutExporter(export_python.ProcessExporterPython):
             proc = matrix_element.get('processes')[0].shell_string()
             me_text = python_matrix_elements[proc]
 
-            fout = open(pjoin(self.dir_path, 'matrix_%s.py' % proc), 'w')
+            me_name =  'matrix_%s' % proc
+            self.me_names.append(me_name)
+            self.proc_names.append(proc)
+            model = matrix_element.get('processes')[0]['model']
+            self.mass_lists.append([model.get_particle(l['id'])['mass'] for l in matrix_element.get('processes')[0]['legs']])
+
+            fout = open(pjoin(self.dir_path, '%s.py' % me_name), 'w')
             fout.write(python_matrix_elements[proc])
             fout.close()
 
+        
+    def write_leading_order_wrapper(self, outfile):
+        imports = ''
+        tree_level = ''
+        masses = ''
 
+        for name, proc, mass in zip(self.me_names, self.proc_names, self.mass_lists):
+
+            imports += 'from %(me)s import %(me)s, model_params as model_%(proc)s\n' % {'me': name, 'proc': proc}
+            tree_level += '"%(proc)s" : (%(me)s, model_%(proc)s)\n'  % {'me': name, 'proc': proc}
+            masses += ('"%s" : [' % proc) + \
+                    ", ".join(['"%s"' % m for m in mass]) + \
+                    ']\n'
+
+        replace_dict = {}
+        replace_dict['matrix_element_imports'] = imports
+        replace_dict['tree_level_keys'] = tree_level
+        replace_dict['masses'] = masses
+
+        template = open(os.path.join(plugin_path, \
+                       'template_files/leading_order.inc')).read()
+        outfile.write(template % replace_dict)
+
+
+        return
 
 
     #===========================================================================
@@ -481,7 +515,12 @@ class PyOutExporter(export_python.ProcessExporterPython):
 
 
     def finalize(self, matrix_elements, history, mg5options, flaglist):
-        """ creates the cards (at the moment just the param_card"""
+        """write a wrapper and creates the cards (at the moment just the param_card"""
+
+        fout = open(pjoin(self.dir_path, 'leading_order.py'), 'w')
+        self.write_leading_order_wrapper(fout)
+        fout.close()
+
         cardpath = pjoin(self.dir_path, 'Cards')
         if not os.path.isdir(cardpath):
             os.mkdir(pjoin(cardpath))
