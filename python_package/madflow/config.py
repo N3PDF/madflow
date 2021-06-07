@@ -1,13 +1,40 @@
 """
     Default settings for madflow
 
-    Since this program is to be installed together with VegasFlow
-    it is allow to take the configuration from there
+    This program is to be installed alongside VegasFlow and
+    PDFFlow so we'll take the main configuration from there.
+    The environment variables for log levels and float/int types
+    are propagated to any other programs used by madflow
 """
 import os
+import logging
+import subprocess as sp
 from pathlib import Path
 
-from vegasflow.configflow import (
+# Read the madfflow environment variables
+_log_level_idx = os.environ.get("MADFLOW_LOG_LEVEL")
+_float_env = os.environ.get("MADFLOW_FLOAT", "64")
+_int_env = os.environ.get("MADFLOW_INT", "32")
+
+# Ensure that both vegasflow and pdfflow are consistent
+# with the corresponding madflow choice
+# For float/int the consistency is enforced, logs can be chosen
+# differently for each program
+
+if _log_level_idx is None:
+    _log_level_idx = "2"
+else:
+    os.environ.setdefault("PDFFLOW_LOG_LEVEL", _log_level_idx)
+    os.environ.setdefault("VEGASFLOW_LOG_LEVEL", _log_level_idx)
+
+os.environ["VEGASFLOW_FLOAT"] = _float_env
+os.environ["PDFFLOW_FLOAT"] = _float_env
+os.environ["VEGASFLOW_INT"] = _int_env
+os.environ["PDFFLOW_INT"] = _int_env
+
+# Now import all functions and variables directly from one of the other programs
+from pdfflow.configflow import (
+    LOG_DICT,
     run_eager,
     DTYPE,
     DTYPEINT,
@@ -19,63 +46,92 @@ from vegasflow.configflow import (
     izero,
 )
 
-import tensorflow as tf
+# Configure logging
+_log_level = LOG_DICT[_log_level_idx]
+logger = logging.getLogger(__name__.split(".")[0])
+logger.setLevel(_log_level)
 
-if DTYPE == tf.float64:
-    DTYPECOMPLEX = tf.complex128
-else:
-    DTYPECOMPLEX = tf.complex64
+# Create and format the log handler
+_console_handler = logging.StreamHandler()
+_console_handler.setLevel(_log_level)
+_console_format = logging.Formatter("[%(levelname)s] (<madflow>) %(message)s")
+_console_handler.setFormatter(_console_format)
+logger.addHandler(_console_handler)
+
+import tensorflow as tf
 
 
 def complex_tf(real, imag):
-    """ Builds a tf.complex tensor from real and imaginary parts"""
-    # print("complex tf")
+    """Builds a tf.complex tensor from real and imaginary parts"""
     # python objects are stored with 32-bits, so cast first with float_me
     real = float_me(real)
     imag = float_me(imag)
     return tf.complex(real, imag)
 
 
+DTYPECOMPLEX = complex_tf(1.0, 1.0).dtype
+
+
 def complex_me(cmp):
-    """ Cast the input to complex type """
-    # print("complex me")
+    """Cast the input to complex type"""
     return tf.cast(cmp, dtype=DTYPECOMPLEX)
 
-import logging
 
-module_name = __name__.split(".")[0]
-logger = logging.getLogger(module_name)
-
-DEFAULT_LOG_LEVEL = "2"
-log_level_idx = os.environ.get("MADFLOW_LOG_LEVEL", DEFAULT_LOG_LEVEL)
-log_dict = {"0": logging.ERROR, "1": logging.WARNING, "2": logging.INFO, "3": logging.DEBUG}
-bad_log_warning = None
-if log_level_idx not in log_dict:
-    bad_log_warning = log_level_idx
-    log_level_idx = DEFAULT_LOG_LEVEL
-log_level = log_dict[log_level_idx]
-
-# Set level debug for development
-logger.setLevel(log_level)
-# Create a handler and format it
-console_handler = logging.StreamHandler()
-console_handler.setLevel(log_level)
-console_format = logging.Formatter("[%(levelname)s] %(message)s")
-console_handler.setFormatter(console_format)
-logger.addHandler(console_handler)
-
-# Now that the logging has been created, warn about the bad logging level
-if bad_log_warning is not None:
-    logger.warning(
-        "Accepted log levels are: %s, received: %s", list(log_dict.keys()), bad_log_warning
-    )
-    logger.warning(f"Setting log level to its default value: {DEFAULT_LOG_LEVEL}")
-
-
-def get_madgraph_path():
-    madgraph_path = Path(os.environ.get("MADGRAPH_PATH", "../../../mg5amcnlo"))
+def get_madgraph_path(madpath=None):
+    """ Return the path to the madgrapt root """
+    if madpath is None:
+        madpath = os.environ.get("MADGRAPH_PATH", "../../../mg5amcnlo")
+    madgraph_path = Path(madpath)
     if not madgraph_path.exists():
-        raise ValueError(f"{madgraph_path} does not exist."
-        "Needs a valid path for Madgraph, can be given as env. variable MADGRAPH_PATH"
+        raise ValueError(
+            f"{madgraph_path} does not exist. "
+            "Needs a valid path for Madgraph, can be given as env. variable MADGRAPH_PATH"
         )
     return madgraph_path
+
+
+def get_madgraph_exe(madpath=None):
+    """ Return the path to the madgraph executable """
+    madpath = get_madgraph_path(madpath)
+    mg5_exe = madpath / "bin/mg5_aMC"
+    if not mg5_exe.exists():
+        raise ValueError(f"Madgraph executablec ould not be found at {mg5_exe}")
+    return mg5_exe
+
+
+def guess_events_limit(nparticles):
+    """ Given a number of particles, reads GPU memory to guess
+    what should be the event limit.
+    Use the smallest available GPU as the limit (but print warning in that case)
+    """
+    gpu_physical_devices = tf.config.list_physical_devices('GPU')
+    memories = []
+    for gpu in gpu_physical_devices:
+        gpu_idx = gpu.name.rsplit(":", 1)[-1]
+        nvidia_run = f"nvidia-smi --id={gpu_idx} --query-gpu=memory.total --format=csv,noheader,nounits"
+        try:
+            out = int(sp.run(nvidia_run, check=True, shell=True, capture_output=True, text=True).stdout)
+            memories.append(out)
+        except sp.CalledProcessError:
+            logger.error("Could not read the memory of GPU %d", gpu_idx)
+        except ValueError:
+            logger.error("Could not read the memory of GPU %d", gpu_idx)
+
+    if not memories:
+        return None
+
+    if len(set(memories)) == 1:
+        memory = memories[0]
+    else:
+        memory = min(memories)
+        logger.warning("Using the memory of GPU#%d: %d MiB to limit the events per device", memories.index(memory), memory)
+
+    # NOTE: this is based on heuristics in some of the available cards
+    if memory < 13000:
+        events_limit = int(1e5)
+    else:
+        events_limit = int(5e5)
+
+    if nparticles > 5:
+        events_limit //= 10
+    return events_limit
