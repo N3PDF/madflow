@@ -4,6 +4,7 @@
 from .config import DTYPE, DTYPECOMPLEX, complex_me, float_me, run_eager
 import numpy as np
 import tensorflow as tf
+from itertools import chain
 
 GS_SIGNATURE = [tf.TensorSpec(shape=[None], dtype=DTYPECOMPLEX)]
 ALPHAS_SIGNATURE = [tf.TensorSpec(shape=[None], dtype=DTYPE)]
@@ -68,7 +69,7 @@ class Model:
             return self._constants
         if not self._constants:
             return results
-        return *self._constants, *results
+        return list(chain.from_iterable([self._constants, results]))
 
     def get_masses(self):
         """Get the masses that entered the model as constants"""
