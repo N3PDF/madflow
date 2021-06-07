@@ -131,3 +131,5 @@ dmypy.json
 # Madgraph stuff
 MG5_debug
 py.py
+MG5_aMC_v*
+Events
