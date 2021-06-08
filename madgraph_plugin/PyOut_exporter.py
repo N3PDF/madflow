@@ -24,6 +24,7 @@ import madgraph.iolibs.helas_call_writers as helas_call_writers
 import madgraph.iolibs.files as files
 import madgraph.iolibs.export_v4 as export_v4
 import madgraph.core.color_algebra as color
+import madgraph.various.misc as misc
 import aloha
 import aloha.create_aloha as create_aloha
 import aloha.aloha_writers as aloha_writers
@@ -438,7 +439,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
             fout.close()
 
         
-    def write_leading_order_wrapper(self, outfile):
+    def write_leading_order_wrapper(self, outfile, history):
         imports = ''
         tree_level = '\n'
         masses = '\n'
@@ -457,15 +458,27 @@ class PyOutExporter(export_python.ProcessExporterPython):
         replace_dict['matrix_element_imports'] = imports
         replace_dict['tree_level_keys'] = tree_level
         replace_dict['masses'] = masses
-        replace_dict['process_title'] = "placeholder_title"
+        replace_dict['history'] = '\n'.join(history)
+        replace_dict['info_lines'] = self.get_info_lines()
 
         template = open(os.path.join(plugin_path, \
                        'template_files/leading_order.inc')).read()
         outfile.write(template % replace_dict)
 
-
         return
 
+
+    def get_info_lines(self):
+        """return the information on the version of MadFlow + Mg5_aMC
+        """
+        info_lines = """
+Generated with MadFlow 
+https://github.com/N3PDF/madflow
+and MG5_aMC v%(mgv)s
+launchpad.net/madgraph5 and amcatnlo.web.cern.ch"""
+        mginfo = info = misc.get_pkg_info()
+        return info_lines % {'mgv' : info['version'] + ', ' + info['date']} 
+        
 
     #===========================================================================
     # convert_model
@@ -521,7 +534,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
         """write a wrapper and creates the cards (at the moment just the param_card"""
 
         fout = open(pjoin(self.dir_path, 'leading_order.py'), 'w')
-        self.write_leading_order_wrapper(fout)
+        self.write_leading_order_wrapper(fout, history)
         fout.close()
 
         cardpath = pjoin(self.dir_path, 'Cards')
