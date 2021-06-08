@@ -18,6 +18,7 @@ length of events has been dumped to disk.
 .. code-block:: python
 
   from madflow.lhe_writer import LheWriter
+  from madflow.config import DTYPE
   from tensorflow import py_function
 
   with LheWriter("process_path", "process_name") as lhe_writer:
@@ -26,7 +27,7 @@ length of events has been dumped to disk.
       ...
       ps = phasespace(...)
       result = matrix.smatrix(ps, ...)
-      py_function(func=lhe_writer.lhe_parser, inp=[ps, result*weight], Tout=None)
+      py_function(func=lhe_writer.lhe_parser, inp=[ps, result*weight], Tout=DTYPe)
       return result
 
 

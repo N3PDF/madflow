@@ -343,7 +343,7 @@ def madflow_main(args=None, quick_return=False):
                 # Fill up the LHE grid
                 if args.pt_cut is not None:
                     weight = tf.gather(weight, idx)[:, 0]
-                tf.py_function(func=lhewriter.lhe_parser, inp=[all_ps, ret * weight], Tout=None)
+                tf.py_function(func=lhewriter.lhe_parser, inp=[all_ps, ret * weight], Tout=DTYPE)
 
             if args.pt_cut is not None:
                 ret = tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
