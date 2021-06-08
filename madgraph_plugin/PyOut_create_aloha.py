@@ -438,7 +438,9 @@ class PyOutAbstractRoutine(create_aloha.AbstractRoutine):
         """ write the content of the object. Same function as in aloha/create_aloha
         except for the first line
         """
-        writer = ALOHAWriterForTensorFlow(self, output_dir)
+        # initialise the writer with an empty dirpath, so that text is returned but
+        # not written to disk (will be done later)
+        writer = ALOHAWriterForTensorFlow(self, dirpath = '') 
         text = writer.write(mode=mode, **opt)
         if combine:
             for grouped in self.combined:

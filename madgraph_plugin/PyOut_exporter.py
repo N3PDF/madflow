@@ -132,6 +132,9 @@ class PyOutExporter(export_python.ProcessExporterPython):
         replace_dict['info_lines'] = info_lines
 
         for ime, matrix_element in enumerate(self.matrix_elements):
+
+            self.aloha_names = self.write_alohas(matrix_element)
+
             process_string = matrix_element.get('processes')[0].shell_string()
             if process_string in self.matrix_methods:
                 continue
@@ -414,10 +417,6 @@ class PyOutExporter(export_python.ProcessExporterPython):
 
         model_path = self.model.path
 
-        # this has to be done before the methods, in order to know
-        # the functions to be included
-
-        self.aloha_names = self.write_alohas()
 
         # setup the various coupling lists
         self.refactorize()
@@ -425,6 +424,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
         python_matrix_elements = self.get_python_matrix_methods()
 
         for matrix_element in self.matrix_elements:
+
             proc = matrix_element.get('processes')[0].shell_string()
             me_text = python_matrix_elements[proc]
 
@@ -504,9 +504,14 @@ launchpad.net/madgraph5 and amcatnlo.web.cern.ch"""
                 files.cp(model.restrict_card, out_path)
 
 
-    def write_alohas(self):
-        """ write the aloha functions, and returns a list of their names
+    def write_alohas(self, matrix_element):
+        """ write the aloha functions for matrix_element, and returns a list of their names
         """
+
+        proc = matrix_element.get('processes')[0].shell_string()
+        outfile = 'aloha_%s.py' % proc
+        fout = open(os.path.join(self.dir_path, outfile), 'w')
+
         aloha_model = create_aloha.AbstractALOHAModel(os.path.basename(self.model.get('modelpath')))
         aloha_model.add_Lorentz_object(self.model.get('lorentz'))
         
@@ -523,9 +528,15 @@ launchpad.net/madgraph5 and amcatnlo.web.cern.ch"""
         for k,v in aloha_model.items():
             aloha_model[k] = pyout_create_aloha.PyOutAbstractRoutine(v)
             routine_names.append(aloha_writers.get_routine_name(abstract = aloha_model[k]))
+            fout.write(aloha_model[k].write(output_dir = ''))
         # Write them out
-        write_dir=self.dir_path
-        aloha_model.write(write_dir, 'Python')
+        #write_dir=self.dir_path
+        #print ('writing')
+        #import pdb; pdb.set_trace()
+        #text = aloha_model.write(write_dir, 'Python')
+        #aloha_model.main(write_dir, 'Python')
+        #print ('written', text)
+        #print ('NAMES', routine_names)
         return routine_names
 
 
