@@ -223,7 +223,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
             # and of the independent ones
             for c in self.coups_indep:
                 if not c.name in couplings: continue
-                model_parameter_lines += '    %s = %s\n' % (c.name, c.expr)
+                model_parameter_lines += '    %s = [%s]\n' % (c.name, c.expr)
 
             if aloha.complex_mass:
                 paramsignature_const = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(parameters+couplings))
@@ -231,7 +231,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
 
             else:
                 paramsignature_const = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPE)'] * len(parameters) + 
-                                                    ['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(couplings))
+                                                    ['tf.TensorSpec(shape=[None], dtype=DTYPECOMPLEX)'] * len(couplings))
                 paramtuple_const = ",".join(["float_me(%s)" % p for p in parameters] + ["complex_me(%s)" % p for p in couplings]) 
 
             paramtuple_func = ",".join(["%s" % p for p in couplings_dep]) 
