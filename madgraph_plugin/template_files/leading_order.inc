@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-   MADFLOW AUTOMATIC TEMPLATE
+%(info_lines)s
+   
+Process (at Leading Order accuracy) :
+%(history)s
 
-   Automatic template for the process: (process)
-   at Leading Order accuracy
 """
 
 # The following settings are the default for this template
