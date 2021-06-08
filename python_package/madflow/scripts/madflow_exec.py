@@ -28,7 +28,16 @@ from pathlib import Path
 import logging
 import numpy as np
 
-from madflow.config import get_madgraph_path, get_madgraph_exe, DTYPE, DTYPEINT, float_me, int_me, run_eager, guess_events_limit
+from madflow.config import (
+    get_madgraph_path,
+    get_madgraph_exe,
+    DTYPE,
+    DTYPEINT,
+    float_me,
+    int_me,
+    run_eager,
+    guess_events_limit,
+)
 from madflow.phasespace import PhaseSpaceGenerator
 from madflow.lhe_writer import LheWriter
 
@@ -150,7 +159,11 @@ def madflow_main(args=None, quick_return=False):
         default="g g > t t~",
     )
     arger.add_argument(
-        "-m", "--massive_particles", help="Number of massive particles", type=int, default=2
+        "-m",
+        "--massive_particles",
+        help="Number of massive particles",
+        type=int,
+        default=2,
     )
     arger.add_argument(
         "-q",
@@ -168,14 +181,18 @@ def madflow_main(args=None, quick_return=False):
         nargs="?",
         const=30.0,
     )
-    arger.add_argument("--histograms", help="Generate LHE files/histograms", action="store_true")
+    arger.add_argument(
+        "--histograms", help="Generate LHE files/histograms", action="store_true"
+    )
     arger.add_argument(
         "-i", "--iterations", help="Iterations of vegasfow to run", type=int, default=10
     )
     arger.add_argument(
         "-f", "--frozen_iter", help="Iterations with frozen grid", type=int, default=0
     )
-    arger.add_argument("--events_per_device", help="How many events to send to each device", type=int)
+    arger.add_argument(
+        "--events_per_device", help="How many events to send to each device", type=int
+    )
 
     args = arger.parse_args(args)
     if quick_return:
@@ -184,6 +201,7 @@ def madflow_main(args=None, quick_return=False):
     out_path = Path(tempfile.mkdtemp(prefix="mad_"))
     _generate_madgraph_process(args.madgraph_process, out_path)
     matrices, models = _import_matrices(out_path)
+    num_matrices = len(matrices)
 
     if args.no_pdf:
         initial_flavours = [None]
@@ -226,13 +244,13 @@ def madflow_main(args=None, quick_return=False):
         logger.info("Setting fixed muF=muR=%.2f GeV.", args.fixed_scale)
         q2 = float_me(args.fixed_scale ** 2)
         if args.no_pdf:
-            alpha_s = 0.118
+            freezed_alpha_s = 0.118
         else:
-            alpha_s = np.squeeze(pdf.alphasQ2([q2]))
-        logger.info("Setting alpha_s = %.4f.", alpha_s)
+            freezed_alpha_s = np.squeeze(pdf.alphasQ2([q2]))
+        logger.info("Setting alpha_s = %.4f.", freezed_alpha_s)
         # Fix all models
         for model in models:
-            models.freeze_alpha_s(alpha_s)
+            models.freeze_alpha_s(freezed_alpha_s)
 
     # Create the phase space
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
@@ -271,12 +289,14 @@ def madflow_main(args=None, quick_return=False):
 
             # Compute the value of muF==muR if needed
             if args.fixed_scale is None:
-                full_mt = tf.reduce_sum(phasespace.mt(all_ps[:, 2:nparticles, :]), axis=-1)
+                full_mt = tf.reduce_sum(
+                    phasespace.mt(all_ps[:, 2:nparticles, :]), axis=-1
+                )
                 q2array = (full_mt / 2.0) ** 2
                 alpha_s = pdf.alphasQ2(q2array)
             else:
                 q2array = tf.ones_like(x1) * q2
-                alpha_s = None
+                alpha_s = tf.ones_like(q2array) * freezed_alpha_s
 
             # Get the luminosity per event
             if args.no_pdf:
@@ -286,6 +306,7 @@ def madflow_main(args=None, quick_return=False):
 
             # Compute each matrix element
             ret = 0.0
+            lumis = tf.TensorArray(DTYPE, size=num_matrices)
             for i, (matrix, model) in enumerate(zip(matrices, models)):
                 smatrix = matrix.smatrix(all_ps, *model.evaluate(alpha_s))
                 if not args.no_pdf:
@@ -293,7 +314,11 @@ def madflow_main(args=None, quick_return=False):
                     p2 = tf.gather(proton_2, gather_2[i], axis=1)
                     # Sum all input channels together for now
                     luminosity = tf.reduce_sum(p1 * p2, axis=1) / x1 / x2
+                    lumis = lumis.write(i, luminosity)
                 ret += luminosity * smatrix
+
+            # stack all the luminosities
+            lumis = tf.transpose(lumis.stack())
 
             # Final cross section
             ret *= wts
@@ -302,7 +327,13 @@ def madflow_main(args=None, quick_return=False):
                 # Fill up the LHE grid
                 if args.pt_cut is not None:
                     weight = tf.gather(weight, idx)[:, 0]
-                tf.py_function(func=lhewriter.lhe_parser, inp=[all_ps, ret * weight], Tout=DTYPE)
+                qarray = tf.math.sqrt(q2array)
+                evt_info = tf.stack([x1,x2, qarray, alpha_s], axis=1)
+                tf.py_function(
+                    func=lhewriter.lhe_parser,
+                    inp=[all_ps, ret * weight, lumis, evt_info],
+                    Tout=DTYPE,
+                )
 
             if args.pt_cut is not None:
                 ret = tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
@@ -311,16 +342,18 @@ def madflow_main(args=None, quick_return=False):
 
         return cross_section
 
-    events_per_iteration = int(1e6)
+    events_per_iteration = int(1e3)
     if args.events_per_device:
         events_limit = args.events_per_device
     else:
         events_limit = guess_events_limit(nparticles)
-        if events_limit is None: # CPU case
+        if events_limit is None:  # CPU case
             events_limit = events_per_iteration
-    frozen_limit = events_limit*2
+    frozen_limit = events_limit * 2
     if nparticles >= 5 and args.frozen_iter == 0:
-        logger.warning("With this many particles (> 5) it is recommended to run with frozen iterations")
+        logger.warning(
+            "With this many particles (> 5) it is recommended to run with frozen iterations"
+        )
 
     vegas = VegasFlow(ndim, events_per_iteration, events_limit=events_limit)
     integrand = generate_integrand()
@@ -331,7 +364,9 @@ def madflow_main(args=None, quick_return=False):
     else:
         warmup_iterations = max(args.iterations - args.frozen_iter, 2)
     logger.info(
-        "Running %d warm-up iterations of %d events each", warmup_iterations, events_per_iteration
+        "Running %d warm-up iterations of %d events each",
+        warmup_iterations,
+        events_per_iteration,
     )
     vegas.run_integration(warmup_iterations)
 
@@ -348,8 +383,13 @@ def madflow_main(args=None, quick_return=False):
     )
 
     if args.histograms:
-        proc_name = args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")
-        with LheWriter(Path("."), proc_name, False, 0) as lhe_writer:
+        proc_name = (
+            args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")
+        )
+        inis = [matrix.initial_states for matrix in matrices]
+        with LheWriter(
+            Path("."), proc_name, False, 0, initial_states=inis
+        ) as lhe_writer:
             integrand = generate_integrand(lhe_writer)
             vegas.compile(integrand)
             res, err = vegas.run_integration(final_iterations)
