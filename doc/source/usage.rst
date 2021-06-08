@@ -25,6 +25,9 @@ The script will use MG5_aMC\@NLO and the ``madflow``-provided :ref:`plugin <plug
 to generate the relevant matrix element and a vectorized form of ``RAMBO`` to
 integrate it.
 
+
+.. _lotemplate-label:
+
 Leading Order template
 ----------------------
 
