@@ -19,6 +19,7 @@ LHE files can be produced with the `--histograms` flag.
 import re
 import sys
 import time
+import shutil
 import itertools
 import importlib
 import argparse
@@ -79,7 +80,8 @@ def _generate_madgraph_process(process, output_folder):
     generate the madgraph process file in the appropriate folder
     """
     madgraph_script = f"""generate {process}
-output pyout {output_folder}"""
+output pyout {output_folder}
+"""
     script_path = Path(tempfile.mktemp(prefix="mad_script_"))
     script_path.write_text(madgraph_script)
     logger.debug("Writing madgraph output script at %s", script_path)
@@ -99,6 +101,9 @@ output pyout {output_folder}"""
         )
 
     logger.debug(parsed_output)
+    # Since we have finished with -apparent- success, move the script to the output folder
+    logger.debug("Saving the madgraph script in %s/", output_folder)
+    shutil.move(script_path, output_folder)
     logger.info("Matrix files written to: %s", output_folder)
 
 
