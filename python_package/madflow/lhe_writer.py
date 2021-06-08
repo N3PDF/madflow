@@ -26,6 +26,10 @@ from madgraph.various import lhe_parser
 sys.path = original_path
 __package__ = original_package
 
+from collections import namedtuple
+
+EventInfoTuple = namedtuple("EventInfo", ["x1", "x2", "scale", "aqcd"])
+
 ################################################
 
 
@@ -48,9 +52,9 @@ class EventFlow(lhe_parser.Event):
         self.nexternal = info.get("nexternal")
         self.ievent = info.get("ievent")
         self.wgt = info.get("wgt")
-        self.aqcd = info.get("aqcd")
         self.scale = info.get("scale")
         self.aqed = info.get("aqed")
+        self.aqcd = info.get("aqcd")
         self.tag = info.get("tag")
         self.comment = info.get("comment")
 
@@ -187,7 +191,7 @@ class LheWriter:
         pids = initial + self.final_states
         return pids, status_vec
 
-    def lhe_parser(self, all_ps, res, all_lumis):
+    def lhe_parser(self, all_ps, res, all_lumis, evt_info):
         """
         Takes care of storing and dumping LHE info from the integrator.
         To be passed as argument to generate the Vegasflow custom integrand.
@@ -197,24 +201,27 @@ class LheWriter:
             all_ps: tf.Tensor, phase space points of shape=(nevents,nexternal,ndims)
             res: tf.Tensor, weights of shape=(nevents,)
             all_lumis: tf.Tensor, luminosity values of shape=(nevents, len(matrices))
+            evt_info: tf.Tensor, event info of shape=(nevents, num info),
+                      each info contains x1, x2, scale, aqcd for the event
         """
         all_lumis = all_lumis / tf.reduce_sum(all_lumis, axis=1, keepdims=True)
 
         events_info = []
         particles_info = []
-        for wgt, ps_external, lumis in zip(
-            res.numpy(), all_ps.numpy(), all_lumis.numpy()
+        for wgt, ps_external, lumis, info in zip(
+            res.numpy(), all_ps.numpy(), all_lumis.numpy(), evt_info.numpy()
         ):
             pids, status_vec = self.lumis_to_pids(lumis)
             nexternal = len(status_vec)
+            info = EventInfoTuple(*info)
             events_info.append(
                 {
                     "nexternal": nexternal,
                     "ievent": 1,
                     "wgt": wgt,
-                    "aqcd": 0.0,  # alpha strong value, get this from vegasflow?
-                    "scale": 0.0,  # Q^2 scale for pdfs, get this from vegasflow?
+                    "scale": info.scale,
                     "aqed": 0.0,  # alpha EW value , get this from vegasflow?
+                    "aqcd": info.aqcd,
                     "tag": "",
                     "comment": "",
                 }

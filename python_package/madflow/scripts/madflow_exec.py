@@ -244,13 +244,13 @@ def madflow_main(args=None, quick_return=False):
         logger.info("Setting fixed muF=muR=%.2f GeV.", args.fixed_scale)
         q2 = float_me(args.fixed_scale ** 2)
         if args.no_pdf:
-            alpha_s = 0.118
+            freezed_alpha_s = 0.118
         else:
-            alpha_s = np.squeeze(pdf.alphasQ2([q2]))
-        logger.info("Setting alpha_s = %.4f.", alpha_s)
+            freezed_alpha_s = np.squeeze(pdf.alphasQ2([q2]))
+        logger.info("Setting alpha_s = %.4f.", freezed_alpha_s)
         # Fix all models
         for model in models:
-            models.freeze_alpha_s(alpha_s)
+            models.freeze_alpha_s(freezed_alpha_s)
 
     # Create the phase space
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
@@ -296,7 +296,7 @@ def madflow_main(args=None, quick_return=False):
                 alpha_s = pdf.alphasQ2(q2array)
             else:
                 q2array = tf.ones_like(x1) * q2
-                alpha_s = None
+                alpha_s = tf.ones_like(q2array) * freezed_alpha_s
 
             # Get the luminosity per event
             if args.no_pdf:
@@ -327,9 +327,11 @@ def madflow_main(args=None, quick_return=False):
                 # Fill up the LHE grid
                 if args.pt_cut is not None:
                     weight = tf.gather(weight, idx)[:, 0]
+                qarray = tf.math.sqrt(q2array)
+                evt_info = tf.stack([x1,x2, qarray, alpha_s], axis=1)
                 tf.py_function(
                     func=lhewriter.lhe_parser,
-                    inp=[all_ps, ret * weight, lumis],
+                    inp=[all_ps, ret * weight, lumis, evt_info],
                     Tout=DTYPE,
                 )
 
