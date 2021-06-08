@@ -232,7 +232,7 @@ def madflow_main(args=None, quick_return=False):
         logger.info("Setting alpha_s = %.4f.", alpha_s)
         # Fix all models
         for model in models:
-            models.freeze_alpha_s(alpha_s)
+            model.freeze_alpha_s(alpha_s)
 
     # Create the phase space
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
