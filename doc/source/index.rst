@@ -47,43 +47,43 @@ With Madflow with aim to close this gap between theoretical and high performance
 by providing a framework that it is maintainable, extensible and modern
 while 
 
+..
+  How to cite ``madflow``?
+  =========================
 
-How to cite ``madflow``?
-=========================
-
-When using ``madflow`` in your research, please cite the following publications:
-
-
-Bibtex:
-
-.. code-block:: latex
-
-    @article{Carrazza:2020rdn,
-        author = "Carrazza, Stefano and Cruz-Martinez, Juan M.",
-        title = "{VegasFlow: accelerating Monte Carlo simulation across multiple hardware platforms}",
-        eprint = "2002.12921",
-        archivePrefix = "arXiv",
-        primaryClass = "physics.comp-ph",
-        reportNumber = "TIF-UNIMI-2020-8",
-        doi = "10.1016/j.cpc.2020.107376",
-        journal = "Comput. Phys. Commun.",
-        volume = "254",
-        pages = "107376",
-        year = "2020"
-    }
+  When using ``madflow`` in your research, please cite the following publications:
 
 
-    @software{vegasflow_package,
-        author       = {Juan Cruz-Martinez and
-                        Stefano Carrazza},
-        title        = {N3PDF/vegasflow: vegasflow v1.0},
-        month        = feb,
-        year         = 2020,
-        publisher    = {Zenodo},
-        version      = {v1.0},
-        doi          = {10.5281/zenodo.3691926},
-        url          = {https://doi.org/10.5281/zenodo.3691926}
-    }
+  Bibtex:
+
+  .. code-block:: latex
+
+      @article{Carrazza:2020rdn,
+          author = "Carrazza, Stefano and Cruz-Martinez, Juan M.",
+          title = "{VegasFlow: accelerating Monte Carlo simulation across multiple hardware platforms}",
+          eprint = "2002.12921",
+          archivePrefix = "arXiv",
+          primaryClass = "physics.comp-ph",
+          reportNumber = "TIF-UNIMI-2020-8",
+          doi = "10.1016/j.cpc.2020.107376",
+          journal = "Comput. Phys. Commun.",
+          volume = "254",
+          pages = "107376",
+          year = "2020"
+      }
+
+
+      @software{vegasflow_package,
+          author       = {Juan Cruz-Martinez and
+                          Stefano Carrazza},
+          title        = {N3PDF/vegasflow: vegasflow v1.0},
+          month        = feb,
+          year         = 2020,
+          publisher    = {Zenodo},
+          version      = {v1.0},
+          doi          = {10.5281/zenodo.3691926},
+          url          = {https://doi.org/10.5281/zenodo.3691926}
+      }
 
 FAQ
 ===

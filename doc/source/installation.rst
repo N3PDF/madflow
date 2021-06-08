@@ -42,6 +42,8 @@ Below are the instructions for MG5_aMC\@NLO 3.1.0, for a more recent release ple
   export MADGRAPH_PATH=${PWD}/MG5_aMC_v3_1_0
 
 
+.. _plugin-label:
+
 Plugin
 ------
 
