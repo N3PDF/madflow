@@ -176,6 +176,7 @@ def madflow_main(args=None, quick_return=False):
         "-f", "--frozen_iter", help="Iterations with frozen grid", type=int, default=0
     )
     arger.add_argument("--events_per_device", help="How many events to send to each device", type=int)
+    arger.add_argument("--events_per_iteration", help="How many events to run per iteration", type=int, default=int(1e6))
 
     args = arger.parse_args(args)
     if quick_return:
@@ -311,7 +312,7 @@ def madflow_main(args=None, quick_return=False):
 
         return cross_section
 
-    events_per_iteration = int(1e6)
+    events_per_iteration = args.events_per_iteration
     if args.events_per_device:
         events_limit = args.events_per_device
     else:
