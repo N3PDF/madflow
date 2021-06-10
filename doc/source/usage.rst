@@ -26,6 +26,26 @@ to generate the relevant matrix element and a vectorized form of ``RAMBO`` to
 integrate it.
 
 
+Technical limitations
+^^^^^^^^^^^^^^^^^^^^^
+
+While, bugs permitting, ``madflow`` should be completely functional, its development
+is still ongoing.
+We tried to use conservative results for the default values to manage the memory
+of hardware accelerators, however our own testing devices are limited.
+
+The ``madflow`` script exposes the ``--events_limit`` flag which limits the maximum
+amount of events that can be sent to the accelerator
+Increasing the number of events run in the accelerator at once will decrease the latency
+and accordingly will increase the performance of the calculation.
+On the flip side, increasing the number of events will increase the amount of on-device
+memory required to perform the calculation
+(which the host computer should also have to prepare said calculation)
+and unpleasant situations where the calculation goes Out of Memory (OOM) can occur.
+If that's the case, please decrease the ``--events_limit`` flag.
+
+
+
 .. _lotemplate-label:
 
 Leading Order template
