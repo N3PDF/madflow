@@ -103,7 +103,7 @@ output pyout {output_folder}
     logger.debug(parsed_output)
     # Since we have finished with -apparent- success, move the script to the output folder
     logger.debug("Saving the madgraph script in %s/", output_folder)
-    shutil.move(script_path, output_folder)
+    shutil.move(script_path.as_posix(), output_folder.as_posix())
     logger.info("Matrix files written to: %s", output_folder)
 
 
