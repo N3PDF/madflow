@@ -118,11 +118,9 @@ class Matrix_%(process_string)s(object):
         # Process parameters
         #  
         ngraphs = %(ngraphs)d
-        nexternal = self.nexternal
         nwavefuncs = %(nwavefuncs)d
         ncolor = %(ncolor)d
         ZERO = float_me(0.)
-        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
         #  
         # Color matrix
         #  
@@ -133,22 +131,12 @@ class Matrix_%(process_string)s(object):
         # ----------
         # Begin code
         # ----------
-        amp = [None] * ngraphs
-        w = [None] * nwavefuncs
         %(helas_calls)s
 
         %(jamp_lines)s
 
         ##%(amp2_lines)s
-        matrix = tf.zeros(nevts, dtype=DTYPECOMPLEX)
-        for i in range(ncolor):
-            ztemp = tf.zeros(nevts, dtype=DTYPECOMPLEX)
-            for j in range(ncolor):
-                ztemp = ztemp + cf[i][j]*jamp[j]
-            matrix = matrix + ztemp * tf.math.conj(jamp[i])/denom[i]   
-        #self.jamp.append(jamp)
-
-        return matrix
+        return tf.einsum("ie, ij, je -> e", jamp, cf, tf.math.conj(jamp)/tf.reshape(denom, (ncolor, 1)))
 
 
 
