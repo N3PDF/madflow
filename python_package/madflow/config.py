@@ -8,6 +8,7 @@
 """
 import os
 import logging
+from distutils.spawn import find_executable
 import subprocess as sp
 from pathlib import Path
 
@@ -78,7 +79,7 @@ def complex_me(cmp):
 
 
 def get_madgraph_path(madpath=None):
-    """ Return the path to the madgrapt root """
+    """Return the path to the madgrapt root"""
     if madpath is None:
         madpath = os.environ.get("MADGRAPH_PATH", "../../../mg5amcnlo")
     madgraph_path = Path(madpath)
@@ -91,7 +92,7 @@ def get_madgraph_path(madpath=None):
 
 
 def get_madgraph_exe(madpath=None):
-    """ Return the path to the madgraph executable """
+    """Return the path to the madgraph executable"""
     madpath = get_madgraph_path(madpath)
     mg5_exe = madpath / "bin/mg5_aMC"
     if not mg5_exe.exists():
@@ -99,18 +100,44 @@ def get_madgraph_exe(madpath=None):
     return mg5_exe
 
 
+def _parse_amd_info(info):
+    """Parse the information returned by
+    rocm-smi to find out the amount of free memory in MB
+    """
+    for line in info.split("\n"):
+        if line.startswith("GPU") and "Used" not in line:
+            total_b = line.strip().rsplit(" ", 1)[-1]
+    return int(total_b) / 1024 / 1024
+
+
 def guess_events_limit(nparticles):
-    """ Given a number of particles, reads GPU memory to guess
+    """Given a number of particles, reads GPU memory to guess
     what should be the event limit.
     Use the smallest available GPU as the limit (but print warning in that case)
     """
-    gpu_physical_devices = tf.config.list_physical_devices('GPU')
+    gpu_physical_devices = tf.config.list_physical_devices("GPU")
     memories = []
     for gpu in gpu_physical_devices:
         gpu_idx = gpu.name.rsplit(":", 1)[-1]
-        nvidia_run = f"nvidia-smi --id={gpu_idx} --query-gpu=memory.total --format=csv,noheader,nounits"
+        # Nvidia and AMD GPU split
+        if find_executable("nvidia-smi"):
+            gpuinfo_command = (
+                f"nvidia-smi --id={gpu_idx} --query-gpu=memory.total --format=csv,noheader,nounits"
+            )
+            parse = lambda x: int(x)
+        elif find_executable("rocm-smi"):
+            gpuinfo_command = f"rocm-smi -d {gpu_idx} --showmeminfo VRAM"
+            parse = _parse_amd_info
+        else:
+            logger.error("No rocm-smi or nvidia-smi command found, GPU memory cannot be guessed")
+            continue
+
         try:
-            out = int(sp.run(nvidia_run, check=True, shell=True, capture_output=True, text=True).stdout)
+            out = parse(
+                sp.run(
+                    gpuinfo_command, check=True, shell=True, capture_output=True, text=True
+                ).stdout
+            )
             memories.append(out)
         except sp.CalledProcessError:
             logger.error("Could not read the memory of GPU %d", gpu_idx)
@@ -124,7 +151,11 @@ def guess_events_limit(nparticles):
         memory = memories[0]
     else:
         memory = min(memories)
-        logger.warning("Using the memory of GPU#%d: %d MiB to limit the events per device", memories.index(memory), memory)
+        logger.warning(
+            "Using the memory of GPU#%d: %d MiB to limit the events per device",
+            memories.index(memory),
+            memory,
+        )
 
     # NOTE: this is based on heuristics in some of the available cards
     if memory < 13000:

@@ -202,6 +202,7 @@ def madflow_main(args=None, quick_return=False):
     arger.add_argument(
         "--dry_run", help="Generate the madgraph output but don't run anything", action="store_true"
     )
+    arger.add_argument("--events_per_iteration", help="How many events to run per iteration", type=int, default=int(1e6))
 
     args = arger.parse_args(args)
     if quick_return:
@@ -350,7 +351,7 @@ def madflow_main(args=None, quick_return=False):
 
         return cross_section
 
-    events_per_iteration = int(1e6)
+    events_per_iteration = args.events_per_iteration
     if args.events_per_device:
         events_limit = args.events_per_device
     else:
