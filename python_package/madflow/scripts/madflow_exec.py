@@ -265,7 +265,7 @@ def madflow_main(args=None, quick_return=False):
     def generate_integrand(lhewriter=None):
         """Generate a cross section with (or without) a LHE parser"""
 
-        def cross_section(xrand, n_dim=ndim, weight=1.0):
+        def cross_section(xrand, weight=1.0):
             """Compute the cross section"""
             # Generate the phase space point
             all_ps, wts, x1, x2, idx = phasespace(xrand)
@@ -306,7 +306,8 @@ def madflow_main(args=None, quick_return=False):
                 tf.py_function(func=lhewriter.lhe_parser, inp=[all_ps, ret * weight], Tout=DTYPE)
 
             if args.pt_cut is not None:
-                ret = tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
+                out_shape = tf.shape(xrand, out_type=DTYPEINT)[0:1]
+                ret = tf.scatter_nd(idx, ret, shape=out_shape)
 
             return ret
 
@@ -325,7 +326,7 @@ def madflow_main(args=None, quick_return=False):
 
     vegas = VegasFlow(ndim, events_per_iteration, events_limit=events_limit)
     integrand = generate_integrand()
-    vegas.compile(integrand)
+    vegas.compile(integrand, trace=True)
 
     if args.frozen_iter == 0:
         warmup_iterations = args.iterations // 2
