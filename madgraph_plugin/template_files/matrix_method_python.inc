@@ -99,10 +99,9 @@ class Matrix_%(process_string)s(object):
         nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
         ans = tf.zeros(nevts, dtype=DTYPECOMPLEX)
         for hel in self.helicities:
-            t = self.matrix(all_ps,hel,%(params)s)
-            ans = ans + t
+            ans += self.matrix(all_ps,hel,%(params)s)
 
-        return tf.math.real(ans)/self.denominator
+        return ans/self.denominator
 
     @tf.function(input_signature=matrix_signature)
     def matrix(self,all_ps,hel,%(params)s):
@@ -136,7 +135,8 @@ class Matrix_%(process_string)s(object):
         %(jamp_lines)s
 
         ##%(amp2_lines)s
-        return tf.einsum("ie, ij, je -> e", jamp, cf, tf.math.conj(jamp)/tf.reshape(denom, (ncolor, 1)))
+        ret = tf.einsum("ie, ij, je -> e", jamp, cf, tf.math.conj(jamp)/tf.reshape(denom, (ncolor, 1)))
+        return tf.math.real(ret)
 
 
 
