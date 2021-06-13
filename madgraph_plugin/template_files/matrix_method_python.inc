@@ -77,6 +77,14 @@ class Matrix_%(process_string)s(object):
     def __str__(self):
         return "%(process_string)s"
 
+    @tf.function(input_signature=[tf.TensorSpec(shape=[None, %(nexternal)d], dtype=DTYPE)]+smatrix_signature)
+    def wrapper(self, all_hel, all_ps, %(params)s):
+        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
+        ans = tf.zeros(nevts, dtype=DTYPE)
+        for hel in self.helicities:
+            ans += self.matrix(all_ps,hel,%(params)s)
+        return ans
+
     @tf.function(input_signature=smatrix_signature)
     def smatrix(self,all_ps,%(params)s):
         #  
@@ -96,12 +104,8 @@ class Matrix_%(process_string)s(object):
         # ----------
         # BEGIN CODE
         # ----------
-        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
-        ans = tf.zeros(nevts, dtype=DTYPECOMPLEX)
-        for hel in self.helicities:
-            ans += self.matrix(all_ps,hel,%(params)s)
 
-        return ans/self.denominator
+        return self.wrapper(self.helicities, all_ps, %(params)s)/self.denominator
 
     @tf.function(input_signature=matrix_signature)
     def matrix(self,all_ps,hel,%(params)s):

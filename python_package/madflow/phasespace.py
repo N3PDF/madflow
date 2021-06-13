@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Helpers for rambo
 events_signature = tf.TensorSpec(shape=[None, 1], dtype=DTYPE)
+events_signature_clean = tf.TensorSpec(shape=[None], dtype=DTYPE)
 p_signature = tf.TensorSpec(shape=[None, 4], dtype=DTYPE)
 ps_signature = tf.TensorSpec(shape=[None, None, 4], dtype=DTYPE)
 
@@ -118,6 +119,7 @@ def _conformal_transformation(input_q, bquad):
     return tf.concat([pnrg, pvec], axis=1)  # (n_events, 4)
 
 
+@tf.function(input_signature=[p_signature])
 def _gen_unconstrained_momenta(xrand):
     """
     Generates unconstrained 4-momenta
@@ -212,6 +214,7 @@ def rambo(xrand, n_particles, sqrts, masses=None, check_physical=False):
     return massive_p, wt
 
 
+@tf.function(input_signature=[tf.TensorSpec(shape=[None, 2], dtype=DTYPE)] + 2*[tf.TensorSpec(shape=[], dtype=DTYPE)])
 def _get_x1x2(xarr, shat_min, s_in):
     """Receives two random numbers and return the
     value of the invariant mass of the center of mass
@@ -291,6 +294,7 @@ def ramboflow(xrand, nparticles, com_sqrts, masses=None):
     return final_p, wgt, x1, x2
 
 
+@tf.function(input_signature=[ps_signature] + [events_signature_clean]*2)
 def _boost_to_lab(p_com, x1, x2):
     """Boost the momenta back from the COM frame of the initial partons
     to the lab frame
