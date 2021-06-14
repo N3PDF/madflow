@@ -8,7 +8,7 @@ import re
 import os
 from setuptools import setup, find_packages
 
-requirements = ["vegasflow", "pdfflow"]
+requirements = ["vegasflow", "pdfflow", "requests"]
 # soft-requirements due to vegasflow and pdfflow are:
 #   tensorflow, joblib, numpy
 package_name = "madflow"

@@ -82,22 +82,25 @@ def complex_me(cmp):
 def get_madgraph_path(madpath=None):
     """Return the path to the madgrapt root"""
     if madpath is None:
-        madpath = os.environ.get("MADGRAPH_PATH", "../../../mg5amcnlo")
+        madpath = os.environ.get("MADGRAPH_PATH", "mg5amcnlo")
     madgraph_path = Path(madpath)
     if not madgraph_path.exists():
         raise ValueError(
             f"{madgraph_path} does not exist. "
             "Needs a valid path for Madgraph, can be given as env. variable MADGRAPH_PATH"
         )
+    # If the path exists, check whether the madgraph executable is there
+    _ = get_madgraph_exe(madgraph_path)
     return madgraph_path
 
 
 def get_madgraph_exe(madpath=None):
     """Return the path to the madgraph executable"""
-    madpath = get_madgraph_path(madpath)
+    if madpath is None:
+        madpath = get_madgraph_path(madpath)
     mg5_exe = madpath / "bin/mg5_aMC"
     if not mg5_exe.exists():
-        raise ValueError(f"Madgraph executablec ould not be found at {mg5_exe}")
+        raise ValueError(f"Madgraph executable could not be found at {mg5_exe}")
     return mg5_exe
 
 

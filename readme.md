@@ -51,11 +51,13 @@ You can check your installed version of `pdfflow` with: `python -c 'import pdffl
 ## Install plugin in MG5_aMC
 
 In order to install the `madflow` plugin in MG5_aMC@NLO, it is necessary to link the `madgraph_plugin` folder inside the `PLUGIN` directory of MG5_aMC@NLO.
-For instance, if the environment variable `$MADGRAPH_PATH` is pointing to the MG5_aMC root:
+For instance, if the environment variable `$MADGRAPH_PATH` is pointing to the MG5_aMC root and you are currently in the repository root.
 
 ```bash
     ln -s ${PWD}/madgraph_plugin ${MADGRAPH_PATH}/PLUGIN/pyout
 ```
+
+The link can be performed automagically with the `madflow --autolink` option.
 
 ## Use `madflow`
 
