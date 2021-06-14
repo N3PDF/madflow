@@ -398,6 +398,8 @@ def madflow_main(args=None, quick_return=False):
             res, err = vegas.run_integration(final_iterations)
             lhe_writer.store_result((res, err))
             proc_folder = output_path / f"Events/{proc_name}"
+            filename = proc_folder / 'cross_err.txt'
+            lhe_writer.dump_result(filename)
             logger.info("Written LHE file to %s", proc_folder)
     else:
         proc_folder = None
