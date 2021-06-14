@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from madflow.lhe_writer import EventFileFlow, FourMomentumFlow
 
 
-def top_hists(lhe, nbins=50):
+def top_hists(lhe, nbins=50, cross_err=None):
     """
 
     Computes pT, Pseudorapidity, histograms from LHE event file.
@@ -21,6 +21,7 @@ def top_hists(lhe, nbins=50):
     ----------
         lhe: EventFileFlow, LHE events file
         nbins: int, number of histogram bins
+        crosse_err: np.array, cross section and statistical error
 
     Returns
     -------
@@ -57,7 +58,7 @@ def top_hists(lhe, nbins=50):
     try:
         _, err = lhe.get_banner().get_cross(witherror=True)
     except:
-        _, err = (0, 2.24203) # TODO: just for the moment since there's no banner in madflow yet
+        _, err = cross_err # TODO: just for the moment since there's no banner in madflow yet
 
     pt_hist= np.histogram(pts, bins=pt_bins, weights=norm)
     eta_hist = np.histogram(etas, bins=eta_bins, weights=norm)
@@ -136,7 +137,7 @@ def plot_hist(hist_flow, hist_mg5, xlabel, fname):
         [bins_flow[0], bins_flow[-2]], [1, 1], lw=0.8, color="black", linestyle="dashed"
     )
     ax.set_xlabel(xlabel, loc="right")
-    ax.set_ylim([0.8, 1.2])
+    ax.set_ylim([0.5, 1.5])
     ax.tick_params(
         axis="x",
         which="both",
@@ -188,7 +189,8 @@ def main():
     lhe_mg5 = EventFileFlow(path_mg5)
 
     print(f"Filling MadFlow histograms with {len(lhe_flow)} events")
-    pt_flow, eta_flow = top_hists(lhe_flow, args.nbins)
+    cross_err_file = np.loadtxt(args.madflow / 'cross_err.txt')
+    pt_flow, eta_flow = top_hists(lhe_flow, args.nbins, cross_err=cross_err_file)
 
     print(f"Filling mg5_aMC histograms with {len(lhe_mg5)} events")
     pt_mg5, eta_mg5 = top_hists(lhe_mg5, args.nbins)
