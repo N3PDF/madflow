@@ -28,10 +28,13 @@ if you are planning to extend or develop code use instead:
   pip install -e .
 
 
-MG5_aMC\@NLO
------------
+.. _plugin-label:
+
+MG5_aMC\@NLO Plugin
+--------------------
 
 A valid installation of MG5_aMC\@NLO (2.8+) is necessary in order to generate matrix elements.
+
 If you already have a valid installation, please add the following environment variable pointing to the right directory: ``MADGRAPH_PATH``.
 Below are the instructions for MG5_aMC\@NLO 3.1.0, for a more recent release please visit the MG5_aMC\@NLO `site <https://launchpad.net/mg5amcnlo>`_.
 
@@ -42,12 +45,16 @@ Below are the instructions for MG5_aMC\@NLO 3.1.0, for a more recent release ple
   export MADGRAPH_PATH=${PWD}/MG5_aMC_v3_1_0
 
 
-.. _plugin-label:
+Once MG5_aMC\@NLO is installed, all that's left is to link the ``madflow`` plugin inside
+the MG5_aMC\@NLO folder.
 
-Plugin
-------
 
-In order to install the ``madflow`` plugin in MG5_aMC\@NLO, it is necessary to link the
+.. code-block:: bash
+
+  madflow --autolink
+
+
+If you prefer to link the plugin manually, it is necessary to link the
 ``madgraph_plugin`` folder inside the ``PLUGIN`` directory of MG5_aMC\@NLO.
 For instance, if the environment variable ``$MADGRAPH_PATH`` is pointing to the MG5_aMC root:
 
