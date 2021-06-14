@@ -44,14 +44,14 @@ def get_model_param(model, param_card_path):
 
 
 smatrix_signature = [
-        tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
+        tf.TensorSpec(shape=[None,%(nexternal)d,4], dtype=DTYPE),
         %(paramsignature_const)s
         %(paramsignature_func)s
         ]
 
 
 matrix_signature = [
-        tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
+        tf.TensorSpec(shape=[None,%(nexternal)d,4], dtype=DTYPE),
         tf.TensorSpec(shape=[%(nexternal)d], dtype=DTYPE),
         %(paramsignature_const)s
         %(paramsignature_func)s
@@ -78,6 +78,14 @@ class Matrix_%(process_string)s(object):
     def __str__(self):
         return "%(process_string)s"
 
+    @tf.function(input_signature=[tf.TensorSpec(shape=[None, %(nexternal)d], dtype=DTYPE)]+smatrix_signature)
+    def wrapper(self, all_hel, all_ps, %(params)s):
+        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
+        ans = tf.zeros(nevts, dtype=DTYPE)
+        for hel in self.helicities:
+            ans += self.matrix(all_ps,hel,%(params)s)
+        return ans
+
     @tf.function(input_signature=smatrix_signature)
     def smatrix(self,all_ps,%(params)s):
         #  
@@ -97,13 +105,8 @@ class Matrix_%(process_string)s(object):
         # ----------
         # BEGIN CODE
         # ----------
-        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
-        ans = tf.zeros(nevts, dtype=DTYPECOMPLEX)
-        for hel in self.helicities:
-            t = self.matrix(all_ps,hel,%(params)s)
-            ans = ans + t
 
-        return tf.math.real(ans)/self.denominator
+        return self.wrapper(self.helicities, all_ps, %(params)s)/self.denominator
 
     @tf.function(input_signature=matrix_signature)
     def matrix(self,all_ps,hel,%(params)s):
@@ -119,11 +122,9 @@ class Matrix_%(process_string)s(object):
         # Process parameters
         #  
         ngraphs = %(ngraphs)d
-        nexternal = self.nexternal
         nwavefuncs = %(nwavefuncs)d
         ncolor = %(ncolor)d
         ZERO = float_me(0.)
-        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
         #  
         # Color matrix
         #  
@@ -134,22 +135,13 @@ class Matrix_%(process_string)s(object):
         # ----------
         # Begin code
         # ----------
-        amp = [None] * ngraphs
-        w = [None] * nwavefuncs
         %(helas_calls)s
 
         %(jamp_lines)s
 
         ##%(amp2_lines)s
-        matrix = tf.zeros(nevts, dtype=DTYPECOMPLEX)
-        for i in range(ncolor):
-            ztemp = tf.zeros(nevts, dtype=DTYPECOMPLEX)
-            for j in range(ncolor):
-                ztemp = ztemp + cf[i][j]*jamp[j]
-            matrix = matrix + ztemp * tf.math.conj(jamp[i])/denom[i]   
-        #self.jamp.append(jamp)
-
-        return matrix
+        ret = tf.einsum("ie, ij, je -> e", jamp, cf, tf.math.conj(jamp)/tf.reshape(denom, (ncolor, 1)))
+        return tf.math.real(ret)
 
 
 
