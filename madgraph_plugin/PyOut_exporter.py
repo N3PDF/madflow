@@ -24,6 +24,7 @@ import madgraph.iolibs.helas_call_writers as helas_call_writers
 import madgraph.iolibs.files as files
 import madgraph.iolibs.export_v4 as export_v4
 import madgraph.core.color_algebra as color
+import madgraph.various.misc as misc
 import aloha
 import aloha.create_aloha as create_aloha
 import aloha.aloha_writers as aloha_writers
@@ -131,6 +132,9 @@ class PyOutExporter(export_python.ProcessExporterPython):
         replace_dict['info_lines'] = info_lines
 
         for ime, matrix_element in enumerate(self.matrix_elements):
+
+            self.aloha_names = self.write_alohas(matrix_element)
+
             process_string = matrix_element.get('processes')[0].shell_string()
             if process_string in self.matrix_methods:
                 continue
@@ -219,7 +223,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
             # and of the independent ones
             for c in self.coups_indep:
                 if not c.name in couplings: continue
-                model_parameter_lines += '    %s = %s\n' % (c.name, c.expr)
+                model_parameter_lines += '    %s = [%s]\n' % (c.name, c.expr)
 
             if aloha.complex_mass:
                 paramsignature_const = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(parameters+couplings))
@@ -227,7 +231,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
 
             else:
                 paramsignature_const = ",\n        ".join(['tf.TensorSpec(shape=[], dtype=DTYPE)'] * len(parameters) + 
-                                                    ['tf.TensorSpec(shape=[], dtype=DTYPECOMPLEX)'] * len(couplings))
+                                                    ['tf.TensorSpec(shape=[None], dtype=DTYPECOMPLEX)'] * len(couplings))
                 paramtuple_const = ",".join(["float_me(%s)" % p for p in parameters] + ["complex_me(%s)" % p for p in couplings]) 
 
             paramtuple_func = ",".join(["%s" % p for p in couplings_dep]) 
@@ -413,10 +417,6 @@ class PyOutExporter(export_python.ProcessExporterPython):
 
         model_path = self.model.path
 
-        # this has to be done before the methods, in order to know
-        # the functions to be included
-
-        self.aloha_names = self.write_alohas()
 
         # setup the various coupling lists
         self.refactorize()
@@ -424,6 +424,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
         python_matrix_elements = self.get_python_matrix_methods()
 
         for matrix_element in self.matrix_elements:
+
             proc = matrix_element.get('processes')[0].shell_string()
             me_text = python_matrix_elements[proc]
 
@@ -438,31 +439,46 @@ class PyOutExporter(export_python.ProcessExporterPython):
             fout.close()
 
         
-    def write_leading_order_wrapper(self, outfile):
+    def write_leading_order_wrapper(self, outfile, history):
         imports = ''
-        tree_level = ''
-        masses = ''
+        tree_level = '\n'
+        masses = '\n'
 
         for name, proc, mass in zip(self.me_names, self.proc_names, self.mass_lists):
 
-            imports += 'from %(me)s import %(me)s, model_params as model_%(proc)s\n' % {'me': name, 'proc': proc}
-            tree_level += '"%(proc)s" : (%(me)s, model_%(proc)s)\n'  % {'me': name, 'proc': proc}
-            masses += ('"%s" : [' % proc) + \
+            me_class = name.capitalize()
+            info_dict = {'me': name, 'proc': proc, 'me_class': me_class}
+            imports += 'from %(me)s import %(me_class)s, get_model_param as model_%(proc)s\n' % info_dict
+            tree_level += '    "%(proc)s": (%(me_class)s, model_%(proc)s),\n'  % info_dict
+            masses += ('    "%s": [' % proc) + \
                     ", ".join(['"%s"' % m for m in mass]) + \
-                    ']\n'
+                    '],\n'
 
         replace_dict = {}
         replace_dict['matrix_element_imports'] = imports
         replace_dict['tree_level_keys'] = tree_level
         replace_dict['masses'] = masses
+        replace_dict['history'] = '\n'.join(history)
+        replace_dict['info_lines'] = self.get_info_lines()
 
         template = open(os.path.join(plugin_path, \
                        'template_files/leading_order.inc')).read()
         outfile.write(template % replace_dict)
 
-
         return
 
+
+    def get_info_lines(self):
+        """return the information on the version of MadFlow + Mg5_aMC
+        """
+        info_lines = """
+Generated with MadFlow 
+https://github.com/N3PDF/madflow
+and MG5_aMC v%(mgv)s
+launchpad.net/madgraph5 and amcatnlo.web.cern.ch"""
+        mginfo = info = misc.get_pkg_info()
+        return info_lines % {'mgv' : info['version'] + ', ' + info['date']} 
+        
 
     #===========================================================================
     # convert_model
@@ -488,9 +504,14 @@ class PyOutExporter(export_python.ProcessExporterPython):
                 files.cp(model.restrict_card, out_path)
 
 
-    def write_alohas(self):
-        """ write the aloha functions, and returns a list of their names
+    def write_alohas(self, matrix_element):
+        """ write the aloha functions for matrix_element, and returns a list of their names
         """
+
+        proc = matrix_element.get('processes')[0].shell_string()
+        outfile = 'aloha_%s.py' % proc
+        fout = open(os.path.join(self.dir_path, outfile), 'w')
+
         aloha_model = create_aloha.AbstractALOHAModel(os.path.basename(self.model.get('modelpath')))
         aloha_model.add_Lorentz_object(self.model.get('lorentz'))
         
@@ -507,9 +528,15 @@ class PyOutExporter(export_python.ProcessExporterPython):
         for k,v in aloha_model.items():
             aloha_model[k] = pyout_create_aloha.PyOutAbstractRoutine(v)
             routine_names.append(aloha_writers.get_routine_name(abstract = aloha_model[k]))
+            fout.write(aloha_model[k].write(output_dir = ''))
         # Write them out
-        write_dir=self.dir_path
-        aloha_model.write(write_dir, 'Python')
+        #write_dir=self.dir_path
+        #print ('writing')
+        #import pdb; pdb.set_trace()
+        #text = aloha_model.write(write_dir, 'Python')
+        #aloha_model.main(write_dir, 'Python')
+        #print ('written', text)
+        #print ('NAMES', routine_names)
         return routine_names
 
 
@@ -518,7 +545,7 @@ class PyOutExporter(export_python.ProcessExporterPython):
         """write a wrapper and creates the cards (at the moment just the param_card"""
 
         fout = open(pjoin(self.dir_path, 'leading_order.py'), 'w')
-        self.write_leading_order_wrapper(fout)
+        self.write_leading_order_wrapper(fout, history)
         fout.close()
 
         cardpath = pjoin(self.dir_path, 'Cards')

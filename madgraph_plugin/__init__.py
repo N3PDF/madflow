@@ -1,9 +1,10 @@
 #####################################################
 #                                                   #
-#  Source file of the MadSTR plugin                  #
+#  Source file of the MadFlow plugin                #
 #  Use only with consent of its authors.            #
 #                                                   #
-#              authors: M. Zaro,                    #
+#   authors: S.Carrazza, J.Cruz-Martinez,           #
+#            M.Rossi, M.Zaro                        #
 #                                                   #
 #                                                   #
 #####################################################
@@ -42,7 +43,7 @@ new_interface = None
 ########################## CONTROL VARIABLE ####################################
 __author__ = 'Marco Zaro'
 __email__ = 'marco.zaro@gmail.com'
-__version__ = (1,0,0)
+__version__ = (0,1,0)
 minimal_mg5amcnlo_version = (2,5,0) 
 maximal_mg5amcnlo_version = (1000,1000,1000)
 latest_validated_version = (2,5,0)

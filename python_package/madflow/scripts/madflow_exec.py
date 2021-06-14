@@ -19,6 +19,7 @@ LHE files can be produced with the `--histograms` flag.
 import re
 import sys
 import time
+import shutil
 import itertools
 import importlib
 import argparse
@@ -28,7 +29,16 @@ from pathlib import Path
 import logging
 import numpy as np
 
-from madflow.config import get_madgraph_path, get_madgraph_exe, DTYPE, DTYPEINT, float_me, int_me, run_eager, guess_events_limit
+from madflow.config import (
+    get_madgraph_path,
+    get_madgraph_exe,
+    DTYPE,
+    DTYPEINT,
+    float_me,
+    int_me,
+    run_eager,
+    guess_events_limit,
+)
 from madflow.phasespace import PhaseSpaceGenerator
 from madflow.lhe_writer import LheWriter
 
@@ -70,7 +80,8 @@ def _generate_madgraph_process(process, output_folder):
     generate the madgraph process file in the appropriate folder
     """
     madgraph_script = f"""generate {process}
-output pyout {output_folder}"""
+output pyout {output_folder}
+"""
     script_path = Path(tempfile.mktemp(prefix="mad_script_"))
     script_path.write_text(madgraph_script)
     logger.debug("Writing madgraph output script at %s", script_path)
@@ -90,6 +101,10 @@ output pyout {output_folder}"""
         )
 
     logger.debug(parsed_output)
+    # Since we have finished with -apparent- success, move the script to the output folder
+    logger.debug("Saving the madgraph script in %s/", output_folder)
+    # .as_posix() for python < 3.9 compatibility
+    shutil.move(script_path.as_posix(), output_folder.as_posix())
     logger.info("Matrix files written to: %s", output_folder)
 
 
@@ -155,7 +170,8 @@ def madflow_main(args=None, quick_return=False):
     arger.add_argument(
         "-q",
         "--fixed_scale",
-        help="Fix value of scale muR=muF (and alphas(q)), if this flag is not provided take dynamical scale q2 = sum(mT)/2",
+        help="Fix value of scale muR=muF (and alphas(q)), "
+        "if this flag is not provided take dynamical scale q2 = sum(mT)/2",
         type=float,
         nargs="?",
         const=91.46,
@@ -175,16 +191,40 @@ def madflow_main(args=None, quick_return=False):
     arger.add_argument(
         "-f", "--frozen_iter", help="Iterations with frozen grid", type=int, default=0
     )
-    arger.add_argument("--events_per_device", help="How many events to send to each device", type=int)
+    arger.add_argument(
+        "--events_per_device", help="How many events to send to each device", type=int
+    )
+    arger.add_argument(
+        "-o",
+        "--output",
+        help="Output folder for the madgraph output",
+        type=Path,
+    )
+    arger.add_argument(
+        "--dry_run", help="Generate the madgraph output but don't run anything", action="store_true"
+    )
     arger.add_argument("--events_per_iteration", help="How many events to run per iteration", type=int, default=int(1e6))
 
     args = arger.parse_args(args)
     if quick_return:
         return args, None, None
 
-    out_path = Path(tempfile.mkdtemp(prefix="mad_"))
-    _generate_madgraph_process(args.madgraph_process, out_path)
-    matrices, models = _import_matrices(out_path)
+    if args.output is None:
+        output_path = Path(tempfile.mkdtemp(prefix="mad_"))
+    else:
+        output_path = args.output
+        if output_path.exists():
+            logger.warning(
+                "The %s folder is not empty and its content will be removed", output_path
+            )
+            yn = input("Do you want to continue? [y/n] ")
+            if yn.lower() != "y" and yn.lower() != "yes":
+                sys.exit(0)
+
+    _generate_madgraph_process(args.madgraph_process, output_path)
+    if args.dry_run:
+        return None, None, None
+    matrices, models = _import_matrices(output_path)
 
     if args.no_pdf:
         initial_flavours = [None]
@@ -233,7 +273,7 @@ def madflow_main(args=None, quick_return=False):
         logger.info("Setting alpha_s = %.4f.", alpha_s)
         # Fix all models
         for model in models:
-            models.freeze_alpha_s(alpha_s)
+            model.freeze_alpha_s(alpha_s)
 
     # Create the phase space
     phasespace = PhaseSpaceGenerator(nparticles, sqrts, masses, com_output=False)
@@ -317,11 +357,13 @@ def madflow_main(args=None, quick_return=False):
         events_limit = args.events_per_device
     else:
         events_limit = guess_events_limit(nparticles)
-        if events_limit is None: # CPU case
+        if events_limit is None:  # CPU case
             events_limit = events_per_iteration
-    frozen_limit = events_limit*2
+    frozen_limit = events_limit * 2
     if nparticles >= 5 and args.frozen_iter == 0:
-        logger.warning("With this many particles (> 5) it is recommended to run with frozen iterations")
+        logger.warning(
+            "With this many particles (> 5) it is recommended to run with frozen iterations"
+        )
 
     vegas = VegasFlow(ndim, events_per_iteration, events_limit=events_limit)
     integrand = generate_integrand()
@@ -350,12 +392,14 @@ def madflow_main(args=None, quick_return=False):
 
     if args.histograms:
         proc_name = args.madgraph_process.replace(" ", "_").replace(">", "to").replace("~", "b")
-        with LheWriter(Path("."), proc_name, False, 0) as lhe_writer:
+        with LheWriter(output_path, proc_name, False, 0) as lhe_writer:
             integrand = generate_integrand(lhe_writer)
             vegas.compile(integrand)
             res, err = vegas.run_integration(final_iterations)
             lhe_writer.store_result((res, err))
-            proc_folder = Path(f"Events/{proc_name}")
+            proc_folder = output_path / f"Events/{proc_name}"
+            filename = proc_folder / 'cross_err.txt'
+            lhe_writer.dump_result(filename)
             logger.info("Written LHE file to %s", proc_folder)
     else:
         proc_folder = None
@@ -365,6 +409,7 @@ def madflow_main(args=None, quick_return=False):
 
 
 def main():
+    """main madflow function"""
     flow_start = time.time()
     _ = madflow_main()
     flow_final = time.time()

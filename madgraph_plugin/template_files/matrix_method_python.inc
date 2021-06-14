@@ -30,7 +30,8 @@ sys.path.insert(0, os.path.join(root_path, 'aloha', 'template_files'))
 import models.import_ufo as import_ufo
 import models.check_param_card as param_card_reader
 
-%(aloha_imports)s
+# import the ALOHA routines
+from aloha_%(process_string)s import *
 
 
 def get_model_param(model, param_card_path):

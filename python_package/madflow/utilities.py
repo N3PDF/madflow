@@ -22,6 +22,23 @@ import tensorflow as tf
 from vegasflow import vegas_wrapper
 
 
+def generate_initial_states(matrices):
+    """Reads a list of matrices and outputs a list of tuples of initial states
+    each element in the list will be a tuple ([flavours hadron 1, flavours hadron 2])
+    for each matrix
+    """
+    initial_flavours = []
+    for matrix in matrices:
+        initials = matrix.initial_states
+        flavs_1, flavs_2 = zip(*initials)
+        if matrix.mirror_initial_states:
+            m2, m1 = zip(*initials)
+            flavs_1 += m1
+            flavs_2 += m2
+        initial_flavours.append((flavs_1, flavs_2))
+    return initial_flavours
+
+
 def _generate_luminosity(pdf, q):
     """Generates a luminosity function"""
     q2 = float_me(q ** 2)

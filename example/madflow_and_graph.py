@@ -74,8 +74,9 @@ set run_card lhaid 303600
     logger.info("Madflow took: %.4fs", end_madflow - start_madflow)
 
     if args.histograms:
+        hist_script = Path(__file__).parent / "compare_mg5_hists.py"
         generate_histograms = [
-            "./compare_mg5_hists.py",
+            hist_script.as_posix(),
             "--madflow",
             events_folder.as_posix(),
             "--mg5",

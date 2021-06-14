@@ -269,6 +269,17 @@ class LheWriter:
         """ Dumps info asynchronously. """
         self.pool.apply_async(self.async_dump, args)
     
+    def dump_result(self, filename):
+        """
+        Dump cross section and statistical error at filename.
+
+        Parameters
+        ----------
+            filename: Path, file to save cross section and error.
+        """
+        xsec_err = np.array([self.__cross, self.__err])
+        np.savetxt(filename.as_posix(), xsec_err)
+    
     @property
     def cross(self):
         """ Cross section. """
