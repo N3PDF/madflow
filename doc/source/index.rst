@@ -85,17 +85,19 @@ while
           url          = {https://doi.org/10.5281/zenodo.3691926}
       }
 
-FAQ
-===
 
-Why the name ``MadFlow``?
----------------------------
 
-It is a combination of the names `Madgraph` and `Tensorflow`.
+  FAQ
+  ===
 
-- **Madgraph**: add here information about Madgraph and the proper references
+  Why the name ``MadFlow``?
+  ---------------------------
 
-- **TensorFlow**: the `tensorflow <https://www.tensorflow.org/>`_ is developed by Google and was made public in November of 2015. It is a perfect combination between performance and usability. With a focus on Deep Learning, TensorFlow provides an algebra library able to easily run operations in many different devices: CPUs, GPUs, TPUs with little input by the developer.
+  It is a combination of the names `Madgraph` and `Tensorflow`.
+
+  - **Madgraph**: add here information about Madgraph and the proper references
+
+  - **TensorFlow**: the `tensorflow <https://www.tensorflow.org/>`_ is developed by Google and was made public in November of 2015. It is a perfect combination between performance and usability. With a focus on Deep Learning, TensorFlow provides an algebra library able to easily run operations in many different devices: CPUs, GPUs, TPUs with little input by the developer.
 
 
 
