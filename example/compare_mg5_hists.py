@@ -53,10 +53,12 @@ def top_hists(lhe, nbins=50):
     weights = wgts / nb_kept
 
     pt_hist = np.histogram(pts, bins=pt_bins, weights=weights)
-    err_pt = np.histogram(pts, bins=pt_bins)[0] * lhe.err / nb_kept
-    
+    sqrtN = np.sqrt(np.histogram(pts, bins=pt_bins)[0])
+    err_pt = pt_hist[0] / sqrtN
+
     eta_hist = np.histogram(etas, bins=eta_bins, weights=weights)
-    err_eta = np.histogram(etas, bins=eta_bins)[0] * lhe.err / nb_kept
+    sqrtN = np.sqrt(np.histogram(etas, bins=eta_bins)[0])
+    err_eta = eta_hist[0] / sqrtN
 
     return (pt_hist, err_pt), (eta_hist, err_eta)
 
@@ -72,6 +74,7 @@ def plot_hist(hist_flow, hist_mg5, xlabel, fname):
         xlabel: str, label of x axis
         fname: Path, plot file name
     """
+    plt.rcParams.update({"savefig.format": "pdf"})
     fig = plt.figure()
     gs = fig.add_gridspec(nrows=5, ncols=1, wspace=0.05)
     ax = fig.add_subplot(gs[:-1])
@@ -87,7 +90,7 @@ def plot_hist(hist_flow, hist_mg5, xlabel, fname):
         h_flow + h_err_flow,
         step="post",
         color="blue",
-        alpha=0.4,
+        alpha=0.3,
     )
 
     (h_mg5, bins_mg5), h_err_mg5 = hist_mg5
@@ -100,7 +103,7 @@ def plot_hist(hist_flow, hist_mg5, xlabel, fname):
         h_mg5 + h_err_mg5,
         step="post",
         color="orange",
-        alpha=0.4,
+        alpha=0.3,
     )
 
     ax.tick_params(
@@ -125,17 +128,19 @@ def plot_hist(hist_flow, hist_mg5, xlabel, fname):
 
     ax = fig.add_subplot(gs[-1])
     h_ratio = h_flow / h_mg5
-    h_ratio_err = h_ratio * np.sqrt((h_err_flow / h_flow) ** 2 + (h_err_mg5 / h_mg5) ** 2)
+    h_ratio_err = h_ratio * np.sqrt(
+        (h_err_flow / h_flow) ** 2 + (h_err_mg5 / h_mg5) ** 2
+    )
 
     ax.set_ylabel("Ratio")
-    ax.step(bins_flow[:-1], h_ratio, where="post", lw=0.75)
+    ax.step(bins_flow[:-1], h_ratio, where="post", lw=0.75, color="blue")
     ax.fill_between(
         bins_flow[:-1],
         h_ratio - h_ratio_err,
         h_ratio + h_ratio_err,
         step="post",
         color="blue",
-        alpha=0.4,
+        alpha=0.3,
     )
     ax.plot(
         [bins_flow[0], bins_flow[-2]], [1, 1], lw=0.8, color="black", linestyle="dashed"
@@ -190,29 +195,25 @@ def main():
         raise FileNotFoundError(f"LHE file for madgraph not found at: {path_mg5}")
 
     lhe_flow = EventFileFlow(path_flow)
-    error_file = args.madflow / "cross_err.txt"
-    lhe_flow.err = np.loadtxt(error_file.as_posix())[1]
     print(f"Filling MadFlow histograms with {len(lhe_flow)} events")
     pt_flow, eta_flow = top_hists(lhe_flow, args.nbins)
 
     lhe_mg5 = EventFileFlow(path_mg5)
-    lhe_mg5.err = lhe_mg5.get_banner().get_cross(witherror=True)[1]
     print(f"Filling mg5_aMC histograms with {len(lhe_mg5)} events")
     pt_mg5, eta_mg5 = top_hists(lhe_mg5, args.nbins)
 
     lhe_folder = path_flow.parent
-
     plot_hist(
         pt_flow,
         pt_mg5,
         "top pT [MeV]",
-        lhe_folder.joinpath("top_pt.png"),
+        lhe_folder.joinpath("ggttbarpt.pdf"),
     )
     plot_hist(
         eta_flow,
         eta_mg5,
         "top \N{GREEK SMALL LETTER ETA}",
-        lhe_folder.joinpath("top_eta.png"),
+        lhe_folder.joinpath("ggttbareta.pdf"),
     )
 
 

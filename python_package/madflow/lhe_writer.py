@@ -69,16 +69,6 @@ class EventFlow(lhe_parser.Event):
     def as_bytes(self):
         """ Returns byte string event representation. """
         return self.__str__().encode("utf-8")
-    
-    @property
-    def err(self):
-        """ Cross section and statistical error. """
-        return self.__err
-
-    @err.setter
-    def err(self, value):
-        """ Cross section and statistical error setter. """
-        self.__err = value
 
 
 class ParticleFlow(lhe_parser.Particle):
