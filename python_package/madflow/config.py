@@ -35,7 +35,6 @@ os.environ["PDFFLOW_INT"] = _int_env
 
 # Now import all functions and variables directly from one of the other programs
 from pdfflow.configflow import (
-    LOG_DICT,
     run_eager,
     DTYPE,
     DTYPEINT,
@@ -48,6 +47,8 @@ from pdfflow.configflow import (
 )
 
 # Configure logging
+# Log levels
+LOG_DICT = {"0": logging.ERROR, "1": logging.WARNING, "2": logging.INFO, "3": logging.DEBUG}
 _log_level = LOG_DICT[_log_level_idx]
 logger = logging.getLogger(__name__.split(".")[0])
 logger.setLevel(_log_level)
