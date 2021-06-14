@@ -1,5 +1,8 @@
 # Madflow
 
+[![Tests](https://github.com/N3PDF/madflow/actions/workflows/pytest.yml/badge.svg)](https://github.com/N3PDF/madflow/actions/workflows/pytest.yml)
+[![Documentation Status](https://readthedocs.org/projects/madflow/badge/?version=latest)](https://madflow.readthedocs.io/en/latest/?badge=latest)
+
 References: https://arxiv.org/abs/2105.10529
 
 ## Install `madflow`
