@@ -8,11 +8,34 @@ from time import time as tm
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 from madflow.lhe_writer import EventFileFlow, FourMomentumFlow
 
 
-def top_hists(lhe, nbins=50, cross_err=None):
+def get_error(lhe, file=None):
+    """
+    Retrieves the cross section statistical error.
+
+    Parameters
+    ----------
+        lhe: EventFileFlow, LHE events file
+        file: Path, file containing the cross section. Used if lhe does not
+              contain the cross section info.
+
+    Returns
+    -------
+        error: float, statistical error on the integrated cross section.
+    """
+    try:
+        cross, err = lhe.get_banner().get_cross(witherror=True)
+    except:
+        cross, err = np.loadtxt(file)
+    print(f"{cross} +- {err}")
+    return err
+
+
+def top_hists(lhe, nbins=50, err=None):
     """
 
     Computes pT, Pseudorapidity, histograms from LHE event file.
@@ -21,13 +44,12 @@ def top_hists(lhe, nbins=50, cross_err=None):
     ----------
         lhe: EventFileFlow, LHE events file
         nbins: int, number of histogram bins
-        crosse_err: np.array, cross section and statistical error
+        cross_err: np.array, cross section and statistical error
 
     Returns
     -------
-        pt_hist: tuple, of np.array, (histogram, error)
-        eta_hist: tuple, of np.array, (histogram, error)
-
+        np.array, containing histogram
+        np.array, containing bin edges
     """
     pt_bins = np.linspace(0, 300, nbins + 1)
     eta_bins = np.linspace(-4, 4, nbins + 1)
@@ -51,63 +73,62 @@ def top_hists(lhe, nbins=50, cross_err=None):
             etas.append(etafinal)
             wgts.append(event.wgt)
             pts.append(pt)
-
     wgts = np.array(wgts)
-    norm = wgts / nb_kept # normalization factor
+    weights = wgts / nb_kept
 
-    try:
-        _, err = lhe.get_banner().get_cross(witherror=True)
-    except:
-        _, err = cross_err # TODO: just for the moment since there's no banner in madflow yet
+    pt_hist = np.histogram(pts, bins=pt_bins, weights=weights)
+    eta_hist = np.histogram(etas, bins=eta_bins, weights=weights)
 
-    pt_hist= np.histogram(pts, bins=pt_bins, weights=norm)
-    eta_hist = np.histogram(etas, bins=eta_bins, weights=norm)
-    
     err_pt = np.histogram(pts, bins=pt_bins)[0] * err / nb_kept
     err_eta = np.histogram(etas, bins=eta_bins)[0] * err / nb_kept
 
-    return (pt_hist, err_pt), \
-           (eta_hist, err_eta), 
+    return (pt_hist, err_pt), (eta_hist, err_eta)
 
 
-def plot_hist(hist_flow, hist_mg5, xlabel, fname):
+def plot_hist(hist_flow, hist_mg5, err_flow, err_mg5, xlabel, fname):
     """
     Plots madflow vs mg5 histograms.
 
     Parameters
     ----------
-        hist_flow: tuple, of np.arrays, madflow and mg5 histogram and error bars
+        hist_flow: tuple, madflow histogram weights, bin edges and error bars
+        hist_mg5: tuple, mg5 histogram weights, bin edges and error bars
+        err_flow: float, madflow cross section statistical error
+        err_mg5: float, madgraph cross section statistical error
         xlabel: str, label of x axis
         fname: Path, plot file name
     """
-
-    (h_flow, bins_flow), err_flow = hist_flow
-    (h_mg5, bins_mg5), err_mg5 = hist_mg5
-
     fig = plt.figure()
     gs = fig.add_gridspec(nrows=5, ncols=1, wspace=0.05)
-
-    # histogram
     ax = fig.add_subplot(gs[:-1])
     ax.title.set_text("g g > t t~")
 
+    (h_flow, bins_flow), h_err_flow = hist_flow
     ax.step(
         bins_flow[:-1], h_flow, where="post", label="madflow", lw=0.75, color="blue"
     )
     ax.fill_between(
         bins_flow[:-1],
-        h_flow - err_flow,
-        h_flow + err_flow,
+        h_flow - h_err_flow,
+        h_flow + h_err_flow,
         step="post",
         color="blue",
-        alpha=0.5,
+        alpha=0.4,
     )
+
+    (h_mg5, bins_mg5), h_err_mg5 = hist_mg5
     ax.step(
         bins_mg5[:-1], h_mg5, where="post", label="mg5_aMC", lw=0.75, color="orange"
     )
     ax.fill_between(
-        bins_mg5[:-1], h_mg5 - err_mg5, h_mg5 + err_mg5, step="post", color="orange", alpha=0.5
+        bins_mg5[:-1],
+        h_mg5 - h_err_mg5,
+        h_mg5 + h_err_mg5,
+        step="post",
+        color="orange",
+        alpha=0.4,
     )
+
     ax.tick_params(
         axis="x",
         which="both",
@@ -128,11 +149,19 @@ def plot_hist(hist_flow, hist_mg5, xlabel, fname):
     )
     ax.legend()
 
-    # madflow to mg5 ratio
     ax = fig.add_subplot(gs[-1])
+    h_ratio = h_flow / h_mg5
+    err_ratio = np.sqrt((err_flow / h_mg5) ** 2 + (h_ratio * err_mg5 / h_mg5) ** 2)
     ax.set_ylabel("Ratio")
-    ratio = h_flow / h_mg5
-    ax.step(bins_flow[:-1], ratio, where="post", lw=0.75)
+    ax.step(bins_flow[:-1], h_ratio, where="post", lw=0.75)
+    ax.fill_between(
+        bins_flow[:-1],
+        h_ratio - err_ratio,
+        h_ratio + err_ratio,
+        step="post",
+        color="blue",
+        alpha=0.4,
+    )
     ax.plot(
         [bins_flow[0], bins_flow[-2]], [1, 1], lw=0.8, color="black", linestyle="dashed"
     )
@@ -186,23 +215,31 @@ def main():
         raise FileNotFoundError(f"LHE file for madgraph not found at: {path_mg5}")
 
     lhe_flow = EventFileFlow(path_flow)
-    lhe_mg5 = EventFileFlow(path_mg5)
-
+    error_file = args.madflow / "cross_err.txt"
+    err_flow = get_error(lhe_flow, file=error_file.as_posix())
     print(f"Filling MadFlow histograms with {len(lhe_flow)} events")
-    cross_err_file = np.loadtxt(args.madflow / 'cross_err.txt')
-    pt_flow, eta_flow = top_hists(lhe_flow, args.nbins, cross_err=cross_err_file)
+    pt_flow, eta_flow = top_hists(lhe_flow, args.nbins, err_flow)
 
+    lhe_mg5 = EventFileFlow(path_mg5)
+    err_mg5 = get_error(lhe_mg5)
     print(f"Filling mg5_aMC histograms with {len(lhe_mg5)} events")
-    pt_mg5, eta_mg5 = top_hists(lhe_mg5, args.nbins)
+    pt_mg5, eta_mg5 = top_hists(lhe_mg5, args.nbins, err_mg5)
 
     lhe_folder = path_flow.parent
+
     plot_hist(
-        pt_flow, pt_mg5,
+        pt_flow,
+        pt_mg5,
+        err_flow,
+        err_mg5,
         "top pT [MeV]",
         lhe_folder.joinpath("top_pt.png"),
     )
     plot_hist(
-        eta_flow, eta_mg5,
+        eta_flow,
+        eta_mg5,
+        err_flow,
+        err_mg5,
         "top \N{GREEK SMALL LETTER ETA}",
         lhe_folder.joinpath("top_eta.png"),
     )
