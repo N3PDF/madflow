@@ -45,7 +45,11 @@ by newcomers to the field.
 
 With Madflow with aim to close this gap between theoretical and high performance computing
 by providing a framework that it is maintainable, extensible and modern
-while 
+while at the same time not sacrificing the complexity of fixed-order computations.
+
+Even while there might be situations for which the huge complexity of many-particle calculations
+cannot efficiently automatically mapped to hardware accelerator, we expect ``madflow`` will
+help quickstart the efforts for a new age of GPU-capable Monte Carlo simulators.
 
 ..
   How to cite ``madflow``?
@@ -95,7 +99,7 @@ while
 
   It is a combination of the names `Madgraph` and `Tensorflow`.
 
-  - **Madgraph**: add here information about Madgraph and the proper references
+  - **Madgraph**: https://cp3.irmp.ucl.ac.be/projects/madgraph/
 
   - **TensorFlow**: the `tensorflow <https://www.tensorflow.org/>`_ is developed by Google and was made public in November of 2015. It is a perfect combination between performance and usability. With a focus on Deep Learning, TensorFlow provides an algebra library able to easily run operations in many different devices: CPUs, GPUs, TPUs with little input by the developer.
 
