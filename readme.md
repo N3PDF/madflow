@@ -1,5 +1,12 @@
 # Madflow
 
+[![Tests](https://github.com/N3PDF/madflow/actions/workflows/pytest.yml/badge.svg)](https://github.com/N3PDF/madflow/actions/workflows/pytest.yml)
+[![Documentation Status](https://readthedocs.org/projects/madflow/badge/?version=latest)](https://madflow.readthedocs.io/en/latest/?badge=latest)
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4954375.svg)](https://doi.org/10.5281/zenodo.4954375)
+
+
+
 References: https://arxiv.org/abs/2105.10529
 
 ## Install `madflow`
@@ -11,7 +18,7 @@ To be done
 #### From the repository
 
 ```bash
-  git clone git@github.com:N3PDF/madflow.git
+  git clone https://github.com/N3PDF/madflow.git
   cd madflow
   pip install .
 ```
@@ -39,7 +46,7 @@ While `LHAPDF` is not strictly necessary to use the `madflow` library or run any
 having access to the `lhapdf` python wrapper can be convenient in order to manage the different PDFsets.
 Please install the latest version from the LHAPDF [site](https://lhapdf.hepforge.org/).
 
-Otherwise, if your installed version of `pdfflow` is equal or greater than `1.3`,
+Otherwise, if your installed version of `pdfflow` is equal or greater than `1.2.1`,
 you can manually install the [PDF sets](https://lhapdf.hepforge.org/pdfsets.html) in a suitable directory
 and ensure that either the `PDFFLOW_DATA_PATH` or `LHAPDF_DATA_PATH` environment variables are pointing to it.
 
@@ -47,12 +54,14 @@ You can check your installed version of `pdfflow` with: `python -c 'import pdffl
 
 ## Install plugin in MG5_aMC
 
-In order to install the `madflow` plugin in MG5_aMC, it is necessary to link the `madgraph_plugin` folder inside the `PLUGIN` directory of MG5_aMC.
-For instance, if the environment variable `$MADGRAPH_PATH` is pointing to the MG5_aMC root:
+In order to install the `madflow` plugin in MG5_aMC@NLO, it is necessary to link the `madgraph_plugin` folder inside the `PLUGIN` directory of MG5_aMC@NLO.
+For instance, if the environment variable `$MADGRAPH_PATH` is pointing to the MG5_aMC root and you are currently in the repository root.
 
 ```bash
     ln -s ${PWD}/madgraph_plugin ${MADGRAPH_PATH}/PLUGIN/pyout
 ```
+
+The link can be performed automagically with the `madflow --autolink` option.
 
 ## Use `madflow`
 

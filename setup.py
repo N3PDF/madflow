@@ -8,13 +8,9 @@ import re
 import os
 from setuptools import setup, find_packages
 
-requirements = ["vegasflow", "pdfflow"]
-if version_info.major >= 3 and version_info.minor >= 9:
-    # For python above 3.9 the only existing TF is 2.5 which works well (even pre releases)
-    tf_pack = "tensorflow"
-else:
-    tf_pack = "tensorflow>2.1"
-requirements.append(tf_pack)
+requirements = ["vegasflow", "pdfflow", "requests"]
+# soft-requirements due to vegasflow and pdfflow are:
+#   tensorflow, joblib, numpy
 package_name = "madflow"
 package_root = "python_package"
 repository_root = Path(__file__).parent
@@ -42,7 +38,7 @@ setup(
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",
-    license="GNU GPLv3",
+    license="Apache 2",
     author="S. Carrazza, J. Cruz-Martinez, M. Rossi, M. Zaro",
     author_email="https://github.com/N3PDF/madflow/issues/new",
     url="https://github.com/N3PDF/madflow/",
@@ -58,6 +54,14 @@ setup(
     ],
     python_requires=">=3.6",
     install_requires=requirements,
+    extras_require={
+        'docs' : [
+            'sphinx_rtd_theme',
+            'recommonmark',
+            'sphinxcontrib-bibtex',
+            ],
+        'amd' : ['tensorflow-rocm']
+        },
     entry_points={
         "console_scripts": [
             "madflow = madflow.scripts.madflow_exec:main",

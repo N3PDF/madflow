@@ -20,6 +20,9 @@ import re
 import sys
 import time
 import shutil
+import tarfile
+import requests
+import datetime
 import itertools
 import importlib
 import argparse
@@ -40,7 +43,6 @@ from madflow.config import (
     guess_events_limit,
 )
 from madflow.phasespace import PhaseSpaceGenerator
-from madflow.lhe_writer import LheWriter
 
 from vegasflow import VegasFlow
 from pdfflow import mkPDF
@@ -151,8 +153,73 @@ def _generate_initial_states(matrices):
     return initial_flavours
 
 
+def _autolink(madpath):
+    """Links the madflow madgraph plugin into the MG5_aMC directory
+    If needed it downloads the plugin from the right github directory
+    """
+    try:
+        madgraph_path = get_madgraph_path(madpath)
+    except ValueError:
+        print(
+            """> The madgraph path could not be autodiscovered
+> Please, set the MADGRAPH_PATH to the madgraph root directory
+> Or add the exact path to --autolink (e.g. madflow --autolink /home/mg5)
+and don't forget to set `export MADGRAPH_PATH=/path/to/madgraph` in your favourite .rc file!"""
+        )
+        sys.exit(0)
+
+    # Check whether we already have a plugin there
+    plugin_path = madgraph_path / "PLUGIN/pyout"
+    if plugin_path.exists():
+        print("The plugin folder already exists")
+        yn = input("Do you want to remove it and link the new one? ")
+        if yn.lower() != "y" and yn.lower() != "yes":
+            sys.exit(0)
+        # Don't fully remove it, just move it around
+        new_path = plugin_path
+        nn = 0
+        while new_path.exists():
+            today_name = datetime.datetime.now().strftime(f".backup-%d-%m-%y-n{nn}")
+            new_path = new_path.with_suffix(today_name)
+            nn += 1
+        plugin_path.rename(new_path)
+
+    # If this is a develop setup, link the repository version
+    test_path = Path(__file__).parent / "../../../madgraph_plugin"
+    if test_path.exists():
+        plugin_path.symlink_to(test_path)
+    else:
+        # Download plugin
+        latest_plugin = (
+            "https://github.com/N3PDF/madflow/releases/latest/download/madgraph_plugin.tar.gz"
+        )
+        target_path = Path("/tmp/madgraph_plugin.tar.gz")
+        print(f"Downloading plugin from github repository and untaring to {plugin_path}")
+        response = requests.get(latest_plugin, stream=True)
+        if response.status_code == 200:
+            target_path.write_bytes(response.raw.read())
+        with tarfile.open(target_path) as tar:
+            tar.extractall(plugin_path.parent)
+
+    print("Linking finished, exiting")
+
+
+class _MadFlowAutolink(argparse.Action):
+    """Wrapper action around _autolink"""
+
+    def __init__(self, **kw):
+        super().__init__(nargs="?", **kw)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        _autolink(values)
+        parser.exit(0)
+
+
 def madflow_main(args=None, quick_return=False):
     arger = argparse.ArgumentParser(__doc__)
+
+    arger.add_argument("--autolink", help="Link madflow with madgraph", action=_MadFlowAutolink)
+
     arger.add_argument("-v", "--verbose", help="Print extra info", action="store_true")
     arger.add_argument("-p", "--pdf", help="PDF set", type=str, default=DEFAULT_PDF)
     arger.add_argument(
@@ -203,11 +270,20 @@ def madflow_main(args=None, quick_return=False):
     arger.add_argument(
         "--dry_run", help="Generate the madgraph output but don't run anything", action="store_true"
     )
-    arger.add_argument("--events_per_iteration", help="How many events to run per iteration", type=int, default=int(1e6))
+    arger.add_argument(
+        "--events_per_iteration",
+        help="How many events to run per iteration",
+        type=int,
+        default=int(1e6),
+    )
 
     args = arger.parse_args(args)
+
     if quick_return:
         return args, None, None
+
+    # LheWriter needs to be imported after --autolink
+    from madflow.lhe_writer import LheWriter
 
     if args.output is None:
         output_path = Path(tempfile.mkdtemp(prefix="mad_"))
@@ -399,7 +475,7 @@ def madflow_main(args=None, quick_return=False):
             res, err = vegas.run_integration(final_iterations)
             lhe_writer.store_result((res, err))
             proc_folder = output_path / f"Events/{proc_name}"
-            filename = proc_folder / 'cross_err.txt'
+            filename = proc_folder / "cross_err.txt"
             lhe_writer.dump_result(filename)
             logger.info("Written LHE file to %s", proc_folder)
     else:

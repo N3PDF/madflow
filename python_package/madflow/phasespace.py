@@ -146,8 +146,8 @@ def rambo(xrand, n_particles, sqrts, masses=None, check_physical=False):
     """
     Implementation of the RAMBO phase space generator in TensorFlow
     RAMBO: RA(NDOM)  M(OMENTA)  B(EAUTIFULLY)  O(RGANIZED)
-        a democratic multi-particle phase space generator
-        based on Comput. Phys. Commun. 40 (1986) 359-373
+    #   a democratic multi-particle phase space generator
+    #   based on Comput. Phys. Commun. 40 (1986) 359-373
     """
     if check_physical:
         if tf.executing_eagerly():
@@ -318,10 +318,10 @@ def _boost_to_lab(p_com, x1, x2):
     # Generate the boost matrix
     zeros = tf.zeros_like(x1)
     ones = tf.ones_like(x1)
-    bE = tf.stack([cth, zeros, zeros, -1.0*sth], axis=1)
+    bE = tf.stack([cth, zeros, zeros, -1.0 * sth], axis=1)
     bX = tf.stack([zeros, ones, zeros, zeros], axis=1)
     bY = tf.stack([zeros, zeros, ones, zeros], axis=1)
-    bZ = tf.stack([-1.0*sth, zeros, zeros, cth], axis=1)
+    bZ = tf.stack([-1.0 * sth, zeros, zeros, cth], axis=1)
 
     bmat = tf.stack([bE, bX, bY, bZ], axis=1)
     # Apply boost
