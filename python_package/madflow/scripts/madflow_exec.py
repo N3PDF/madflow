@@ -346,7 +346,8 @@ def madflow_main(args=None, quick_return=False):
                 tf.py_function(func=lhewriter.lhe_parser, inp=[all_ps, ret * weight], Tout=DTYPE)
 
             if args.pt_cut is not None:
-                ret = tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
+                out_shape = tf.shape(xrand)[0:1]
+                ret = tf.scatter_nd(idx, ret, shape=out_shape)
 
             return ret
 

@@ -5,7 +5,6 @@ from madflow.config import (
     DTYPE,
     DTYPEINT,
     run_eager,
-    DTYPECOMPLEX,
     complex_tf,
     complex_me
 )
@@ -44,14 +43,14 @@ def get_model_param(model, param_card_path):
 
 
 smatrix_signature = [
-        tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
+        tf.TensorSpec(shape=[None,%(nexternal)d,4], dtype=DTYPE),
         %(paramsignature_const)s
         %(paramsignature_func)s
         ]
 
 
 matrix_signature = [
-        tf.TensorSpec(shape=[None,None,4], dtype=DTYPE),
+        tf.TensorSpec(shape=[None,%(nexternal)d,4], dtype=DTYPE),
         tf.TensorSpec(shape=[%(nexternal)d], dtype=DTYPE),
         %(paramsignature_const)s
         %(paramsignature_func)s
@@ -98,12 +97,11 @@ class Matrix_%(process_string)s(object):
         # BEGIN CODE
         # ----------
         nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
-        ans = tf.zeros(nevts, dtype=DTYPECOMPLEX)
+        ans = tf.zeros(nevts, dtype=DTYPE)
         for hel in self.helicities:
-            t = self.matrix(all_ps,hel,%(params)s)
-            ans = ans + t
+            ans += self.matrix(all_ps,hel,%(params)s)
 
-        return tf.math.real(ans)/self.denominator
+        return ans/self.denominator
 
     @tf.function(input_signature=matrix_signature)
     def matrix(self,all_ps,hel,%(params)s):
@@ -119,11 +117,9 @@ class Matrix_%(process_string)s(object):
         # Process parameters
         #  
         ngraphs = %(ngraphs)d
-        nexternal = self.nexternal
         nwavefuncs = %(nwavefuncs)d
         ncolor = %(ncolor)d
         ZERO = float_me(0.)
-        nevts = tf.shape(all_ps, out_type=DTYPEINT)[0]
         #  
         # Color matrix
         #  
@@ -134,23 +130,12 @@ class Matrix_%(process_string)s(object):
         # ----------
         # Begin code
         # ----------
-        amp = [None] * ngraphs
-        w = [None] * nwavefuncs
         %(helas_calls)s
 
         %(jamp_lines)s
 
-        ##%(amp2_lines)s
-        matrix = tf.zeros(nevts, dtype=DTYPECOMPLEX)
-        for i in range(ncolor):
-            ztemp = tf.zeros(nevts, dtype=DTYPECOMPLEX)
-            for j in range(ncolor):
-                ztemp = ztemp + cf[i][j]*jamp[j]
-            matrix = matrix + ztemp * tf.math.conj(jamp[i])/denom[i]   
-        #self.jamp.append(jamp)
-
-        return matrix
-
+        ret = tf.einsum("ie, ij, je -> e", jamp, cf, tf.math.conj(jamp)/tf.reshape(denom, (ncolor, 1)))
+        return tf.math.real(ret)
 
 
 if __name__ == "__main__":
