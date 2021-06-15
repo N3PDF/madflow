@@ -86,8 +86,9 @@ def get_madgraph_path(madpath=None):
     madgraph_path = Path(madpath)
     if not madgraph_path.exists():
         raise ValueError(
-            f"{madgraph_path} does not exist. "
-            "Needs a valid path for Madgraph, can be given as env. variable MADGRAPH_PATH"
+            f"""{madgraph_path} does not exist.
+Are you sure Madgraph is installed? https://madflow.readthedocs.io/en/latest/installation.html#mg5-amc-nlo-plugin
+MadFlow needs a valid path for Madgraph, can be given as env. variable MADGRAPH_PATH"""
         )
     # If the path exists, check whether the madgraph executable is there
     _ = get_madgraph_exe(madgraph_path)
@@ -100,7 +101,10 @@ def get_madgraph_exe(madpath=None):
         madpath = get_madgraph_path(madpath)
     mg5_exe = madpath / "bin/mg5_aMC"
     if not mg5_exe.exists():
-        raise ValueError(f"Madgraph executable could not be found at {mg5_exe}")
+        raise ValueError(
+            f"""Madgraph executable could not be found at {mg5_exe},
+are you sure Madgraph is installed? https://madflow.readthedocs.io/en/latest/installation.html#mg5-amc-nlo-plugin"""
+        )
     return mg5_exe
 
 
