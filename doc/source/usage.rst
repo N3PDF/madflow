@@ -69,3 +69,9 @@ you can use the ``--dry_run`` option.
 The previous command will output to the ``pp2z`` all the necessary files to perform the integration
 alongside a template for cross section calculations: ``leading_order.py``.
 This template serves as a guide to start building your own fixed order calculation.
+
+
+Scope
+^^^^^
+
+With the leading order template we aim to kickstart more complex fixed order

@@ -91,9 +91,13 @@ for p1, p2 in initial_flavours:
 #     (number of particles, center of mass energy, mass of the final state particles,
 #                                 flag to return the result in the lab frame or com frame)
 phasespace = PhaseSpaceGenerator(nparticles, SQRTS, masses, com_output=False)
-for i in range(2, nparticles):
-    # Apply a PT cut of 30 GeV to all outgoing particles
-    phasespace.register_cut("pt", particle=i, min_val=30.0)
+if nparticles > 3:
+  cuts_active = True
+  for i in range(2, nparticles):
+      # Apply a PT cut of 30 GeV to all outgoing particles
+      phasespace.register_cut("pt", particle=i, min_val=30.0)
+else:
+  cuts_active = False
 
 
 # Create the functions that will be actually part of the integrand
@@ -160,7 +164,11 @@ def cross_section_generation(lhewriter=None):
             tf.py_function(func=lhewriter.lhe_parser, inp=[all_ps, ret * weight], Tout=DTYPE)
 
         # Use scatter to return a vector with 0s wherever the result has been cut away
-        return tf.scatter_nd(idx, ret, shape=xrand.shape[0:1])
+        if cuts_active:
+            out_shape = tf.shape(xrand)[0:1]
+            ret = tf.scatter_nd(idx, ret, shape=out_shape)
+
+        return ret
 
     return cross_section
 
@@ -176,12 +184,13 @@ vegas.compile(xs)
 vegas.run_integration(ITERATIONS)
 vegas.freeze_grid()
 
-# Now output an event file
-proc_name = Path("test")
-with LheWriter(Path("."), proc_name, False, 0) as lhe_writer:
-    xs_events = cross_section_generation(lhe_writer)
-    vegas.compile(xs_events)
-    res, err = vegas.run_integration(ITERATIONS)
-    lhe_writer.store_result((res, err))
-    proc_folder = Path(f"Events/{proc_name}")
-    print(f"Written LHE file to {proc_folder}")
+# Now output an event file if this is a 2->2
+if nparticles == 4:
+    proc_name = Path("test")
+    with LheWriter(Path("."), proc_name, False, 0) as lhe_writer:
+        xs_events = cross_section_generation(lhe_writer)
+        vegas.compile(xs_events)
+        res, err = vegas.run_integration(ITERATIONS)
+        lhe_writer.store_result((res, err))
+        proc_folder = Path(f"Events/{proc_name}")
+        print(f"Written LHE file to {proc_folder}")

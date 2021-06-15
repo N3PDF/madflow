@@ -172,7 +172,7 @@ and don't forget to set `export MADGRAPH_PATH=/path/to/madgraph` in your favouri
     plugin_path = madgraph_path / "PLUGIN/pyout"
     if plugin_path.exists():
         print("The plugin folder already exists")
-        yn = input("Do you want to remove it and link the new one? ")
+        yn = input("Do you want to remove it and link the new one? [y/n] ")
         if yn.lower() != "y" and yn.lower() != "yes":
             sys.exit(0)
         # Don't fully remove it, just move it around
@@ -187,6 +187,7 @@ and don't forget to set `export MADGRAPH_PATH=/path/to/madgraph` in your favouri
     # If this is a develop setup, link the repository version
     test_path = Path(__file__).parent / "../../../madgraph_plugin"
     if test_path.exists():
+        print("Linking in development mode")
         plugin_path.symlink_to(test_path)
     else:
         # Download plugin

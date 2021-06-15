@@ -233,6 +233,27 @@ def _get_x1x2(xarr, shat_min, s_in):
     return shat, wgt, x1, x2
 
 
+def _get_x1x2_onshell(xr, mass, s_in):
+    """Get x1 x2 for a 2 -> 1 scattering
+    such that
+        x1*x2*s_in == mass
+    """
+    # sqrt(s_in) is always > mass, therefore
+    # tau_max is always < 0
+    mass_ratio = mass / tf.sqrt(s_in)
+    tau_max = tf.math.log(mass_ratio)
+    wgt = -2.0 * tau_max / s_in
+    # The numbers above are shared between all ps points
+    tau = tau_max - 2.0 * xr * tau_max
+    x1 = mass_ratio * tf.exp(tau)
+    x2 = mass_ratio * tf.exp(-tau)
+    # Return value need to be one per point
+    oo = tf.ones_like(xr)
+    shat = oo * mass ** 2
+    wgts = oo * wgt
+    return shat, wgts, x1, x2
+
+
 def ramboflow(xrand, nparticles, com_sqrts, masses=None):
     """Takes as input an array of nevent x ndim random points and outputs
     an array of momenta (nevents x nparticles x 4) in the C.O.M.
@@ -268,16 +289,23 @@ def ramboflow(xrand, nparticles, com_sqrts, masses=None):
     else:
         shat_min = float_me(np.sum(masses) ** 2)
 
-    # Sample the initial state
-    shat, wgt, x1, x2 = _get_x1x2(xrand[:, :2], shat_min, com_sqrts ** 2)
-    roots = tf.sqrt(shat)
+    # If we have only one outgoing particle (equivalen to having single onshell boson)
+    if nparticles == 3:
+        shat, wgt, x1, x2 = _get_x1x2_onshell(xrand[:, 0], masses[0], com_sqrts**2)
+        roots = tf.sqrt(shat)
+        zeros = tf.zeros_like(x1)
+        p_out = tf.expand_dims(tf.stack([roots] + [zeros] * 3, axis=-1), 1)
+    else:
+        # Sample the initial state
+        shat, wgt, x1, x2 = _get_x1x2(xrand[:, :2], shat_min, com_sqrts ** 2)
+        roots = tf.sqrt(shat)
+        zeros = tf.zeros_like(x1)
 
-    # Sample the outgoing states
-    p_out, wtps = rambo(xrand[:, 2:], int(nparticles - 2), roots, masses=masses)
-    wgt *= wtps
+        # Sample the outgoing states
+        p_out, wtps = rambo(xrand[:, 2:], int(nparticles - 2), roots, masses=masses)
+        wgt *= wtps
 
     # Now stack the input states on top
-    zeros = tf.zeros_like(x1)
     ein = roots / 2.0
     pa = tf.expand_dims(tf.stack([ein, zeros, zeros, ein], axis=1), 1)
     pb = tf.expand_dims(tf.stack([ein, zeros, zeros, -ein], axis=1), 1)
