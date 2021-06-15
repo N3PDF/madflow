@@ -74,4 +74,43 @@ This template serves as a guide to start building your own fixed order calculati
 Scope
 ^^^^^
 
-With the leading order template we aim to kickstart more complex fixed order
+With the leading order template we aim to kick-start more complex fixed order calculations.
+The template is commented in a pedagogical step-by-step way and should suffice to run the simpler calculations
+while making clear where changes are needed for more complex situations.
+
+The main areas to address are:
+
+- Phase-space and cuts:
+
+In the template the phase space is a vectorized form of ``rambo`` which we have dubbed
+``ramboflow``.
+As the seasoned phenomenologist knows, the right choice of phase-space generator can mean
+the difference between a convergent integration and crazy and unreasonable results.
+Unfortunately building a fully general phase-space sampling algorithm is (as the very same
+seasoned phenomenologist surely knows) a very much non-trivial subject.
+For the time being ``ramboflow`` is the only phase-space generator provider by ``madflow``
+and thus more complicated calculations will need to build their own.
+
+The cuts on the phase-space, while trivial on their own, must be applied carefully
+when building software targeting hardware accelerators.
+The number-1 enemy of GPUs is branching, and cuts to the phase-space will mean
+exactly that.
+Therefore cuts (and equivalently any kind of multi-channeling algorithm)
+should be applied in such a way that the number of events that are computed at each
+single go is maximized.
+
+
+- Matrix element evaluation:
+
+While one of the advantages of ``madflow`` is to use the capabilities of MG5_aMC in order
+to automatically generate matrix elements which can be evaluated in hardware accelerators
+no hardware-specific optimization has been applied to the evaluation strategy
+which remain that of `ALOHA <https://inspirehep.net/literature/922833>`_,
+which is based in a raw evaluation of Feynman diagrams.
+
+While this approach ensures universality, it also means the number of diagrams
+can grow in a factorial manner, soon becoming intractable.
+Processes with many particles in the final state will surely benefit of other
+strategies.
+In the future we aim to provide interfaces to other Matrix-elements provided
+(also vectorized when possible) in order to address these short-comings.
