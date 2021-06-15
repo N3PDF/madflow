@@ -40,7 +40,7 @@ setup(
     long_description_content_type="text/markdown",
     license="Apache 2",
     author="S. Carrazza, J. Cruz-Martinez, M. Rossi, M. Zaro",
-    author_email="https://github.com/N3PDF/madflow/issues/new",
+    author_email="n3pdf@lairen.eu",
     url="https://github.com/N3PDF/madflow/",
     package_dir={"": package_root},
     packages=find_packages(package_root),
