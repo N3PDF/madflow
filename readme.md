@@ -5,9 +5,25 @@
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4954375.svg)](https://doi.org/10.5281/zenodo.4954375)
 
+If you use this software please cite this [paper](https://inspirehep.net/literature/1869616)
 
+```bibtex
+@article{madflow,
+    author = "Carrazza, Stefano and Cruz-Martinez, Juan and Rossi, Marco and Zaro, Marco",
+    title = "{MadFlow: automating Monte Carlo simulation on GPU for particle physics processes}",
+    eprint = "2106.10279",
+    archivePrefix = "arXiv",
+    primaryClass = "physics.comp-ph",
+    reportNumber = "TIF-UNIMI-2021-9",
+    doi = "10.1140/epjc/s10052-021-09443-8",
+    journal = "Eur. Phys. J. C",
+    volume = "81",
+    number = "7",
+    pages = "656",
+    year = "2021"
+}
 
-References: https://arxiv.org/abs/2105.10529
+```
 
 ## Install `madflow`
 
