@@ -29,7 +29,9 @@ If you use this software please cite this [paper](https://inspirehep.net/literat
 
 #### From PyPI
 
-To be done
+```
+    pip install madflow
+```
 
 #### From the repository
 
