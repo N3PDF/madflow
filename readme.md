@@ -2,6 +2,8 @@
 
 [![Tests](https://github.com/N3PDF/madflow/actions/workflows/pytest.yml/badge.svg)](https://github.com/N3PDF/madflow/actions/workflows/pytest.yml)
 [![Documentation Status](https://readthedocs.org/projects/madflow/badge/?version=latest)](https://madflow.readthedocs.io/en/latest/?badge=latest)
+[![epjc](https://img.shields.io/badge/%20%20%20%20Eur.Phys.J.C-%2081%20(2021)%207%2C%20656-blue)](https://inspirehep.net/literature/1869616)
+
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4954375.svg)](https://doi.org/10.5281/zenodo.4954375)
 
