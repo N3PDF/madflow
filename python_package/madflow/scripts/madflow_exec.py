@@ -233,9 +233,6 @@ def madflow_main(args=None, quick_return=False):
         default="g g > t t~",
     )
     arger.add_argument(
-        "-m", "--massive_particles", help="Number of massive particles", type=int, default=2
-    )
-    arger.add_argument(
         "-q",
         "--fixed_scale",
         help="Fix value of scale muR=muF (and alphas(q)), "
@@ -325,16 +322,11 @@ def madflow_main(args=None, quick_return=False):
     # The number of particles is the same for all matrices
     nparticles = int(matrices[0].nexternal)
     ndim = (nparticles - 2) * 4 + 2
-    massive_particles = args.massive_particles
-    non_massive = nparticles - massive_particles - 2
-    # For this script the massive particles go always first
-    # as the output should always be to particles and not wrappers
-    # _if_ the number of masses is below the number of massive particle
-    param_masses = models[0].get_masses()
-    if len(param_masses) < massive_particles:
-        param_masses *= massive_particles
-    param_masses = [i.numpy() for i in param_masses]
-    masses = param_masses + [0.0] * non_massive
+    # Try to autodiscover massive states
+    final_state = args.madgraph_process.split(">")[-1].strip()
+    final_state_particles = final_state.split(" ")
+    # Clean the antiparticles
+    masses = [models[0].get_mass(p) for p in final_state_particles]
     logger.debug("Masses: %s", masses)
     ###################################################
 

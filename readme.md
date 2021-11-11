@@ -94,7 +94,7 @@ Using this script is possible to run any process at Leading Order, integrated wi
   madflow --help
 ```
 ```bash
-    [-h] [-v] [-p PDF] [--no_pdf] [-c] [--madgraph_process MADGRAPH_PROCESS] [-m MASSIVE_PARTICLES] [-g] [--pt_cut PT_CUT] [--histograms]
+    [-h] [-v] [-p PDF] [--no_pdf] [-c] [--madgraph_process MADGRAPH_PROCESS] [-g] [--pt_cut PT_CUT] [--histograms]
 
     optional arguments:
       -h, --help            show this help message and exit
@@ -104,8 +104,6 @@ Using this script is possible to run any process at Leading Order, integrated wi
       -c, --enable_cuts     Enable the cuts
       --madgraph_process MADGRAPH_PROCESS
                             Set the madgraph process to be run
-      -m MASSIVE_PARTICLES, --massive_particles MASSIVE_PARTICLES
-                            Number of massive particles
       -g, --variable_g      Use variable g_s
       --pt_cut PT_CUT       Minimum pt for the outgoint particles
       --histograms          Generate LHE files/histograms

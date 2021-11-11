@@ -71,13 +71,27 @@ class Model:
             return results
         return list(chain.from_iterable([self._constants, results]))
 
+    def get_mass(self, particle, safe=False):
+        """Get the mass of the given particle
+        If the particle is not found defaults to mass=0 unless safe=True"""
+        if particle.endswith("~"):
+            particle = particle[:-1]
+        massive_name = f"mdl_M{particle.upper()}"
+        if hasattr(self._tuple_constants, massive_name):
+            return getattr(self._tuple_constants, massive_name)
+        if safe:
+            raise ValueError(f"Particle {particle} is not massive in this model")
+        return 0.0
+
     def get_masses(self):
         """Get the masses that entered the model as constants"""
         masses = []
+        massive_particles = []
         for key, val in self._tuple_constants._asdict().items():
             if key.startswith("mdl_M"):
                 masses.append(val)
-        return masses
+                massive_particles.append(key[-1])
+        return masses, massive_particles
 
     def parse_parameter(self, parameter_name):
         """Parse a (constant) parameter given its string name"""
