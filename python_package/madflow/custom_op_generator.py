@@ -2199,7 +2199,7 @@ def translate(destination):
     
     madflowLocation = madflow.__file__
     madflowLocation = re.sub('__init__.*', '', madflowLocation)
-    print(madflowLocation)
+    #print(madflowLocation)
     
     #subprocess.check_output(["/bin/sh", "-c", "rm -f matrix_1_*"])
     #subprocess.check_output(["/bin/sh", "-c", "rm -f gpu/*"])

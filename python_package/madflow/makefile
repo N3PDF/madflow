@@ -76,13 +76,8 @@ $(TARGET_LIB): $(OBJECT_SRCS)
 #$(TARGET_LIB_CUDA): $(OBJECT_SRCS_CUDA)
 #	$(CXX) -o $@ $(CFLAGS_CUDA) $^ $(LDFLAGS_CUDA)
 
-ifeq ($(UNAME_S), "Darwin")
-%_cu.so: gpu/%.cudao
-	$(CXX) -o $@ $(CFLAGS) $^ $(LDFLAGS)
-else
 %_cu.so: gpu/%.cudao gpu/%.cu.cudao
 	$(CXX) -o $@ $(CFLAGS_CUDA) $^ $(LDFLAGS_CUDA)
-endif
 
 #matrix_gg_gttx_cu.so: gpu/matrix_gg_gttx.cudao gpu/matrix_gg_gttx.cu.cudao
 #	$(CXX) -o matrix_gg_gttx_cu.so $(CFLAGS_CUDA) gpu/matrix_gg_gttx.cudao gpu/matrix_gg_gttx.cu.cudao $(LDFLAGS_CUDA)

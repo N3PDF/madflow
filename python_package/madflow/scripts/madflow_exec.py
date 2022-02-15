@@ -116,12 +116,10 @@ def _import_matrices(output_folder):
     """Given a folder with the pyout matrix_xxx.py files,
     import them all and instantiate the matrix element and model files"""
     sys.path.insert(0, output_folder.as_posix())
-    #this_folder = Path("./")
     re_name = re.compile(r"\w{3,}")
     matrices = []
     models = []
     for i, matrix_file in enumerate(output_folder.glob("matrix_*.py")):
-        #for i, matrix_file in enumerate(this_folder.glob("matrix_*.py")):
         matrix_name = re_name.findall(matrix_file.name)[0]
         matrix_module = _import_module_from_path(matrix_file, matrix_name)
         # Import specifically the matrix element
