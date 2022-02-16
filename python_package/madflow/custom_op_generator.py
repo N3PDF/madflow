@@ -4,6 +4,7 @@ import subprocess
 import re
 
 import madflow.wavefunctions_flow
+from madflow.makefile_template import write_makefile
 
 INT64Type = 'int64_t'
 
@@ -2204,7 +2205,7 @@ def translate(destination):
     #subprocess.check_output(["/bin/sh", "-c", "rm -f matrix_1_*"])
     #subprocess.check_output(["/bin/sh", "-c", "rm -f gpu/*"])
     subprocess.check_output(["/bin/sh", "-c", "mkdir " + destination + "gpu/"])
-    subprocess.check_output(["/bin/sh", "-c", "cp " + madflowLocation + "makefile " + destination + "."])
+    write_makefile(destination)
     
     function_list_ = []
     #custom_op_list = []
