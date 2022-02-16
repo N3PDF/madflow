@@ -1,7 +1,8 @@
 makefileName = "makefile"
 cppCompiler = "g++"
 cppVersion = "c++14"
-cudaPath = "/usr/local/cuda-11.5"
+cudaPath = ""
+#cudaPath = "/usr/local/cuda-11.5"
 
 
 def write_compilers(text):
@@ -24,7 +25,7 @@ def write_multithreading(text):
     text += "NPROCS = $(shell grep -c 'processor' /proc/cpuinfo)\n"
     text += "endif\n"
     # if the number of processors isn't found, default to 1
-    text += 'ifeq ($(NPROCS), "")\n'
+    text += 'ifeq ($(NPROCS),)\n'
     text += "NPROCS = 1\n"
     text += "endif\n"
     text += "MAKEFLAGS += -j$(NPROCS)\n"
@@ -41,7 +42,10 @@ def write_tf_generic_flags(text):
 
 def write_tf_cuda_flags(text):
     text += "CUDA_LFLAGS = -x cu -Xcompiler -fPIC\n"
-    text += "CUDA_PATH = " + cudaPath + "\n"
+    if cudaPath == "":
+        text += "CUDA_PATH = $(shell echo ${PATH} | sed -e \"s&.*:\([^:]*cuda[^/]*\).*&\\1&g\")\n"
+    else:
+        text += "CUDA_PATH = " + cudaPath + "\n"
     text = write_nl(text)
     return text
 
