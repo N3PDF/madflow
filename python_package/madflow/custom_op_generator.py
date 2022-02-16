@@ -261,7 +261,7 @@ struct MatrixFunctor<Eigen::GpuDevice, T> {\n\
     temp += tm.render(custom_op=custom_op, func=func, op_types=op_types)
     return temp
 
-def define_function(temp, func, device):
+def define_function(temp, func, device): # to be renamed into write_function_definition(...)
     
     dev = ''
     if device == 'gpu':
@@ -325,7 +325,6 @@ def read_file_from_source(function_list, file_source, signatures, signature_vari
                 l = f.readline()
                 i += 1
             line = re.sub(' *def ', '', line) # cut "def " from the line
-            #line = line[4:] # cut "def " from the line
             f_name = grab_function_name(line)
             
             already_defined = False
@@ -334,7 +333,6 @@ def read_file_from_source(function_list, file_source, signatures, signature_vari
                     already_defined = True
                     break
             
-            #if f_name.startswith('sign') == False:
             if already_defined == False:
                 f_type = 'void'
                 args = []
@@ -364,7 +362,6 @@ def extract_matrix_from_file(function_list, file_source, signatures, signature_v
                 l = f.readline()
                 i += 1
             line = re.sub(' *def ', '', line) # cut "def " from the line
-            #line = line[4:] # cut "def " from the line
             f_name = grab_function_name(line)
             
             already_defined = False
@@ -373,7 +370,6 @@ def extract_matrix_from_file(function_list, file_source, signatures, signature_v
                     already_defined = True
                     break
             
-            #if f_name.startswith('sign') == False:
             if already_defined == False and f_name == 'matrix':
                 f_type = 'void'
                 args = []
@@ -403,35 +399,26 @@ def grab_function_arguments(line, f, f_name, args, signatures, signature_variabl
             break
     if j != -1:
         del split_args[j]
-    #print(split_args, len(split_args))
     
     split_types = []
     split_sizes = []
     split_tensors = []
     split_slices = []
     sig_list = []
-    #l = f.readline()
-    #print(line)
-    #split_args = clean_args(line).split(',')
     signature_line = signature_line.split('@tf.function(')[1]
     signature_line = signature_line.split(')')[0]
     signature_line = clean_args(signature_line).split('input_signature=')[1]
     if signature_line.startswith('['):
         s = get_signature(signature_line)
-        #print(s.name, s.type, s.size)
         sig_list.append(s)
     else:
         for sv in signature_variables:
             if sv.name == signature_line:
-                #print(len(sv.signature_list), len(split_args))
                 if len(sv.signature_list) == len(split_args):
                     sig_list = sv.signature_list
                     
     
-        
-    #print(signature_line, sig_list)
     for a in sig_list:
-        #print(a.name, a.type, a.size, a.tensor)
         t = a.type
         if a.size != 0:
             t += '*'
@@ -439,48 +426,12 @@ def grab_function_arguments(line, f, f_name, args, signatures, signature_variabl
         split_sizes.append(a.size)
         split_tensors.append(a.tensor)
         split_slices.append(a.slice)
-    #for l in split_args:
-        #print(l)
-    #    split_types.append(doubleType)
-    #    split_sizes.append(-1)
-    """
-    while l != '':
-        if l.startswith('    Parameters'):
-            l = f.readline()
-            l = f.readline()
-            for i in range(len(split_args)):
-                if "shape=(" not in l:
-                    l = l[:-1]
-                    l += f.readline()
-                splitted = l.split("dtype")
-                if len(splitted) == 2:
-                    new_type = convert_type(splitted[1])
-                else:
-                    new_type = doubleType
-                splitted = splitted[0].split("shape=(")
-                splitted[1] = clean_args(splitted[1])
-                size = -1
-                if splitted[1].startswith(')') == False and splitted[1].startswith('None)') == False:
-                    new_type += '*'
-                    #print(re.sub('.*(\d+)\).*', '\g<1>', splitted[1]))
-                    size = int(re.sub('.*(\d+)\).*', '\g<1>', splitted[1]))
-                else:
-                    size = 0
-                split_types.append(new_type)
-                split_sizes.append(size)
-                l = f.readline()
-        if l.startswith('    Returns'):
-            break
-        l = f.readline()
-    """
+    
     for i in range(len(split_args)):
         #print(split_args[i])
         split_args[i] = clean_args(split_args[i])
         args.append(argument(split_args[i], split_types[i], split_sizes[i], split_tensors[i], split_slices[i]))
-    """
-    for arg in args:
-        print(arg.name, arg.type, arg.size)
-    """
+    
     return args
 
 def grab_function_return(line, f, f_name, f_type, args):
@@ -514,33 +465,23 @@ def grab_function_return(line, f, f_name, f_type, args):
 
 def grab_function_scope(f, scope, scope_args, args, f_type):
     
-    #comment_count = 1
-    #while comment_count < 2:
-    #    line = f.readline()
-    #    if clean_args(line) == '"""':
-    #        comment_count += 1
-    
     line = f.readline()
     function_scope = []
     function_return = ''
     
     match = re.search('^ *return[ ]+', line)
-    while clean_args(line).startswith('return') == False:#match == None:# and line != '':
+    while clean_args(line).startswith('return') == False:
         function_scope.append(line)
         match = re.search('^ *return[ ]+', line)
-        #print(match)
         line = f.readline()
     while clean_args(line) != '':
         function_return += line
         line = f.readline()
     
     args[-1].name = grab_return_variable_name(function_return)
-    #print(function_return)
     scope, scope_args = parse_function_scope(function_scope, scope, scope_args, args, f_type)
-    #print(scope)
     scope, scope_args = parse_function_return(function_return, scope, scope_args, args, f_type)
     
-    #print(function_return, args[-1].name)
     return scope, scope_args
 
 def grab_return_variable_name(function_return):
@@ -555,87 +496,43 @@ def grab_return_variable_name(function_return):
         ret_name = function_return[len(st2):].split(')')[0].split(',')[0]
     elif function_return.startswith(st3):
         ret_name = function_return[len(st3):].split(')')[0].split(',')[0]
-    #print(function_return)
     return ret_name
     
 def parse_function_return(function_return, scope, scope_args, args, f_type):
-    #print(scope, function_return)
     
     function_return = re.sub('return', args[-1].name+' =', function_return)
     function_return = re.sub('#[^\n]*\n', '', function_return)
     inside_comment = False
-    #print(function_return)
     new_line, scope_args, scope, inside_comment = parse_line(function_return, args, scope_args, scope, inside_comment)
     
     scope.append(new_line)
     
     return scope, scope_args
-    """
-    st1 = 'tf.stack'
-    st2 = 'tf.transpose'
-    if re.search(st1, function_return) != None:
-        return scope, scope_args
-    elif re.search(st2, function_return) != None:
-        return scope, scope_args
-    
-    scope.append(function_return) # to be removed
-    
-    return scope, scope_args
-    """
+
 
 def parse_function_scope(function_scope, scope, scope_args, args, f_type):
     if len(function_scope) == 0:
         return scope, scope_args
     i = 0
-    #print(function_scope, len(function_scope))
     line = function_scope[i]
     i += 1
-    #scope_variables = []
     inside_comment = False
     while i <= len(function_scope):
-        #print(i)
         brackets_count = 0
         brackets_count = count_brackets(line, brackets_count)
-        #print(line, brackets_count)
         while brackets_count > 0 and i < len(function_scope):
-            #print(i)
             l = function_scope[i]
-            #print(l)
             i += 1
             brackets_count = count_brackets(l, brackets_count)
             line += l
-        #new_line, scope_variables, scope = parse_line(line, args, scope_variables, scope)
         new_line, scope_args, scope, inside_comment = parse_line(line, args, scope_args, scope, inside_comment)
-        #print(scope,new_line)
         scope.append(new_line)
         #print(i, len(function_scope))
         if i < len(function_scope):
             line = function_scope[i]
         i += 1
-    #print(scope)
     return scope, scope_args
 
-
-"""
-    comment_count = 1
-    while comment_count < 2:
-        line = f.readline()"""
-#        if clean_args(line) == '"""':
-"""            comment_count += 1
-    line = f.readline()
-    scope_variables = []
-    while line.startswith('    return') == False:
-        brackets_count = 0
-        brackets_count = count_brackets(line, brackets_count)
-        while brackets_count > 0:
-            l = f.readline()
-            brackets_count = count_brackets(l, brackets_count)
-            line += l
-        new_line, scope_variables = parse_line(line, args, scope_variables)
-        scope.append(new_line)
-        line = f.readline()
-    return scope
-"""
 
 def clean_pointer(var_type):
     var_type = re.sub('[&*]*', '', var_type)
@@ -643,7 +540,6 @@ def clean_pointer(var_type):
 
 def parse_line(line, args, scope_variables, scope, inside_comment):
     return_line = ""
-    #print(line)
     
     if inside_comment == True:
         match = re.search('"""', line)
@@ -665,7 +561,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
     defined_in_args = False
     defined_in_scope = False
     position = -1
-    #print(s)
     if len(s) > 1:
         comment = s[1]
         
@@ -676,14 +571,9 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
         return return_line, scope_variables, scope, inside_comment
     
     if clean_args(line) != '':
-        #line = re.sub('([^!><=+\-*/])=([^><=+\-*/])', '\g<1>?\g<2>', line, 1)
-        #split_line = line.split('?')
         line = re.sub('([a-zA-Z0-9_()[\]{} ])=', '\g<1> =', line, 1)
         split_line = line.split(' = ')
-        #print(line)
-        #print(line, split_line)
         if clean_args(line).startswith('return'):
-            #print(line)
             return return_line, scope_variables, scope, inside_comment
             
         for i in range(len(split_line) - 1):
@@ -697,7 +587,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 position = i
                 defined_in_args = True
                 break
-            #print(assigned_variable, args[i].name)
         if already_defined == False:
             for i in range(len(scope_variables)):
                 if assigned_variable == scope_variables[i].name:
@@ -709,11 +598,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
         if split_line[0].endswith(']'):
             is_array = True
         
-        #print(split_line[2])
-        #print(line)
-        #print('--------------------------------------')
         value = split_line[2]
-        #print(value)
         square_brackets = 0
         assigned = split_line[2]
         custom_type = doubleType
@@ -721,17 +606,14 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
         while clean_args(value).startswith('['):
             value = value[1:]
             square_brackets += 1
-            #print(value)
         if square_brackets > 0:
             is_arrayy = '*'
             is_array = True
-            #print(split_line, clean_args(value.split(']')[-1])[1:])
             sz = clean_args(value.split(']')[-1])[1:]
             if sz != '':
                 custom_size = int(sz)
             
             value = value.split(']', 1)[0]
-            #print(value, sz)
             if sz != '':
                 definition = ''
                 if already_defined == False:
@@ -739,8 +621,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 scope.append('for (int it1 = 0; it1 < ' + str(sz) + '; it1++) {')
                 scope.append('    ' + convert_grammar(split_line[0] + '[it1] = ' + value + ';'))
                 scope.append('}')
-                #for i in range(custom_size): # impossible to use if the size is a variable
-                #    scope.append(convert_grammar(split_line[0] + '[' + str(i) + '] = ' + value + ';'))
             else:
                 scope.append(convert_grammar(split_line[0] + ' = ' + value + ';'))
                 
@@ -778,16 +658,11 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
         if 'tf.stack([' in clean_args(value):
             reassignment = re.search('[()[\]{}+\-*/, ]'+assigned_variable+'[()[\]{}+\-*/, ]', value)
             if reassignment != None:
-                #print(assigned_variable)
-                #print(line)
                 counter = 0
                 for s in scope:
-                    #print(re.sub('([()[\]{}+\-*/, ]*'+assigned_variable+')([()[\]{}+\-*/, ]*)', '\g<1>_\g<2>', s))
                     scope[counter] = re.sub('([()[\]{}+\-*/, ]*'+assigned_variable+')([()[\]{}+\-*/, ]*)', '\g<1>_\g<2>', s)
-                    #print(s)
                     counter += 1
                 
-                #print(re.sub('([()[\]{}+\-*/, ]*'+assigned_variable+')([()[\]{}+\-*/, ]*)', '\g<1>_\g<2>', value))
                 value = re.sub('([()[\]{}+\-*/, ]*'+assigned_variable+')([()[\]{}+\-*/, ]*)', '\g<1>_\g<2>', value)
                 already_defined = False
                 
@@ -860,19 +735,13 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     scope_variables[position].type = 'T'
         
         if value.startswith(st1):
-            #value = value[len(st1):] # done below
             custom_type = 'T'
-            
-            #print(value)
             
             match = re.search('tf.stack\(', value)
             
             if match != None:
-                #print('match')
                 
                 comp = ['', '']
-                #lhs = ''
-                #rhs = ''
                 real_part = True
                 
                 br_count = 0
@@ -886,35 +755,17 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                         real_part = False
                     
                     if real_part == True:
-                        #lhs += letter
                         comp[0] += letter
                     else:
-                        #rhs += letter
                         comp[1] += letter
-                """
-                rhs = rhs[1:-2]
-                print(lhs, rhs)
                 
-                match = re.search('tf.stack\(', lhs)
-                
-                if match != None:
-                    print('m')
-                    
-                    lhs = re.sub('tf.stack\(\[(.*)] *, *axis.*', '\g<1>', lhs)
-                    lhs = lhs.split(',')
-                    print(lhs)
-                """
                 
                 comp[1] = (comp[1])[1:-2]
                 
                 for e in range(len(comp)):
-                    #print(el)
-                    #match = re.search('tf.stack\(', el)
-                    #if match != None:
                     comp[e] = re.sub('tf.stack\(\[(.*)] *, *axis.*', '\g<1>', comp[e])
                     comp[e] = comp[e].split(',')
                     
-                    #print(comp[e], len(comp[e]))
                 
                 size_of_stack = 0
                 
@@ -922,10 +773,8 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     if len(el) > size_of_stack:
                         size_of_stack = len(el)
                 
-                #print(size_of_stack)
                 
                 scope.append(custom_type + is_arrayy + " " + split_line[0] + '[' + str(size_of_stack) + '];')
-                #print(custom_type + is_arrayy + " " + split_line[0] + '[' + str(size_of_stack) + '];')
                 
                 for e in range(len(comp)):
                     if len(comp[e]) != size_of_stack:
@@ -937,28 +786,9 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                         comp[e][i] = convert_grammar(comp[e][i])
                 for e in range(size_of_stack):
                     scope.append(split_line[0] + '[' + str(e) + '] = T(' + comp[0][e] + ',' + comp[1][e] + ');')
-                    #print(split_line[0] + '[' + str(e) + '] = T(' + comp[0][e] + ',' + comp[1][e] + ');')
                 
                 value = ''
             
-            # done below
-            """
-            br_count = 1
-            has_comma = False
-            vv = 'T('
-            for letter in value:
-                if letter == '(':
-                    br_count += 1
-                elif letter == ')':
-                    br_count -= 1
-                elif letter == ',':
-                    has_comma = True
-                if br_count == 0 and has_comma == True:
-                    break
-                vv += letter
-            vv += ')'
-            value = vv
-            """
         elif value.startswith(st2):
             value = value[len(st2):]
             
@@ -1014,9 +844,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
             if custom_type == 'T':
                 vv += ')'
             value = vv
-            #print(vv)
-            #value = value.split(')')[0]
-            #print(line, convert_grammar(value)) #here
         elif value.startswith(st3):
             custom_type = 'int'
         elif value.startswith(st4):
@@ -1046,7 +873,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 if br_value == 0 and comma_num == 2:
                     break
             condition.append(vv[:-1])
-            #print(line)
+            
             
             for i in range(3):
                 condition[i] = convert_grammar(condition[i])
@@ -1057,29 +884,21 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     custom_size = 0
                 else:
                     custom_size = -1
-                #print(assigned_variable, custom_size, is_array)
                 scope_variables.append(argument(assigned_variable, custom_type, custom_size, False, [])) # need to define size
-                #print(split_line[2])
                 scope.append(custom_type + is_arrayy + " " + split_line[0] + ';')
             
             for i in range(1,3):
                 condition[i] = clean_args(condition[i])
                 
-                #print(condition[i])
                 for var in args + scope_variables:
                     if var.size != 0 and var.size != -1:
                         match = re.search('[+\-*/ ]' + var.name + ' *[,(){};]+', condition[i])
-                        #if match != None:
-                            #print(var.name, var.size, match, condition[i])
                         match = re.search('[(){}, +-]' + var.name + ' *[+\-*/]+', condition[i])
                         if match != None:
-                            #print(var.name, var.size, match, condition[i])
                             for var2 in args + scope_variables:
                                 match = re.search('[(){}, +-]' + var.name + ' *[+\-*/]+ *' + var2.name + ' *[,(){};]+', condition[i])
                                 if match != None:
-                                    #print(var.name, var.size, ',', var2.name, var2.size, match, condition[i])
                                     if var2.size != 0 and var2.size != -1:
-                                        #print('h')
                                         
                                         scope.append(re.sub('[&*]*', '', var.type) + ' _' + var.name + '[' + str(var.size) + '];')
                                         scope.append('for (int it1 = 0; it1 <' + str(var.size) + '; it1++) {')
@@ -1107,20 +926,12 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                                         if scope_variables[v].size != 0:
                                             scope_variables[v].type += '*'
                                             print('v')
-                                            """
-                                for v in args + scope_variables:
-                                    if assigned_variable == v.name:
-                                        v.size = var.size
-                                        v.type = var.type
-                                        if v.size != 0:
-                                            v.type += '*'
-                                            """
+                                            
                 
                 if condition[i].startswith('T('):
                     condition[i] = split_line[0]+' = '+condition[i]
                 else:
                     condition[i] = re.sub('\)$', ', '+split_line[0]+')', condition[i])
-            #print('if ('+condition[0]+') {'+condition[1]+'}\nelse{'+condition[2]+'}')
             scope.append('if ('+clean_args(condition[0])+') {')
             scope.append('    '+clean_args(condition[1])+';')
             scope.append(clean_args('}'))
@@ -1128,7 +939,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
             scope.append('    '+clean_args(condition[2])+';')
             scope.append(clean_args('}'))
             
-            #print(convert_grammar(condition[2]))
             
             return return_line, scope_variables, scope, inside_comment
         elif value.startswith(st7):
@@ -1181,7 +991,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     conc_type = doubleType
             
             if unknown == False:
-                #print(var_list, conc_size)
             
                 for i in range(len(args)):
                     if assigned_variable == args[i].name:
@@ -1206,7 +1015,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                         newline = ''
                         if var_length[j] == 1:
                             newline = assigned_variable+'['+str(i)+'] = '+var_list[j]+';'
-                        #print(newline)
                         scope.append(newline)
                         i += 1
             else:
@@ -1216,7 +1024,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
             return return_line, scope_variables, scope, inside_comment
         elif value.startswith(st9):
             custom_type = convert_type(value.split('dtype=')[1][:-2])
-            #print(custom_type)
             value = re.sub('[\[\]]*', '', value)
             value = re.sub(', *dtype.*', '', value)
             value = re.sub('tf.constant\(', '', value)
@@ -1226,21 +1033,13 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
             custom_size = len(sp)
             is_array = True
             newLine = 'const ' + custom_type + ' ' + assigned_variable + '[] = {'
-            #newLine = 'const T ' + assigned_variable + '[] = {'
-            #scope.append(custom_type + ' ' + assigned_variable + '[' + str(len(sp)) + '];')
-            #print(custom_type + ' ' + assigned_variable + '[' + str(len(sp)) + '];')
             
             for v in range(len(sp) - 1):
                 newLine += sp[v] + ','
-                #newLine += 'T('+sp[v] + ',0),'
-                #scope.append(assigned_variable + '[' + str(v) + '] = ' + sp[v] + ';')
-                #print(assigned_variable + '[' + str(v) + '] = ' + sp[v] + ';')
             newLine += sp[-1] + '};'
-            #newLine += 'T('+sp[-1] + ',0)};'
             
             scope.append(newLine)
             value = ''
-            #print(clean_args(value))
         elif value.startswith(st10):
             value = re.sub('tf.einsum\(', '', value)
             value = re.sub('tf.reshape\(([a-zA-Z0-9_]*) *,.*\)', '\g<1>', value)
@@ -1282,8 +1081,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 if x.name == 'denom':
                     prov_len = str(x.size)
             
-            #scope.append('// final_indices ' + final_indices)
-            #scope.append('//'+pattern)
             for m in range(len(matrices)):
                 temp_arr = []
                 for n in initial_indices[m]:
@@ -1292,7 +1089,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     else:
                         temp_arr.append(n)
                 indices.append(temp_arr)
-                #scope.append('//'+matrices[m] + str(len(initial_indices[m])))
                 
                 index = ''
                 
@@ -1308,7 +1104,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                             prod *= int(prov_len)
                         ind -= 1
                 
-                #matrices[m] = re.sub('([^.]+[a-zA-Z0-9]*)([()])', '\g<1>[' + index + ']\g<2>', matrices[m])
                 matrices[m] = re.sub('([^.]+[a-zA-Z0-9]+)([() +\-*/])', '\g<1>[' + index + ']\g<2>', matrices[m])
                 matrices[m] = re.sub('([^.]+[a-zA-Z0-9]+)$', '\g<1>[' + index + ']', matrices[m])
                 
@@ -1317,13 +1112,11 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
             
             value = value[:-3]
             
-            #scope.append('//'+value)
             
             value = convert_grammar(value)
             
             custom_type = doubleType
             scope.append(custom_type + ' ' + assigned_variable + ' = 0;')
-            #scope.append(custom_type + ' ' + assigned_variable + ' = T(0,0);')
             spacing = ''
             
             
@@ -1341,27 +1134,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
             
             value = ''
         
-        
-        """
-        value = re.sub('\[:, (\d+)\]', '[\g<1>]', value)
-        value = re.sub('\[:,(\d+)\]', '[\g<1>]', value)
-        value = re.sub('float_me\(([a-zA-Z0-9[\]+\-*/ ]*)\)', '\g<1>', value)
-        value = re.sub('int_me\(([a-zA-Z0-9()+\-/ ]*)\)', '\g<1>', value)
-        value = re.sub('([a-zA-Z_0-9[\]]+) *\*\* *2', '\g<1> * \g<1>', value)
-        value = re.sub('([a-zA-Z_0-9[\]]+) \*\* (\d+)', 'pow(\g<1>, \g<2>)', value)
-        value = re.sub('([a-zA-Z_0-9()[\]+\-*/ ]+)// *2', '\g<1> / 2', value)
-        value = re.sub('\( *\(([a-zA-Z_0-9()[\]{}+\-*/ \n]*)\) *\)', '(\g<1>)', value)
-        value = re.sub('tf.ones_like\([a-zA-Z_0-9[\]{}+\-*/=, \n]*\) *\**', '', value)
-        #value = re.sub('complex_tf\(([a-zA-Z_0-9[\]{}+\-*/=,. \n]*)\)', 'T(\g<1>)', value)
-        value = re.sub('tfmath\.', '', value)
-        value = re.sub('minimum', 'min', value)
-        value = re.sub('maximum', 'max', value)
-        value = re.sub('tf.stack\([ \n]*\[([a-zA-Z_0-9()[\]+\-*/,. ]*)] *, *axis=[0-9 \n]*\)', '{\g<1>}', value)
-        value = re.sub('tf.stack\([ \n]*\[([a-zA-Z_0-9()[\]+\-*/,. ]*)][ \n]*\)', '{\g<1>}', value)
-        #value = re.sub('complex_tf\(([a-zA-Z_0-9()[\]{}+\-*/=,. \n]*)\)', 'T(\g<1>)', value)
-        value = re.sub('complex_tf', 'T', value)
-        assigned = value
-        """
         assigned = convert_grammar(value)
         
         for var in args + scope_variables:
@@ -1372,33 +1144,16 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     print(var.name, var.size, match, assigned)
                 match = re.search('[(){}, +-]' + var.name + ' *[+\-*/]+', assigned)
                 if match != None:
-                    #print(var.name, var.size, match, assigned)
                     for var2 in args + scope_variables:
                         match = re.search('[(){}, +-]' + var.name + ' *[+\-*/]+ *' + var2.name + ' *[,(){};]+', assigned)
                         if match != None:
-                            #print(var.name, var.size, ',', var2.name, var2.size, match, assigned)
                             if var2.size != 0 and var2.size != -1:
-                                #print('h')
                                 found = True
-                            """
-                            else:
-                                print('for (int it1 = 0; it1 <' + str(var.size) + '; it1++)')
-                                print('{')
-                                print('    ' + assigned_variable + '[it1] = ' + re.sub('([(){}, +-])' + var.name + '( *[+\-*/]+)', '\g<1>' + var.name + '[it1]\g<2>', assigned))
-                                print('}')
-                                for v in args + scope_variables:
-                                    if assigned_variable == v.name:
-                                        v.size = var.size
-                            """
-                     
+                            
                     if found == False:
                         scope.append('for (int it1 = 0; it1 <' + str(var.size) + '; it1++) {')
                         scope.append('    ' + assigned_variable + '[it1] = ' + clean_args(re.sub('([(){}, +-])' + var.name + '( *[+\-*/]+)', '\g<1>' + var.name + '[it1]\g<2>', assigned)) + ';')
                         scope.append('}')
-                        #print('for (int it1 = 0; it1 <' + str(var.size) + '; it1++)')
-                        #print('{')
-                        #print('    ' + assigned_variable + '[it1] = ' + re.sub('([(){}, +-])' + var.name + '( *[+\-*/]+)', '\g<1>' + var.name + '[it1]\g<2>', assigned))
-                        #print('}')
                         for v in range(len(args)):
                             if assigned_variable == args[v].name:
                                 args[v].size = var.size
@@ -1420,14 +1175,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                                     #scope_variables[v].type += '*'
                                     print('v')
                         assigned = ''
-                        """
-                        for v in args + scope_variables:
-                            if assigned_variable == v.name:
-                                v.size = var.size
-                                v.type = var.type
-                                if v.size != 0:
-                                    v.type += '*'
-                        """
         
         if already_defined == False:
             if is_array == False:
@@ -1453,12 +1200,9 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                         br_count -= 1
                     elif letter == ',' and br_count == 0 and curly_br_count == 1:
                         custom_size += 1
-                #print(assigned)
                 comment = 'array of size ' + str(custom_size)
-            #print(assigned_variable, custom_size, is_array)
             scope_variables.append(argument(assigned_variable, custom_type, custom_size, False, [])) # need to define size
             return_line += custom_type + is_arrayy + " "
-            #print(split_line[2])
         return_line += split_line[0] + ' = ' + clean_args(assigned)
     
         if clean_args(assigned) == '':
@@ -1501,9 +1245,7 @@ def convert_type(t):
 def convert_grammar(value):
     value = re.sub('tf.reshape', '', value)
     value = re.sub('\[:,[ :]*(\d+)\]', '[\g<1>]', value)
-    #value = re.sub('\[:,(\d+)\]', '[\g<1>]', value)
     value = re.sub('float_me\(([a-zA-Z0-9[\]+\-*/. ]*)\)', '\g<1>', value)
-    #value = re.sub('int_me\(([a-zA-Z0-9()+\-/ ]*)\)', '\g<1>', value)
     value = re.sub('int_me', '(int)', value)
     value = re.sub('([a-zA-Z_0-9[\]]+) *\*\* *2', '\g<1> * \g<1>', value)
     value = re.sub('([a-zA-Z_0-9[\]]+) \*\* (\d+)', 'pow(\g<1>, \g<2>)', value)
@@ -1512,8 +1254,6 @@ def convert_grammar(value):
     value = re.sub('tf.ones_like\([a-zA-Z_0-9[\]{}+\-*/=, \n]*\) *\**', '', value)
     #value = re.sub('complex_tf\(([a-zA-Z_0-9[\]{}+\-*/=,. \n]*)\)', 'T(\g<1>)', value)
     value = re.sub('tfmath\.', '', value)
-    #value = re.sub('minimum', 'std::min', value) #hhh
-    #value = re.sub('maximum', 'std::max', value) #hhh
     value = re.sub('minimum', 'MINIMUM', value) #hhh
     value = re.sub('maximum', 'MAXIMUM', value) #hhh
     value = re.sub('tf.math.real\(([a-zA-Z0-9_()[\] +\-*/]*)\)', '\g<1>.real()', value)
@@ -1523,13 +1263,10 @@ def convert_grammar(value):
     value = re.sub('tf.stack\([ \n]*\[([a-zA-Z_0-9()[\]+\-*/,. ]*)][ \n]*\)', '{\g<1>}', value)
     value = re.sub('tf.stack\([ \n]*([a-zA-Z_0-9()[\]+\-*/,. ]*) *, *axis=[0-9 \n]*\)', '', value)
     value = re.sub('\(*tf.stack\([ \n]*([a-zA-Z_0-9()[\]+\-*/,. ]*) *, *\[[0-9, \n]*]\)', '', value)
-    #value = re.sub('complex_tf\(([a-zA-Z_0-9()[\]{}+\-*/=,. \n]*)\)', 'T(\g<1>)', value)
     value = re.sub('complex_tf', 'T', value)
     value = re.sub('complex_me', 'T', value)
     value = re.sub('complex\(', 'T(', value)
     value = re.sub('\( *\(([a-zA-Z_0-9()[\]{}+\-*/ \n]*)\) *\)', '(\g<1>)', value)
-    #value = re.sub('([ ,;+*\-/()[\]{}\n]+[0-9]+\.[0-9]*)([ ,;+*\-/()[\]{}\n]+)', '\g<1>f\g<2>', value)
-    #value = re.sub('([ ,;+*\-/()[\]{}\n]+[0-9]+\.[0-9]*)([ ,;+*\-/()[\]{}\n]+)', '\g<1>f\g<2>', value)
     return value
 
 def check_variables(counter, function_list):
@@ -1543,27 +1280,11 @@ def check_variables(counter, function_list):
         if (function_list[counter].args)[i].size == -1:
             all_sizes_defined = False
             break
-    #print(all_sizes_defined, i)
     
     if all_sizes_defined == False:
         for j in range(len(function_list[counter].scope)):
             line = (function_list[counter].scope)[j]
-            #print((function_list[counter].scope)[j])
-            """
-            match = re.search((function_list[counter].args)[i].type + '\** ' + (function_list[counter].args)[i].name + ';', line)
-            if match != None:
-                found = True
             
-            if found == True:
-                for k in range(len(function_list)):
-                    match = re.search(function_list[k].name + '\(.*' + (function_list[counter].args)[i].name, line)
-                    if match != None:
-                        function_list = check_variables(k, function_list)
-                        #print(function_list[k].args[-1].size)
-                        #print(line, match, k, function_list[k].name)
-                        (function_list[counter].args)[i].size = function_list[k].args[-1].size
-                        found = False # to avoid counting multiple times
-            """
             for k in range(len(function_list)):
                 match = re.search(function_list[k].name + '\(.*' + (function_list[counter].args)[i].name, line)
                 if match != None:
@@ -1581,12 +1302,10 @@ def check_variables(counter, function_list):
     i = 0
     all_sizes_defined = True
     for i in range(len(function_list[counter].scope_args)):
-        #print((function_list[counter].scope_args)[i].type, (function_list[counter].scope_args)[i].name, (function_list[counter].scope_args)[i].size)
         if (function_list[counter].scope_args)[i].size == -1:
             all_sizes_defined = False
             break
     
-    #print(all_sizes_defined, i)
     
     line_of_definition = -1
     variabe_type = ''
@@ -1595,9 +1314,6 @@ def check_variables(counter, function_list):
     if all_sizes_defined == False:
         for j in range(len(function_list[counter].scope)):
             line = (function_list[counter].scope)[j]
-            #print((function_list[counter].scope)[j])
-            #print(i, len(function_list[counter].scope_args))
-            #print((function_list[counter].scope_args)[i].type, (function_list[counter].scope_args)[i].name, i, len(function_list[counter].scope_args))
             match = re.search((function_list[counter].scope_args)[i].type + '\** ' + (function_list[counter].scope_args)[i].name + ';', line)
             if match != None:
                 found = True
@@ -1608,8 +1324,6 @@ def check_variables(counter, function_list):
                     match = re.search(function_list[k].name + '\(.*' + (function_list[counter].scope_args)[i].name, line)
                     if match != None:
                         function_list = check_variables(k, function_list)
-                        #print(function_list[k].args[-1].size)
-                        #print(line, match, k, function_list[k].name)
                         new_size = function_list[k].args[-1].size
                         (function_list[counter].scope_args)[i].size = new_size
                         variabe_type = re.sub('[&\*]*', '', function_list[k].args[-1].type)
@@ -1617,11 +1331,9 @@ def check_variables(counter, function_list):
                         found = False # to avoid counting multiple times
     
     if variabe_type != '':
-        #print((function_list[counter].scope)[line_of_definition], variabe_type)
         (function_list[counter].scope)[line_of_definition] = re.sub('^[a-zA-Z0-9_]* ', variabe_type + ' ', (function_list[counter].scope)[line_of_definition])
         if new_size != 0:
             (function_list[counter].scope)[line_of_definition] = re.sub(';', '[' + str(new_size) + '];', (function_list[counter].scope)[line_of_definition])
-        #print((function_list[counter].scope)[line_of_definition], variabe_type)
     
     return function_list
 
@@ -1629,7 +1341,6 @@ def check_variables(counter, function_list):
 
 def check_lines(counter, function_list):
     it = 0
-    #for it in range(len(function_list[counter].scope)):
     while it < len(function_list[counter].scope):
         line = function_list[counter].scope[it]
         
@@ -1665,7 +1376,6 @@ def check_lines(counter, function_list):
         ls = line.split(' = ')
         if len(ls) > 1:
             if ls[1].startswith('T('):
-                #print(ls)
                 value = ls[1]
                 for v in function_list[counter].args + function_list[counter].scope_args:
                     reassignment = re.search('[()[\]{}+\-*/, \n]'+v.name+'[()[\]{}+\-*/, \n;]', value)
@@ -1679,19 +1389,15 @@ def check_lines(counter, function_list):
                         if v.type.startswith('T'):
                             match = re.search('T\( *' + v.name +'[0-9[\]]* *\)', value)
                             if match != None:
-                                #print(match)
                                 if ls[0].startswith(v.name):
-                                    #print(ls, v.name)
                                     function_list[counter].scope[it] = ''
                                     break
                         elif v.type.startswith(doubleType):
                             match = re.search('T\( *' + v.name +'[0-9[\]]* *\)', value)
                             if match != None:
-                                #print(match)
                                 if ls[0].startswith(v.name):
                                     for it2 in range(it):
                                         function_list[counter].scope[it2] = re.sub('([()[\]{}, +\-*/]*' + v.name + ')([()[\]{}, +\-*/;]*)', '\g<1>_\g<2>', function_list[counter].scope[it2])
-                                        #print(function_list[counter].scope[it2])
                                     function_list[counter].scope[it] = 'T ' + ls[0] + ' = ' + re.sub('([()[\]{}, +\-*/]*' + v.name + ')([()[\]{}, +\-*/;]*)\);', '\g<1>_\g<2>', ls[1]) + ', 0);'
                                     function_list[counter].scope_args.append(argument(v.name, 'T', 0, False, []))
                                     for it2 in range(len(function_list[counter].args)):
@@ -1700,41 +1406,25 @@ def check_lines(counter, function_list):
                                     for it2 in range(len(function_list[counter].scope_args)):
                                         if v.name == function_list[counter].scope_args[it2].name:
                                             function_list[counter].scope_args[it2].name += '_'
-                                    #print(ls, v.name)
-                                    #print(function_list[counter].scope[it])
                                     break
             else:
                 for f in function_list:
                     match = re.search('^ *' + f.name + ' *\(', ls[1])
                     if match != None:
                         if f.type == 'void':
-                            #print(line, f.name, f.type, f.args[-1].type, f.args[-1].size)
                             if ls[0].startswith('T') or ls[0].startswith(doubleType) or ls[0].startswith('int'):
-                                #print(ls[0], f.args[-1].type, f.args[-1].size)
                                 for v in range(len(function_list[counter].scope_args)):
                                     if l[0].endswith(' ' + function_list[counter].scope_args[v].name):
                                         function_list[counter].scope_args[v].type = re.sub('[&*]*', '', f.args[-1].type)
                                         function_list[counter].scope_args[v].size = f.args[-1].size
-                                        #print('name', l[0], function_list[counter].scope_args[v].name)
                                         break
-                                #print(function_list[counter].scope_args[v].type + ' ' + function_list[counter].scope_args[v].name + '[' + str(f.args[-1].size) + '];')
-                                #print('a', function_list[counter].scope[it])
                                 if f.args[-1].size > 0:
                                     function_list[counter].scope.insert(it, function_list[counter].scope_args[v].type + ' ' + function_list[counter].scope_args[v].name + '[' + str(f.args[-1].size) + '];')
                                 else:
                                     function_list[counter].scope.insert(it, function_list[counter].scope_args[v].type + ' ' + function_list[counter].scope_args[v].name + ';')
-                                #print('b', function_list[counter].scope[it])
                                 it += 1
                                 function_list[counter].scope[it] = re.sub('.* +' + function_list[counter].scope_args[v].name + ' *=', function_list[counter].scope_args[v].name + ' =', function_list[counter].scope[it])
-                            #function_list[counter].scope[it] = re.sub(function_list[counter].scope_args[v].name + ' *= *(.*)\) *;', '\g<1>, ' + function_list[counter].scope_args[v].name + ');', function_list[counter].scope[it])
                             function_list[counter].scope[it] = re.sub('([a-zA-Z0-9_]*) *= *(.*)\) *;', '\g<2>, \g<1>);', function_list[counter].scope[it])
-                                #print('c', function_list[counter].scope[it])
-                                #print('---')
-                                #for it2 in range(it-2, it+2):
-                                #    print(function_list[counter].scope[it2])
-                                #print('---')
-                                
-            #dd
         
         match = re.search('tf.concat', line)
         if match != None:
@@ -1789,7 +1479,6 @@ def check_lines(counter, function_list):
                     conc_type = doubleType
             
             if unknown == False:
-                #print(var_list, conc_size)
             
                 for i in range(len(function_list[counter].args)):
                     if assigned_variable == function_list[counter].args[i].name:
@@ -1809,30 +1498,22 @@ def check_lines(counter, function_list):
                             function_list[counter].scope_args[i].size = 0
                         break
                 i = 0
-                #print(assigned, conc_size)
                 it2 = 0
                 while i < conc_size:
                     for j in range(len(var_list)):
-                        #print(var_list[j], var_length[j])
                         newline = ''
                         if var_length[j] == 1:
                             newline = assigned_variable+'['+str(i)+'] = '+var_list[j]+';'
                             function_list[counter].scope.insert(it + it2, newline)
                             it2 += 1
                         else:
-                            #print('for (int it1 = 0; it1 < ' + str(var_length[j]) + '; it1++) {')
-                            #print('    ' + assigned_variable+'['+str(i)+' + it1] = '+var_list[j]+'[it1];')
-                            #print('}')
                             function_list[counter].scope.insert(it + it2, 'for (int it1 = 0; it1 < ' + str(var_length[j]) + '; it1++) {')
                             it2 += 1
                             function_list[counter].scope.insert(it + it2, '    ' + assigned_variable+'['+str(i)+' + it1] = '+var_list[j]+'[it1];')
                             it2 += 1
                             function_list[counter].scope.insert(it + it2, '}')
                             it2 += 1
-                            #print(var_list[j], var_length[j])
-                        #print(newline)
                         i += int(var_length[j])
-            #print(assigned, var_length)
         it += 1
     return function_list
 
@@ -1876,12 +1557,6 @@ def parallelize_function(f):
             f.scope.insert(s, 'for (auto it = t; it < w; it += 1) {')
             s += 1
             
-            """
-            # OpenMP version
-            f.scope.insert(s, '#pragma omp parallel for')
-            s += 1
-            f.scope.insert(s, 'for (int it = 0; it < ' + n_events.name + '; it++) {')
-            """
         s += 1
     
     f.scope.insert(s, '}')
@@ -1893,9 +1568,6 @@ def parallelize_function(f):
     f = prepare_custom_op(f, n_events)
     
     f.args.append(argument('context', 'const OpKernelContext*', 0, False, []))
-    
-    #for s in f.scope:
-    #    print(s)
     
     return f
 
@@ -1977,12 +1649,9 @@ def read_signatures(signatures, signature_variables, file_source):
         match = re.search('tf.TensorSpec', line)
         match2 = re.search('signature', line)
         if match != None and clean_args(line).startswith('@tf.function') == False:
-            #print(line)
             s = get_signature(line)
-            #print(s.name, s.type, s.size)
             signatures.append(s)
         elif match2 != None and clean_args(line).startswith('@tf.function') == False:
-            #print(line)
             br_count = 0
             for letter in line:
                 if letter == '[':
@@ -1997,41 +1666,27 @@ def read_signatures(signatures, signature_variables, file_source):
                     elif letter == ']':
                         br_count -= 1
                 line += l
-            #print(line)
             line = re.sub('(TensorSpec\([^)]*\) *),', '\g<1>?', line)
-            #print(line)
             name = clean_args(line.split('=')[0])
             line = line.split(' = ')[1]
-            #print(line.split(' = '))
             var_list = line.split('+')
-            #print(var_list, len(var_list))
             if len(var_list) == 1:
                 var_list = line.split('?')
-            #print(var_list)
             sig_list = []
             s_list = []
             for var in var_list:
                 match = re.search('tf.TensorSpec', var)
                 if match != None:
                     var = re.sub('.*[\n]*.*(tf.TensorSpec\([^)]*\)).*', '\g<1>', var)
-                    #print(var)
-                    #s = get_signature(var)
-                    #print(var, get_signature(var).type, get_signature(var).size, get_signature(var).tensor)
                     s_list.append(signature(var, get_signature(var).type, get_signature(var).size, get_signature(var).tensor, get_signature(var).slice))
-                    #signature_variables.append(get_signature(var))
                 match = re.search('\[[a-zA-Z0-9_]+] *\*', var)
                 sig_name = clean_args(re.sub('\[([a-zA-Z0-9_]+)].*', '\g<1>', var))
                 times = 1
                 if match != None:
                     times = int(clean_args(re.sub('\[[a-zA-Z0-9_]+] *\*(\d+)', '\g<1>', var)))
-                    #print(match)
-                #print(sig_name)
                 for i in range(times):
                     #print('sig_name', sig_name, times)
                     sig_list.append(sig_name)
-                #print(var)
-                
-            #print(name)
             
             if len(s_list) > 0:
                 s = signature_variable(name, s_list, [])
@@ -2170,27 +1825,17 @@ defined = ["COMPLEX_CONJUGATE std::conj",
            "GPUDevice Eigen::GpuDevice",
            "DEFAULT_BLOCK_SIZE 32"]
              
-#file_source = '/home/gabriele/Scaricati/madflow/python_package/madflow/wavefunctions_flow.py'
-#file_source = '/home/gabriele/Scrivania/madflow-ggttbar-customop-main/aloha_1_gg_ttx.py'
 
 folder_name = 'prov/'
-folder_path = ''#'/home/gabriele/Scrivania/'
+folder_path = ''
 
 
 process = 'p p > t t~'
 process_name = re.sub(' *', '', process)
 process_name = re.sub('>', '_', process_name)
 process_name = re.sub('~', 'x', process_name)
-"""
-file_sources = ['/home/gabriele/Scaricati/madflow/python_package/madflow/wavefunctions_flow.py', # functions defined inside madflow package
-                folder_path + '/' + folder_name + '/aloha_1_' + process_name + '.py']#'/home/gabriele/Scaricati/madflow-ggttbar-customop/aloha_1_gg_ttx.py'] # functions process dependent
 
-matrix_source = folder_path + '/' + folder_name + '/' + 'matrix_1_' + process_name + '.py'
-
-matrix_name = 'matrix_1_' + process_name + '.py'
-"""
 temp = ""
-#msg = ""
 
 def translate(destination):
     
@@ -2200,15 +1845,11 @@ def translate(destination):
     
     madflowLocation = madflow.__file__
     madflowLocation = re.sub('__init__.*', '', madflowLocation)
-    #print(madflowLocation)
     
-    #subprocess.check_output(["/bin/sh", "-c", "rm -f matrix_1_*"])
-    #subprocess.check_output(["/bin/sh", "-c", "rm -f gpu/*"])
     subprocess.check_output(["/bin/sh", "-c", "mkdir " + destination + "gpu/"])
     write_makefile(destination)
     
     function_list_ = []
-    #custom_op_list = []
     
     aux_args = []
     auxiliary_functions = []
@@ -2230,15 +1871,6 @@ def translate(destination):
     function_list_.append(aux_function)
     auxiliary_functions.append(aux_function)
     
-    #signatures = []
-    #signature_variables = []
-    
-    #signatures, signature_variables = read_signatures(signatures, signature_variables, file_source)
-    
-    #signature_variables = convert_signatures(signatures, signature_variables)
-    
-    #function_list = read_file_from_source(function_list, file_source, signatures, signature_variables)
-    
     
     for file_source in file_sources:
         signatures_ = []
@@ -2251,7 +1883,6 @@ def translate(destination):
         function_list_ = read_file_from_source(function_list_, file_source, signatures_, signature_variables_)
     
     files_list = subprocess.check_output(["/bin/sh", "-c", "ls " + folder_path + destination + ' | grep matrix_1_']).decode('utf-8').split('\n')[:-1]
-    #print(files_list)
     
     for _file_ in files_list:
         
@@ -2268,8 +1899,6 @@ def translate(destination):
         process_source = folder_path + destination + 'aloha_1_' + process_name + '.py'
         
         _file_ = process_source
-        
-        #print(matrix_source, process_name)
         
         signatures = []
         for s in signatures_:
@@ -2337,17 +1966,9 @@ def translate(destination):
         for c in custom_op_list:
             temp = write_custom_op(temp, c, function_list[-1], 'cpu', process_name)
             
-        #print("Writing to " + "gpu/matrix_" + process_name + ".cc")
-        #print(temp)
         with open(destination + "gpu/matrix_" + process_name + ".cc", "w") as fh:
             fh.write(temp)
         
-        #for i in range(len(defined)):
-        #    defined[i] = re.sub('std::', '', defined[i])
-        #    defined[i] = re.sub('conj', 'cconj', defined[i])
-        
-        #for i in range(len(auxiliary_functions)):
-        #    function_list[i].name += function_list[i].name[-1]
         
         temp = ""
         temp += "#ifdef GOOGLE_CUDA\n\
@@ -2357,11 +1978,9 @@ def translate(destination):
         temp = write_namespace(temp, namespace)
         temp = write_defined(temp, defined, 'gpu')
         
-        #constants.remove("using thread::ThreadPool")
         
         temp = write_constants(temp, constants, 'gpu')
         
-        #function_list[-1].scope.remove('#pragma omp parallel for')
         
         del function_list[-1].args[-1]
         
@@ -2377,55 +1996,6 @@ def translate(destination):
                 break
             i += 1
         
-        """
-        i = 0
-        while i < len(function_list[-1].scope):
-            if function_list[-1].scope[i].startswith('const double denom'):
-                vals = (function_list[-1].scope[i].split('=')[1])[2:-2].split(',')
-                #print(vals)
-                function_list[-1].scope[i] = '__shared__ double denom[' + str(len(vals)) + '];'
-                for j in range(len(vals)):
-                    function_list[-1].scope.insert(i + j + 1, 'denom[' + str(j) + '] = ' + str(vals[j]) + ';')
-                break
-            i += 1
-        """
-        """
-        i = 0
-        while i < len(function_list[-1].scope):
-            if function_list[-1].scope[i].startswith('const double cf'):
-                vals = (function_list[-1].scope[i].split('=')[1])[2:-2].split(',')
-                #print(vals)
-                function_list[-1].scope[i] = '__shared__ double cf[' + str(len(vals)) + '];'
-                for j in range(len(vals)):
-                    function_list[-1].scope.insert(i + j + 1, 'cf[' + str(j) + '] = ' + str(vals[j]) + ';')
-                break
-            i += 1
-        """
-        """
-        for i in range(len(function_list[-1].scope)):
-            if function_list[-1].scope[i].startswith('for (int it'):
-                function_list[-1].scope[i] = 'for (int it = blockIdx.x * blockDim.x + threadIdx.x; it < ' + function_list[-1].args[-1].name + '; it += blockDim.x * gridDim.x) {'
-        """
-        """
-        i = 0
-        while i < len(function_list[-1].scope):
-            
-            #function_list[-1].scope[i] = re.sub('(T amp[0-9]*);', '\g<1> = (T)malloc(sizeof(T));', function_list[-1].scope[i])
-            function_list[-1].scope[i] = re.sub('T (w[0-9]*)\[([0-9]*)];', 'T* \g<1> = (T*)malloc(sizeof(T) * \g<2>);', function_list[-1].scope[i])
-            
-            if function_list[-1].scope[i].startswith('    T jamp[]'):
-                for j in range(121):
-                    function_list[-1].scope.insert(i, '    free(w' + str(j) + ');')
-                    i += 1
-                
-                for j in range(1890):
-                    function_list[-1].scope.insert(i + 1, '    free(amp' + str(j) + ');')
-                    i += 1
-                
-                break
-            
-            i += 1
-        """
         for f in function_list:
             temp = define_function(temp, f, 'gpu')
         
@@ -2482,19 +2052,16 @@ __device__ COMPLEX_TYPE operator/(const COMPLEX_TYPE& a, const " + doubleType + 
         
         temp += "\n#endif\n"
         
-        #print(temp)
         with open(destination + "gpu/matrix_" + process_name + ".cu.cc", "w") as fh:
             fh.write(temp)
         
         temp = ""
         temp = write_header_file(temp, c, function_list[-1])
-        #print(temp)
         with open(destination + "gpu/matrix_" + process_name + ".h", "w") as fh:
             fh.write(temp)
         
         temp = ""
         temp = modify_matrix(matrix_source, temp, process_name, destination)
-        #print(temp)
         with open(destination + matrix_name, "w") as fh:
             fh.write(temp)
             
