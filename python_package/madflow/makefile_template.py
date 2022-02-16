@@ -2,7 +2,7 @@ makefileName = "makefile"
 cppCompiler = "g++"
 cppVersion = "c++14"
 cudaPath = ""
-# example: cudaPath = "/usr/local/cuda-11.5"
+# example: cudaPath = "/usr/local/cuda"
 
 
 def write_compilers(text):
@@ -42,10 +42,13 @@ def write_tf_generic_flags(text):
 
 def write_tf_cuda_flags(text):
     text += "CUDA_LFLAGS = -x cu -Xcompiler -fPIC\n"
+    text += "CUDA_PATH := $(shell echo ${CUDA_PATH})\n"
+    text += "ifeq ($(CUDA_PATH),)\n"
     if cudaPath == "":
         text += 'CUDA_PATH = $(shell echo ${PATH} | sed -e "s&.*:\([^:]*cuda[^/]*\).*&\\1&g")\n'
     else:
         text += "CUDA_PATH = " + cudaPath + "\n"
+    text += "endif\n"
     text = write_nl(text)
     return text
 
