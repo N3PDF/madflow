@@ -1,9 +1,11 @@
 makefileName = "makefile"
+cppCompiler = "g++"
 cppVersion = "c++14"
+cudaPath = "/usr/local/cuda-11.5"
 
 
 def write_compilers(text):
-    text += "CXX := g++\n"
+    text += "CXX := " + cppCompiler + "\n"
     text += "NVCC := $(shell which nvcc)\n"
     text = write_nl(text)
     return text
@@ -39,7 +41,7 @@ def write_tf_generic_flags(text):
 
 def write_tf_cuda_flags(text):
     text += "CUDA_LFLAGS = -x cu -Xcompiler -fPIC\n"
-    text += "CUDA_PATH = /opt/cuda\n"
+    text += "CUDA_PATH = " + cudaPath + "\n"
     text = write_nl(text)
     return text
 
