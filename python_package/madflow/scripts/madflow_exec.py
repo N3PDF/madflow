@@ -280,9 +280,7 @@ def madflow_main(args=None, quick_return=False):
         default=int(1e6),
     )
     arger.add_argument(
-        "--custom_op",
-        help="Use a Custom Operator for ME evaluation",
-        action="store_true"
+        "--custom_op", help="Use a Custom Operator for ME evaluation", action="store_true"
     )
 
     args = arger.parse_args(args)
@@ -292,7 +290,7 @@ def madflow_main(args=None, quick_return=False):
 
     # LheWriter needs to be imported after --autolink
     from madflow.lhe_writer import LheWriter
-    
+
     if args.output is None:
         output_path = Path(tempfile.mkdtemp(prefix="mad_"))
     else:
@@ -352,7 +350,7 @@ def madflow_main(args=None, quick_return=False):
         logger.info("Set variable muF=muR=sum(mT)/2")
     else:
         logger.info("Setting fixed muF=muR=%.2f GeV.", args.fixed_scale)
-        q2 = float_me(args.fixed_scale ** 2)
+        q2 = float_me(args.fixed_scale**2)
         if args.no_pdf:
             alpha_s = 0.118
         else:
@@ -381,7 +379,7 @@ def madflow_main(args=None, quick_return=False):
             wgts = matrix.cusmatrix(test_ps, *model.evaluate(test_alpha))
         else:
             wgts = matrix.smatrix(test_ps, *model.evaluate(test_alpha))
-        
+
         logger.info("Testing %s: %s", matrix, wgts.numpy())
 
     @tf.function(input_signature=3 * [tf.TensorSpec(shape=[None], dtype=DTYPE)])
@@ -423,7 +421,7 @@ def madflow_main(args=None, quick_return=False):
                     smatrix = matrix.cusmatrix(all_ps, *model.evaluate(alpha_s))
                 else:
                     smatrix = matrix.smatrix(all_ps, *model.evaluate(alpha_s))
-                #smatrix = matrix.smatrix(all_ps, *model.evaluate(alpha_s))
+                # smatrix = matrix.smatrix(all_ps, *model.evaluate(alpha_s))
                 if not args.no_pdf:
                     p1 = tf.gather(proton_1, gather_1[i], axis=1)
                     p2 = tf.gather(proton_2, gather_2[i], axis=1)
