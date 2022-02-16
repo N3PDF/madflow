@@ -141,6 +141,9 @@ def write_source_commands(text):
 def write_cleanup_commands(text):
     text += "clean:\n"
     text += "\trm -f $(TARGETS) $(OBJECT_SRCS_CUDA)\n"
+    text = write_nl(text)
+    text += "clean_all:\n"
+    text += "\trm -f $(TARGETS) $(OBJECT_SRCS_CUDA)\n"
     text += "\trm -f gpu/*\n"
     text = write_nl(text)
     return text
