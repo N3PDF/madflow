@@ -60,15 +60,6 @@ def write_omp_flags(text):
     return text
 
 
-def write_sources(text):
-    text += "GSRCS = $(wildcard gpu/*.cc)\n"
-    text += "CUDASRC = $(wildcard gpu/*.cu.cc)\n"
-    text += "SOURCES = $(filter-out $(CUDASRC), $(GSRCS))\n"
-    text += "OBJECT_SRCS_CUDA = $(GSRCS:.cc=.cudao)\n"
-    text = write_nl(text)
-    return text
-
-
 def write_cflags(text):
     text += "CFLAGS = ${TF_CFLAGS} ${OMP_CFLAGS} -fPIC -O2 -std=" + cppVersion + "\n"
     text += "LDFLAGS = -shared ${TF_LFLAGS}\n"
@@ -164,7 +155,6 @@ def write_makefile(destination):
     makefileContent = write_tf_generic_flags(makefileContent)
     makefileContent = write_tf_cuda_flags(makefileContent)
     # makefileContent = write_omp_flags(makefileContent)
-    # makefileContent = write_sources(makefileContent) # not needed
     makefileContent = write_cflags(makefileContent)
     makefileContent = write_target(makefileContent)
     makefileContent = write_commands(makefileContent)
