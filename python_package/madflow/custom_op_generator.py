@@ -5,310 +5,12 @@ import re
 
 import madflow.wavefunctions_flow
 from madflow.makefile_template import write_makefile
+from madflow.op_constants import * # to be removed
+from madflow.op_global_constants import *
+from madflow.op_aux_functions import *
+from madflow.op_classes import *
+from madflow.op_write_templates import *
 
-INT64Type = 'int64_t'
-
-def write_libraries(temp, libs):
-    tem = "{% for lib in libraries %}\
-"            "#include <{{ lib }}>\n\
-"           "{% endfor %}"
-
-    tm = Template(tem)
-    temp += tm.render(libraries=libs)
-    return temp
-    
-def write_headers(temp, libs):
-    tem = "{% for lib in libraries %}\
-"            "#include \"{{ lib }}\"\n\
-"           "{% endfor %}"
-
-    tm = Template(tem)
-    temp += tm.render(libraries=libs)
-    return temp
-
-def write_namespace(temp, name):
-    temp += "using namespace "+name+";\n"
-    return temp
-    
-def write_constants(temp, libs, device):
-    
-    dev = ''
-    if device == 'gpu':
-        dev = '__device__ ' 
-    
-    tem = "{% for lib in libraries %}\
-"            "{{ dev }}{{ lib }};\n\
-"           "{% endfor %}"
-
-    tm = Template(tem)
-    temp += tm.render(libraries=libs, dev=dev)
-    return temp
-    
-def write_defined(temp, libs_, device):
-    
-    libs = []
-    for l in libs_:
-        libs.append(l)
-    if device == 'gpu':
-        for i in range(len(libs)):
-            libs[i] = re.sub('std::', '', libs[i])
-            libs[i] = re.sub('conj', 'cconj', libs[i])
-    
-    tem = "{% for lib in libraries %}\
-"            "#define {{ lib }}\n\
-"           "{% endfor %}"
-
-    tm = Template(tem)
-    temp += tm.render(libraries=libs)
-    return temp
-    
-def empty_line(temp):
-    temp += "\n"
-    return temp
-
-def write_function(temp, func, device):
-    
-    dev = ''
-    if device == 'gpu':
-        if func.name == 'matrix':
-            dev = '__global__ ' 
-        else:
-            dev = '__device__ ' 
-    
-    func.argn = len(func.args)
-    tem = "\
-{{ func.template }}\n\
-{{ dev }}{{ func.type }} {{ func.name }} (\
-{% for i in range(func.argn - 1) %}\
-{{ func.args[i].type }} {{ func.args[i].name }}, \
-{% endfor %}\
-{{ func.args[func.argn - 1].type }} {{ func.args[func.argn - 1].name }}\
-) {\n\
-{% for scope in func.scope %}\
-    {{ scope }}\n\
-{% endfor %}\
-}"
-    tm = Template(tem)
-    temp = empty_line(temp)
-    temp += tm.render(func=func, dev=dev)
-    return temp
-
-def write_custom_op(temp, custom_op, func, device, process_name):
-    func2 = func
-    op_types = []
-    for i in range(len(func.args)):
-        t = re.sub('const (.*)', '\g<1>', func.args[i].type)
-        t = re.sub('([^&*]*)[&*]*', '\g<1>', t)
-        op_types.append(t)
-    func.argn = len(func.args)
-    p = re.sub('_', '', process_name)
-    if device == 'cpu':
-        tem = "\
-REGISTER_OP(\"Matrix" + p + "\")\n\
-    .Attr(\"T: numbertype\")\n\
-{% for i in range(func.argn - 3) %}\
-    .Input(\"{{ func.args[i].name|lower }}: {{ op_types[i] }}\")\n\
-{% endfor %}\
-    .Output(\"{{ func.args[func.argn - 3].name|lower }}: {{ op_types[func.argn - 3] }}\")\n\
-    .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {\n\
-      c->set_output(0, c->MakeShape({c->Dim(c->input(0), 0)}));\n\
-      return Status::OK();\n\
-    });\n\
-\
-\
-\
-template <typename T>\n\
-struct {{ custom_op.functor_name }}<CPUDevice, T> {\n\
-  void operator()(const CPUDevice& d,\
-{% for i in range(func.argn - 1) %}\
-{{ func.args[i].type }} {{ func.args[i].name }}, \
-{% endfor %}\
-{{ func.args[func.argn - 1].type }} {{ func.args[func.argn - 1].name }}\
-) {\n\
-      {{ func.name }}({% for i in range(func.argn - 1) %}\
-{{ func.args[i].name }}, \
-{% endfor %}\
-{{ func.args[func.argn - 1].name }}\
-);\n\
-  }\n\
-};\n\
-\
-\
-\
-template <typename Device, typename T>\n\
-class {{ custom_op.name }} : public OpKernel {\n\
- public:\n\
-  explicit {{ custom_op.name }}(OpKernelConstruction* context) : OpKernel(context) {}\n\
-\n\
-  void Compute(OpKernelContext* context) override {\n\
-{% for scope in custom_op.scope %}\
-    {{ scope }}\n\
-{% endfor %}\
-  }\n\
-};\n\
-#define REGISTER_CPU(T)\\\n\
-  REGISTER_KERNEL_BUILDER(\\\n\
-      Name(\"Matrix" + p + "\").Device(DEVICE_CPU).TypeConstraint<T>(\"T\"),\\\n\
-      MatrixOp<CPUDevice, T>);\n\
-REGISTER_CPU(COMPLEX_TYPE);\n\
-\n\
-// Register the GPU kernels.\n\
-#ifdef GOOGLE_CUDA\n\
-#define REGISTER_GPU(T)\\\n\
-  /* Declare explicit instantiations in kernel_example.cu.cc. */\\\n\
-  extern template class MatrixFunctor<GPUDevice, T>;\\\n\
-  REGISTER_KERNEL_BUILDER(\\\n\
-      Name(\"Matrix" + p + "\").Device(DEVICE_GPU).TypeConstraint<T>(\"T\"),\\\n\
-      MatrixOp<GPUDevice, T>);\n\
-REGISTER_GPU(COMPLEX_TYPE);\n\
-#endif\n\
-"
-    elif device == 'gpu':
-       tem = "\
-template <typename T>\n\
-void MatrixFunctor<GPUDevice, T>::operator()(\n\
-    const GPUDevice& d,\
-{% for i in range(func.argn - 1) %}\
-{{ func.args[i].type }} {{ func.args[i].name }}, \
-{% endfor %}\
-{{ func.args[func.argn - 1].type }} {{ func.args[func.argn - 1].name }}\
-) {\n\
-    // Launch the cuda kernel.\n\
-    //\n\
-    // See core/util/gpu_kernel_helper.h for example of computing\n\
-    // block count and thread_per_block count.\n\
-    \n\
-    int eventsPerBlock = 1;\n\
-    \n\
-    int blockSize = DEFAULT_BLOCK_SIZE;\n\
-    int numBlocks = (nevents + blockSize - 1) / (eventsPerBlock * blockSize);\n\
-    \n\
-    //std::cout << blockSize << " " << numBlocks << std::endl;\n\
-    if (nevents < blockSize) {\n\
-      numBlocks = 1;\n\
-      blockSize = nevents;\n\
-    }\n\
-    \n\
-    //int ngraphs = 3;\n\
-    //int nwavefuncs = 5;\n\
-    //int ncolor = 2;\n\
-    \n\
-    \n\
-    {{ func.name }}<T><<<numBlocks, blockSize, 0, d.stream()>>>({% for i in range(func.argn - 2) %}\
-{{ func.args[i].name }}, \
-{% endfor %}\
-{{ func.args[func.argn - 2].name }}\
-);\n\
-    \n\
-}\n\
-\n\
-// Explicitly instantiate functors for the types of OpKernels registered.\n\
-template struct MatrixFunctor<GPUDevice, COMPLEX_TYPE>;"
-    tm = Template(tem)
-    temp = empty_line(temp)
-    temp += tm.render(custom_op=custom_op, func=func, op_types=op_types)
-    return temp
-
-def write_header_file(temp, custom_op, func):
-    func2 = func
-    op_types = []
-    for i in range(len(func.args)):
-        t = re.sub('const (.*)', '\g<1>', func.args[i].type)
-        t = re.sub('([^&*]*)[&*]*', '\g<1>', t)
-        op_types.append(t)
-    func.argn = len(func.args)
-    tem = "#ifndef MATRIX_H_\n\
-#define MATRIX_H_\n\
-\n\
-#include <omp.h>\n\
-#include <unsupported/Eigen/CXX11/Tensor>\n\
-\n\
-#include \"tensorflow/core/framework/op.h\"\n\
-#include \"tensorflow/core/framework/op_kernel.h\"\n\
-//#include <cuComplex.h>\n\
-using namespace tensorflow;\n\
-\n\
-template <typename Device, typename T>\n\
-struct MatrixFunctor {\n\
-  void operator()(const Device& d, \
-{% for i in range(func.argn - 1) %}\
-{{ func.args[i].type }} {{ func.args[i].name }}, \
-{% endfor %}\
-{{ func.args[func.argn - 1].type }} {{ func.args[func.argn - 1].name }}\
-);\n\
-};\n\
-\n\
-#if GOOGLE_CUDA\n\
-// Partially specialize functor for GpuDevice.\n\
-template <typename T>\n\
-struct MatrixFunctor<Eigen::GpuDevice, T> {\n\
-  void operator()(const Eigen::GpuDevice& d, \
-{% for i in range(func.argn - 1) %}\
-{{ func.args[i].type }} {{ func.args[i].name }}, \
-{% endfor %}\
-{{ func.args[func.argn - 1].type }} {{ func.args[func.argn - 1].name }}\
-);\n\
-};\n\
-#endif\n\
-\n\
-//#include <thrust/complex.h>\n\
-\n\
-#define COMPLEX_TYPE " + complexType + "//thrust::complex<" + doubleType + ">\n\
-\n\
-#endif"
-    tm = Template(tem)
-    temp = empty_line(temp)
-    temp += tm.render(custom_op=custom_op, func=func, op_types=op_types)
-    return temp
-
-def define_function(temp, func, device): # to be renamed into write_function_definition(...)
-    
-    dev = ''
-    if device == 'gpu':
-        if func.name == 'matrix':
-            dev = '__global__ ' 
-        else:
-            dev = '__device__ ' 
-    
-    func.argn = len(func.args)
-    if func.args[0].type == doubleType + '*':
-        func.args[0].type = 'const ' + func.args[0].type
-    tem = "\
-{{ func.template }}\n\
-{{ dev }}{{ func.type }} {{ func.name }} (\
-{% for i in range(func.argn - 1) %}\
-{{ func.args[i].type }} {{ func.args[i].name }}, \
-{% endfor %}\
-{{ func.args[func.argn - 1].type }} {{ func.args[func.argn - 1].name }}\
-);"
-    tm = Template(tem)
-    temp = empty_line(temp)
-    temp += tm.render(func=func, dev=dev)
-    return temp
-    
-class function:
-    def __init__(self, f_type, f_name, f_args, f_scope, f_scope_args, f_template):
-        self.type = f_type
-        self.name = f_name
-        self.args = f_args
-        self.scope = f_scope
-        self.scope_args = f_scope_args
-        self.argn = len(f_args)
-        self.template = f_template
-        
-class custom_operator:
-    def __init__(self, f_name, f_scope, f_functor_name):
-        self.name = f_name
-        self.scope = f_scope
-        self.functor_name = f_functor_name
-
-class argument:
-    def __init__(self, a_name, a_type, a_size, a_tensor, a_slice):
-        self.name = a_name
-        self.type = a_type
-        self.size = a_size
-        self.tensor = a_tensor
-        self.slice = a_slice
 
 def read_file_from_source(function_list, file_source, signatures, signature_variables):
     f = open(file_source, "r")
@@ -1276,7 +978,6 @@ def check_variables(counter, function_list):
     
     
     for i in range(len(function_list[counter].args)):
-        #print((function_list[counter].args)[i].type, (function_list[counter].args)[i].name, (function_list[counter].args)[i].size)
         if (function_list[counter].args)[i].size == -1:
             all_sizes_defined = False
             break
@@ -1598,20 +1299,6 @@ def prepare_custom_op(f, nevents):
     
     return f
 
-class signature:
-    def __init__(self, a_name, a_type, a_size, a_tensor, a_slice):
-        self.name = a_name
-        self.type = a_type
-        self.size = a_size
-        self.tensor = a_tensor
-        self.slice = a_slice
-
-class signature_variable:
-    def __init__(self, a_name, signature_list, signature_name_list):
-        self.name = a_name
-        self.signature_name_list = signature_name_list
-        self.signature_list = signature_list
-
 def get_signature(line):
     type_ = line.split('dtype=')[1]
     type_ = type_.split(')')[0]
@@ -1775,7 +1462,6 @@ def extract_constants(func, constants):
     for i in range(len(func.scope)):
         if func.scope[i].startswith('const double '):
             constants.append(change_array_into_variable(func.scope[i]))
-            #constants.append(re.sub('const ', '', func.scope[i]))
             del func.scope[i]
             i -= 1
             count += 1
@@ -1800,77 +1486,26 @@ def change_array_into_variable(line):
         line = re.sub(';', '', line)
         return line
 
-doubleType = 'double'
-complexType = 'complex128'
 
-
-libraries = ["iostream",
-             "math.h",
-             "unsupported/Eigen/CXX11/Tensor"]
-headers_ = ["tensorflow/core/framework/op.h",
-           "tensorflow/core/framework/op_kernel.h",
-           "tensorflow/core/util/work_sharder.h",
-           "tensorflow/core/framework/shape_inference.h",
-           "tensorflow/cc/ops/array_ops.h",
-           "tensorflow/cc/ops/math_ops.h"]
-           
-namespace = "tensorflow"
-globalConstants = ["const " + doubleType + " SQH = 0.70710676908493",
-             "const COMPLEX_TYPE CZERO = COMPLEX_TYPE(0.0, 0.0)"]
-cpuConstants = ["using thread::ThreadPool"]
-defined = ["COMPLEX_CONJUGATE std::conj",
-           "MAXIMUM std::max",
-           "MINIMUM std::min",
-           "CPUDevice Eigen::ThreadPoolDevice",
-           "GPUDevice Eigen::GpuDevice",
-           "DEFAULT_BLOCK_SIZE 32"]
-             
 
 folder_name = 'prov/'
-folder_path = ''
-
-
-process = 'p p > t t~'
-process_name = re.sub(' *', '', process)
-process_name = re.sub('>', '_', process_name)
-process_name = re.sub('~', 'x', process_name)
 
 temp = ""
 
 def translate(destination):
     
-    if destination[-1] != '/':
+    if destination[-1] != '/': # Avoid weird behaviours if destination does not end with '/'
         destination += '/'
-    file_sources = [madflow.wavefunctions_flow.__file__]
+    file_sources = [madflow.wavefunctions_flow.__file__] # path to wavefunctions_flow.py
     
-    madflowLocation = madflow.__file__
-    madflowLocation = re.sub('__init__.*', '', madflowLocation)
+    # Create the directory for the Op source code and create the makefile
     
     subprocess.check_output(["/bin/sh", "-c", "mkdir " + destination + "gpu/"])
     write_makefile(destination)
     
-    function_list_ = []
-    
-    aux_args = []
     auxiliary_functions = []
-    aux_arg = argument('x', doubleType, 0, False, [])
-    aux_args.append(aux_arg)
-    aux_arg = argument('y', doubleType, 0, False, [])
-    aux_args.append(aux_arg)
-    aux_scope = ['int sign = 0;',
-                 'y >= 0 ? sign = 1 : sign = -1;',
-                 'return x * sign;']
-    aux_scope_args = [argument('sign', 'int', 0, False, [])]
-    aux_function = function(doubleType, 'sign', aux_args, aux_scope, aux_scope_args, '')
-    function_list_.append(aux_function)
-    auxiliary_functions.append(aux_function)
-    
-    aux_scope = ['return sign(x, y);']
-    aux_scope_args = []
-    aux_function = function(doubleType, 'signvec', aux_args, aux_scope, aux_scope_args, '')
-    function_list_.append(aux_function)
-    auxiliary_functions.append(aux_function)
-    
+    function_list_ = []
+    auxiliary_functions, function_list_ = generate_auxiliary_functions(auxiliary_functions, function_list_)
     
     for file_source in file_sources:
         signatures_ = []
@@ -1882,7 +1517,7 @@ def translate(destination):
     
         function_list_ = read_file_from_source(function_list_, file_source, signatures_, signature_variables_)
     
-    files_list = subprocess.check_output(["/bin/sh", "-c", "ls " + folder_path + destination + ' | grep matrix_1_']).decode('utf-8').split('\n')[:-1]
+    files_list = subprocess.check_output(["/bin/sh", "-c", "ls " + destination + ' | grep matrix_1_']).decode('utf-8').split('\n')[:-1]
     
     for _file_ in files_list:
         
@@ -1895,8 +1530,8 @@ def translate(destination):
         process_name = re.sub('matrix_1_', '', _file_)
         process_name = re.sub('\.py', '', process_name)
         
-        matrix_source = folder_path + destination + 'matrix_1_' + process_name + '.py'
-        process_source = folder_path + destination + 'aloha_1_' + process_name + '.py'
+        matrix_source = destination + 'matrix_1_' + process_name + '.py'
+        process_source = destination + 'aloha_1_' + process_name + '.py'
         
         _file_ = process_source
         
@@ -1946,7 +1581,7 @@ def translate(destination):
         
         temp = ""
         temp = write_headers(temp, headers)
-        temp = write_namespace(temp, namespace)
+        temp = write_namespaces(temp, namespace)
         temp = write_defined(temp, defined, 'cpu')
         
         temp = write_constants(temp, constants, 'cpu')
@@ -1957,10 +1592,10 @@ def translate(destination):
                 function_list[-1].scope[i] = re.sub('.real\(\)', '', function_list[-1].scope[i])
         
         for f in function_list:
-            temp = define_function(temp, f, 'cpu')
+            temp = write_function_definition(temp, f, 'cpu')
         
         for f in function_list:
-            temp = empty_line(temp)
+            temp = write_empty_line(temp)
             temp = write_function(temp, f, 'cpu')
         
         for c in custom_op_list:
@@ -1975,7 +1610,7 @@ def translate(destination):
 "               "#define EIGEN_USE_GPU\n"
         temp = write_libraries(temp, libraries)
         temp = write_headers(temp, headers)
-        temp = write_namespace(temp, namespace)
+        temp = write_namespaces(temp, namespace)
         temp = write_defined(temp, defined, 'gpu')
         
         
@@ -1997,48 +1632,13 @@ def translate(destination):
             i += 1
         
         for f in function_list:
-            temp = define_function(temp, f, 'gpu')
+            temp = write_function_definition(temp, f, 'gpu')
         
-        temp = empty_line(temp)
-        temp += "__device__ COMPLEX_TYPE cconj(COMPLEX_TYPE a) {\n\
-    return COMPLEX_TYPE(a.real(), -a.imag());\n\
-}\n\
-\n\
-__device__ COMPLEX_TYPE operator+(const COMPLEX_TYPE& a, const COMPLEX_TYPE& b) {\n\
-    return COMPLEX_TYPE(a.real() + b.real(), a.imag() + b.imag());\n\
-}\n\
-\n\
-__device__ COMPLEX_TYPE operator-(const COMPLEX_TYPE& a, const COMPLEX_TYPE& b) {\n\
-    return COMPLEX_TYPE(a.real() - b.real(), a.imag() - b.imag());\n\
-}\n\
-\n\
-__device__ COMPLEX_TYPE operator*(const COMPLEX_TYPE& a, const COMPLEX_TYPE& b) {\n\
-    return COMPLEX_TYPE(a.real() * b.real() - a.imag() * b.imag(), a.imag() * b.real() + a.real() * b.imag());\n\
-}\n\
-\n\
-__device__ COMPLEX_TYPE operator/(const COMPLEX_TYPE& a, const COMPLEX_TYPE& b) {\n\
-    " + doubleType + " norm = b.real() * b.real() + b.imag() * b.imag();\n\
-    return COMPLEX_TYPE((a.real() * b.real() + a.imag() * b.imag())/norm, (a.imag() * b.real() - a.real() * b.imag())/norm);\n\
-}\n\
-\n\
-__device__ COMPLEX_TYPE operator-(const COMPLEX_TYPE& a) {\n\
-    return COMPLEX_TYPE(-a.real(), -a.imag());\n\
-}\n\
-\n\
-__device__ COMPLEX_TYPE operator*(const COMPLEX_TYPE& a, const " + doubleType + "& b) {\n\
-    return COMPLEX_TYPE(a.real() * b, a.imag() * b);\n\
-}\n\
-\n\
-__device__ COMPLEX_TYPE operator*(const " + doubleType + "& a, const COMPLEX_TYPE& b) {\n\
-    return b * a;\n\
-}\n\
-\n\
-__device__ COMPLEX_TYPE operator/(const COMPLEX_TYPE& a, const " + doubleType + "& b) {\n\
-    return COMPLEX_TYPE(a.real() / b, a.imag() / b);\n\
-}\n"
+        temp = write_empty_line(temp)
+        temp += gpuArithmeticOperators
         
         for f in function_list:
-            temp = empty_line(temp)
+            temp = write_empty_line(temp)
             temp = write_function(temp, f, 'gpu')
         
         
