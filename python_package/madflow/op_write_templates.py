@@ -13,17 +13,11 @@ def template_with_string(templateString, variable):
 
 
 def write_libraries(temp, lib):
-    # templateString = libraryTemplate
-    # template = Template(templateString)
-    # temp += template.render(library=lib)
     temp += template_with_string(libraryTemplate, lib)
     return temp
 
 
 def write_headers(temp, head):
-    # templateString = headerTemplate
-    # template = Template(templateString)
-    # temp += template.render(header=head)
     temp += template_with_string(headerTemplate, head)
     return temp
 
@@ -56,9 +50,6 @@ def write_defined(temp, constants_, device):
             constants[i] = re.sub("std::", "", constants[i])
             constants[i] = re.sub("conj", "cconj", constants[i])
 
-    # templateString = definedConstantTemplate
-    # template = Template(templateString)
-    # temp += template.render(constantVariables=constants)
     temp += template_with_string(definedConstantTemplate, constants)
     return temp
 
