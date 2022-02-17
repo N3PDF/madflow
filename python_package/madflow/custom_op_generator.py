@@ -1,11 +1,9 @@
-from jinja2 import Template
-
 import subprocess
-import re
+#import re
 
 import madflow.wavefunctions_flow
 from madflow.makefile_template import write_makefile
-from madflow.op_constants import * # to be removed
+#from madflow.op_constants import * # to be removed
 from madflow.op_global_constants import *
 from madflow.op_aux_functions import *
 from madflow.op_classes import *
