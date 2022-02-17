@@ -1,4 +1,4 @@
-from madflow.op_global_constants import *
+from madflow.op_global_constants import doubleType, complexType
 
 # Templates ----------------------
 

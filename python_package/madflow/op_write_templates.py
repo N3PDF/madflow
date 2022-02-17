@@ -128,8 +128,3 @@ def write_custom_op(temp, custom_op, func, device, process_name):
     temp += "\n"
     temp += template.render(custom_op=custom_op, func=func, op_types=op_types, process=p)
     return temp
-
-
-def write_empty_line(temp):
-    temp += "\n"
-    return temp
