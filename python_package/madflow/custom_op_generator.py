@@ -35,12 +35,14 @@ def translate(destination):
     subprocess.check_output(["/bin/sh", "-c", "mkdir -p " + destination + "gpu/"])
     write_makefile(destination)
 
+    # Generate sign functions
     auxiliary_functions = []
     function_list_ = []
     auxiliary_functions, function_list_ = generate_auxiliary_functions(
         auxiliary_functions, function_list_
     )
-
+    
+    # Read wavefunctions_flow.py
     for file_source in file_sources:
         signatures_ = []
         signature_variables_ = []
@@ -54,7 +56,8 @@ def translate(destination):
         function_list_ = read_file_from_source(
             function_list_, file_source, signatures_, signature_variables_
         )
-
+    
+    # Find all generated matrix_1_xxxxx.py (one for each subprocess)
     files_list = (
         subprocess.check_output(["/bin/sh", "-c", "ls " + destination + " | grep matrix_1_"])
         .decode("utf-8")
@@ -122,9 +125,13 @@ def translate(destination):
         function_list[-1] = parallelize_function(function_list[-1])
 
         custom_op_list = define_custom_op(custom_op_list, function_list[-1])
-
+        
         function_list[-1], constants = extract_constants(function_list[-1], constants)
+        
+        function_list[-1] = remove_real_ret(function_list[-1])
 
+        write_custom_op(headers, namespace, defined, constants, cpuConstants, function_list, custom_op_list, destination, process_name, "cpu")
+        """
         temp = ""
         temp = write_headers(temp, headers)
         temp = write_namespaces(temp, namespace)
@@ -145,18 +152,21 @@ def translate(destination):
             temp = write_function(temp, f, "cpu")
 
         for c in custom_op_list:
-            temp = write_custom_op(temp, c, function_list[-1], "cpu", process_name)
+            temp = write_matrix_op(temp, c, function_list[-1], "cpu", process_name)
 
         with open(destination + "gpu/matrix_" + process_name + ".cc", "w") as fh:
             fh.write(temp)
+        """
 
+        write_custom_op(headers, namespace, defined, constants, cpuConstants, function_list, custom_op_list, destination, process_name, "gpu")
+        """
         temp = ""
         temp += (
             "#ifdef GOOGLE_CUDA\n\
 "
             "#define EIGEN_USE_GPU\n"
         )
-        temp = write_libraries(temp, libraries)
+        temp = write_libraries(temp, libraries) # ???
         temp = write_headers(temp, headers)
         temp = write_namespaces(temp, namespace)
         temp = write_defined(temp, defined, "gpu")
@@ -197,7 +207,7 @@ def translate(destination):
         function_list[-1].args.append(argument("context", "const OpKernelContext*", 0, False, []))
 
         for c in custom_op_list:
-            temp = write_custom_op(temp, c, function_list[-1], "gpu", process_name)
+            temp = write_matrix_op(temp, c, function_list[-1], "gpu", process_name)
 
         temp = re.sub("([ ,+\-*/]+)sign([ (;]+)", "\g<1>signn\g<2>", temp)
         temp = re.sub("([ ,+\-*/]+)signvec([ (;]+)", "\g<1>signvecc\g<2>", temp)
@@ -206,9 +216,12 @@ def translate(destination):
 
         with open(destination + "gpu/matrix_" + process_name + ".cu.cc", "w") as fh:
             fh.write(temp)
+        """
 
         temp = ""
-        temp = write_header_file(temp, c, function_list[-1])
+        #temp = write_header_file(temp, c, function_list[-1])
+        for c in custom_op_list:
+            temp = write_header_file(temp, c, function_list[-1])
         with open(destination + "gpu/matrix_" + process_name + ".h", "w") as fh:
             fh.write(temp)
 

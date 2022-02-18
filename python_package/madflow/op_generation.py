@@ -227,3 +227,12 @@ def extract_constants(func, constants):
             break
 
     return func, constants
+
+def remove_real_ret(func):
+
+    for i in range(len(func.scope)):  # This loop can be reversed
+        if clean_spaces(func.scope[len(func.scope) - i - 1]).startswith(func.args[-3].name):
+            func.scope[len(func.scope) - i - 1] = re.sub(".real\(\)", "", func.scope[len(func.scope) - i - 1])
+            break # Only one occurrence
+
+    return func
