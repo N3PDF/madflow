@@ -171,16 +171,31 @@ def define_custom_op(custom_op_list, func):
     return custom_op_list
 
 
-def modify_matrix(infile, temp, process_name, destination):
+def modify_matrix(infile, process_name, destination):
     f = open(infile, "r")
     line = f.readline()
+    previousLine = ""
     new_matrix = ""
+    matrixSourceCode = ""
+    matrixSourceCodeArray = []
+    skipLines = False
     inside_matrix = False
     p = re.sub("_", "", process_name)
     while line != "":
-        temp += line
+        if skipLines == True:
+            if clean_spaces(line).startswith("return"):
+                skipLines = False
+        else:
+            #temp += line
+            matrixSourceCodeArray.append(line)
+        if clean_spaces(line).startswith("defcusmatrix("): # I can re-run the script without creating duplicates of cusmatrix()
+            skipLines = True
+            matrixSourceCodeArray.pop()
+            matrixSourceCodeArray.pop()
         if clean_spaces(line).startswith("defsmatrix("):
             inside_matrix = True
+            new_matrix += "\n" # add empty line
+            new_matrix += previousLine # add @tf.function() with the same input signature as smatrix
         if inside_matrix == True:
             if clean_spaces(line).startswith("for"):
                 space = line.split("for")[0]
@@ -195,15 +210,25 @@ def modify_matrix(infile, temp, process_name, destination):
             new_matrix += line
             if clean_spaces(line).startswith("return"):
                 inside_matrix = False
-                break
+                new_matrix = re.sub("smatrix\(", "cusmatrix(", new_matrix)
+                new_matrix = re.sub("self\.matrix\(", "matrixOp.matrix" + p + "(", new_matrix)
+                #temp += new_matrix
+                matrixSourceCodeArray.append(new_matrix)
+                #break
+        if clean_spaces(line) != "": # not checking if it is inside a comment !!!
+            previousLine = line
         line = f.readline()
-    new_matrix = re.sub("smatrix\(", "cusmatrix(", new_matrix)
-    new_matrix = re.sub("self\.matrix\(", "matrixOp.matrix" + p + "(", new_matrix)
-    temp += new_matrix
-    while line != "":
-        temp += line
-        line = f.readline()
-    return temp
+    #new_matrix = re.sub("smatrix\(", "cusmatrix(", new_matrix)
+    #new_matrix = re.sub("self\.matrix\(", "matrixOp.matrix" + p + "(", new_matrix)
+    #temp += new_matrix
+    #while line != "":
+    #    temp += line
+    #    line = f.readline()
+    
+    for line in matrixSourceCodeArray:
+        matrixSourceCode += line
+    
+    return matrixSourceCode
 
 
 def extract_constants(func, constants):

@@ -1,22 +1,13 @@
 import subprocess
 
-# import re
 
 import madflow.wavefunctions_flow
 from madflow.makefile_template import write_makefile
 
-# from madflow.op_constants import * # to be removed
-# from madflow.op_global_constants import *
-# from madflow.op_aux_functions import *
-# from madflow.op_classes import *
 from madflow.op_write_templates import *
 from madflow.op_syntax import *
 from madflow.op_read import *
 from madflow.op_generation import *
-
-
-def clean_args(a):
-    return a.translate({ord(c): None for c in "\n "})
 
 
 folder_name = "prov/"
@@ -130,103 +121,20 @@ def translate(destination):
         
         function_list[-1] = remove_real_ret(function_list[-1])
 
+
         write_custom_op(headers, namespace, defined, constants, cpuConstants, function_list, custom_op_list, destination, process_name, "cpu")
-        """
-        temp = ""
-        temp = write_headers(temp, headers)
-        temp = write_namespaces(temp, namespace)
-        temp = write_defined(temp, defined, "cpu")
-
-        temp = write_constants(temp, constants, "cpu")
-        temp = write_constants(temp, cpuConstants, "cpu")
-
-        for i in range(len(function_list[-1].scope)):  # This loop can be reversed
-            if clean_args(function_list[-1].scope[i]).startswith(function_list[-1].args[-3].name):
-                function_list[-1].scope[i] = re.sub(".real\(\)", "", function_list[-1].scope[i])
-
-        for f in function_list:
-            temp = write_function_definition(temp, f, "cpu")
-
-        for f in function_list:
-            temp += "\n"
-            temp = write_function(temp, f, "cpu")
-
-        for c in custom_op_list:
-            temp = write_matrix_op(temp, c, function_list[-1], "cpu", process_name)
-
-        with open(destination + "gpu/matrix_" + process_name + ".cc", "w") as fh:
-            fh.write(temp)
-        """
 
         write_custom_op(headers, namespace, defined, constants, cpuConstants, function_list, custom_op_list, destination, process_name, "gpu")
-        """
-        temp = ""
-        temp += (
-            "#ifdef GOOGLE_CUDA\n\
-"
-            "#define EIGEN_USE_GPU\n"
-        )
-        temp = write_libraries(temp, libraries) # ???
-        temp = write_headers(temp, headers)
-        temp = write_namespaces(temp, namespace)
-        temp = write_defined(temp, defined, "gpu")
-
-        temp = write_constants(temp, constants, "gpu")
-
-        del function_list[-1].args[-1]
-
-        i = 0
-        while i < len(function_list[-1].scope):
-            if function_list[-1].scope[i].startswith("auto thread_pool"):
-                while (
-                    i < len(function_list[-1].scope)
-                    and function_list[-1].scope[i].startswith("for (auto it") == False
-                ):
-                    del function_list[-1].scope[i]
-                function_list[-1].scope[i] = (
-                    "for (int it = blockIdx.x * blockDim.x + threadIdx.x; it < "
-                    + function_list[-1].args[-1].name
-                    + "; it += blockDim.x * gridDim.x) {"
-                )
-            elif function_list[-1].scope[i] == "};":
-                del function_list[-1].scope[i]
-                del function_list[-1].scope[i]
-                break
-            i += 1
-
-        for f in function_list:
-            temp = write_function_definition(temp, f, "gpu")
-
-        temp += "\n"
-        temp += gpuArithmeticOperators
-
-        for f in function_list:
-            temp += "\n"
-            temp = write_function(temp, f, "gpu")
-
-        function_list[-1].args.append(argument("context", "const OpKernelContext*", 0, False, []))
-
-        for c in custom_op_list:
-            temp = write_matrix_op(temp, c, function_list[-1], "gpu", process_name)
-
-        temp = re.sub("([ ,+\-*/]+)sign([ (;]+)", "\g<1>signn\g<2>", temp)
-        temp = re.sub("([ ,+\-*/]+)signvec([ (;]+)", "\g<1>signvecc\g<2>", temp)
-
-        temp += "\n#endif\n"
-
-        with open(destination + "gpu/matrix_" + process_name + ".cu.cc", "w") as fh:
-            fh.write(temp)
-        """
+        
 
         temp = ""
-        #temp = write_header_file(temp, c, function_list[-1])
         for c in custom_op_list:
             temp = write_header_file(temp, c, function_list[-1])
         with open(destination + "gpu/matrix_" + process_name + ".h", "w") as fh:
             fh.write(temp)
 
         temp = ""
-        temp = modify_matrix(matrix_source, temp, process_name, destination)
+        temp = modify_matrix(matrix_source, process_name, destination)
         with open(destination + matrix_name, "w") as fh:
             fh.write(temp)
 
