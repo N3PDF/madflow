@@ -1,7 +1,36 @@
 from madflow.op_aux_functions import *
 
+n_events = argument("nevents", "const int", 0, False, [])
+forLoopString = "for (int it = 0; it < " + n_events.name + "; it += 1) {"
 
-def parallelize_function(f):
+def serialize_function(f):
+    forLoop = False
+    spacing = "    "
+    s = 0
+    while s < len(f.scope):
+        if forLoop == True:
+            f.scope[s] = spacing + f.scope[s]
+        elif clean_spaces(f.scope[s]).startswith("//Begin"):
+            forLoop = True
+            s += 1
+            while clean_spaces(f.scope[s]).startswith("//") == True:
+                s += 1
+
+            f.scope.insert(s, forLoopString)
+
+        s += 1
+
+    f.scope.insert(s, "}")
+    s += 1
+
+    f = prepare_custom_op(f, n_events)
+
+    f.args.append(argument("context", "const OpKernelContext*", 0, False, []))
+
+    return f
+    
+def parallelize_function(f, parallelizationType):
+    """
     parall = False
     n_events = argument("nevents", "const int", 0, False, [])
     spacing = "    "
@@ -52,11 +81,59 @@ def parallelize_function(f):
     f.scope.insert(s, "};")
     s += 1
     f.scope.insert(s, "thread_pool->ParallelFor(" + n_events.name + ", p, DoWork);")
-
-    f = prepare_custom_op(f, n_events)
-
-    f.args.append(argument("context", "const OpKernelContext*", 0, False, []))
-
+    """
+    
+    s = 0
+    if parallelizationType == 'OpenMP':
+        while s < len(f.scope):
+            if clean_spaces(f.scope[s]).startswith(clean_spaces(forLoopString)):
+                f.scope.insert(s, "#pragma omp parallel for")
+                break
+            s += 1
+    elif parallelizationType == 'ThreadPool':
+        while s < len(f.scope):
+            if clean_spaces(f.scope[s]).startswith(clean_spaces(forLoopString)):
+                f.scope.insert(
+                    s, "auto thread_pool = context->device()->tensorflow_cpu_worker_threads()->workers;"
+                )
+                s += 1
+                f.scope.insert(s, "const int ncores = (int)thread_pool->NumThreads();")
+                s += 1
+                f.scope.insert(s, INT64Type + " nreps;")
+                s += 1
+                f.scope.insert(s, "if (ncores > 1) {")
+                s += 1
+                f.scope.insert(s, "    nreps = (" + INT64Type + ")" + n_events.name + " / ncores;")
+                s += 1
+                f.scope.insert(s, "} else {")
+                s += 1
+                f.scope.insert(s, "    nreps = 1;")
+                s += 1
+                f.scope.insert(s, "}")
+                s += 1
+                f.scope.insert(
+                    s,
+                    "const ThreadPool::SchedulingParams p(ThreadPool::SchedulingStrategy::kFixedBlockSize, absl::nullopt, nreps);",
+                )
+                s += 1
+                f.scope.insert(s, "auto DoWork = [&](" + INT64Type + " t, " + INT64Type + " w) {")
+                s += 1
+                del f.scope[s]
+                f.scope.insert(s, "for (auto it = t; it < w; it += 1) {")
+                break
+            s += 1
+        
+        s = len(f.scope)
+        f.scope.insert(s, "};")
+        s += 1
+        f.scope.insert(s, "thread_pool->ParallelFor(" + n_events.name + ", p, DoWork);")
+    elif parallelizationType == 'CUDA':
+        while s < len(f.scope):
+            if clean_spaces(f.scope[s]).startswith(clean_spaces(forLoopString)):
+                f.scope[s] = "for (int it = blockIdx.x * blockDim.x + threadIdx.x; it < " + f.args[-1].name + "; it += blockDim.x * gridDim.x) {"
+                break
+            s += 1
+    
     return f
 
 

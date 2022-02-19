@@ -3,6 +3,7 @@ import re
 
 from madflow.op_constants import *
 from madflow.op_classes import *
+from madflow.op_generation import *
 
 
 def template_with_string(templateString, variable):
@@ -76,21 +77,38 @@ def write_function_definition(temp, func, device):
     return temp
 
 
-def write_function(temp, func, device):
+def write_function(temp, fun, device):
 
     dev = ""
+        
+    if fun.name == "matrix":
+        func = function(fun.type, fun.name, fun.args, [], fun.scope_args, fun.template)
+        for i in range(len(fun.scope)):
+            func.scope.append(fun.scope[i])
+        if device == "cpu":
+            func = parallelize_function(func, 'ThreadPool')
+        else:
+            del func.args[-1]
+            func = parallelize_function(func, 'CUDA')
+            dev = "__global__ "
+    else:
+        func = fun
+        if device == "gpu":
+            dev = "__device__ "
+    """
     if device == "gpu":
         if func.name == "matrix":
             dev = "__global__ "
         else:
             dev = "__device__ "
-
+    """
     func.argn = len(func.args)
     templateString = functionTemplate
 
     template = Template(templateString)
     temp += "\n"
     temp += template.render(func=func, dev=dev)
+    
     return temp
 
 
@@ -111,7 +129,7 @@ def write_header_file(temp, custom_op, func):
 
 
 def write_matrix_op(temp, custom_op, func, device, process_name):
-    func2 = func
+    #func2 = func
     op_types = []
     for i in range(len(func.args)):
         t = re.sub("const (.*)", "\g<1>", func.args[i].type)
@@ -155,8 +173,9 @@ def write_custom_op(headers, namespace, defined, constants, cpuConstants, functi
     
     if device == "cpu":
         customOpCode = write_constants(customOpCode, cpuConstants, device)
-
-    if device =="gpu":
+    
+    """
+    if device == "gpu":
         del function_list[-1].args[-1]
 
         i = 0
@@ -177,11 +196,11 @@ def write_custom_op(headers, namespace, defined, constants, cpuConstants, functi
                 del function_list[-1].scope[i]
                 break
             i += 1
-    
+    """
     for f in function_list:
         customOpCode = write_function_definition(customOpCode, f, device)
     
-    if device =="gpu":
+    if device == "gpu":
         customOpCode += "\n"
         customOpCode += gpuArithmeticOperators
 

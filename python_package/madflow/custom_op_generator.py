@@ -113,7 +113,8 @@ def translate(destination):
         for i in range(len(function_list)):
             function_list = check_variables(i, function_list)
 
-        function_list[-1] = parallelize_function(function_list[-1])
+        #function_list[-1] = parallelize_function(function_list[-1])
+        function_list[-1] = serialize_function(function_list[-1])
 
         custom_op_list = define_custom_op(custom_op_list, function_list[-1])
         
