@@ -80,16 +80,16 @@ def write_function_definition(temp, func, device):
 def write_function(temp, fun, device):
 
     dev = ""
-        
+
     if fun.name == "matrix":
         func = function(fun.type, fun.name, fun.args, [], fun.scope_args, fun.template)
         for i in range(len(fun.scope)):
             func.scope.append(fun.scope[i])
         if device == "cpu":
-            func = parallelize_function(func, 'ThreadPool')
+            func = parallelize_function(func, "ThreadPool")
         else:
             del func.args[-1]
-            func = parallelize_function(func, 'CUDA')
+            func = parallelize_function(func, "CUDA")
             dev = "__global__ "
     else:
         func = fun
@@ -108,7 +108,7 @@ def write_function(temp, fun, device):
     template = Template(templateString)
     temp += "\n"
     temp += template.render(func=func, dev=dev)
-    
+
     return temp
 
 
@@ -129,7 +129,7 @@ def write_header_file(temp, custom_op, func):
 
 
 def write_matrix_op(temp, custom_op, func, device, process_name):
-    #func2 = func
+    # func2 = func
     op_types = []
     for i in range(len(func.args)):
         t = re.sub("const (.*)", "\g<1>", func.args[i].type)
@@ -148,15 +148,27 @@ def write_matrix_op(temp, custom_op, func, device, process_name):
     temp += template.render(custom_op=custom_op, func=func, op_types=op_types, process=p)
     return temp
 
-def write_custom_op(headers, namespace, defined, constants, cpuConstants, function_list, custom_op_list, destination, process_name, device):
-    
+
+def write_custom_op(
+    headers,
+    namespace,
+    defined,
+    constants,
+    cpuConstants,
+    function_list,
+    custom_op_list,
+    destination,
+    process_name,
+    device,
+):
+
     extension = ""
     customOpCode = ""
     if device == "cpu":
         extension = ".cc"
     elif device == "gpu":
         extension = ".cu.cc"
-        
+
         customOpCode += (
             "#ifdef GOOGLE_CUDA\n\
 "
@@ -164,16 +176,16 @@ def write_custom_op(headers, namespace, defined, constants, cpuConstants, functi
         )
     else:
         return
-    
+
     customOpCode = write_headers(customOpCode, headers)
     customOpCode = write_namespaces(customOpCode, namespace)
     customOpCode = write_defined(customOpCode, defined, device)
 
     customOpCode = write_constants(customOpCode, constants, device)
-    
+
     if device == "cpu":
         customOpCode = write_constants(customOpCode, cpuConstants, device)
-    
+
     """
     if device == "gpu":
         del function_list[-1].args[-1]
@@ -199,7 +211,7 @@ def write_custom_op(headers, namespace, defined, constants, cpuConstants, functi
     """
     for f in function_list:
         customOpCode = write_function_definition(customOpCode, f, device)
-    
+
     if device == "gpu":
         customOpCode += "\n"
         customOpCode += gpuArithmeticOperators
@@ -208,13 +220,13 @@ def write_custom_op(headers, namespace, defined, constants, cpuConstants, functi
         customOpCode += "\n"
         customOpCode = write_function(customOpCode, f, device)
 
-    if device =="gpu":
+    if device == "gpu":
         function_list[-1].args.append(argument("context", "const OpKernelContext*", 0, False, []))
-            
+
     for c in custom_op_list:
         customOpCode = write_matrix_op(customOpCode, c, function_list[-1], device, process_name)
-        
-    if device =="gpu":
+
+    if device == "gpu":
         customOpCode = re.sub("([ ,+\-*/]+)sign([ (;]+)", "\g<1>signn\g<2>", customOpCode)
         customOpCode = re.sub("([ ,+\-*/]+)signvec([ (;]+)", "\g<1>signvecc\g<2>", customOpCode)
 

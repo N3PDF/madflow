@@ -32,7 +32,7 @@ def translate(destination):
     auxiliary_functions, function_list_ = generate_auxiliary_functions(
         auxiliary_functions, function_list_
     )
-    
+
     # Read wavefunctions_flow.py
     for file_source in file_sources:
         signatures_ = []
@@ -47,7 +47,7 @@ def translate(destination):
         function_list_ = read_file_from_source(
             function_list_, file_source, signatures_, signature_variables_
         )
-    
+
     # Find all generated matrix_1_xxxxx.py (one for each subprocess)
     files_list = (
         subprocess.check_output(["/bin/sh", "-c", "ls " + destination + " | grep matrix_1_"])
@@ -113,20 +113,39 @@ def translate(destination):
         for i in range(len(function_list)):
             function_list = check_variables(i, function_list)
 
-        #function_list[-1] = parallelize_function(function_list[-1])
         function_list[-1] = serialize_function(function_list[-1])
 
         custom_op_list = define_custom_op(custom_op_list, function_list[-1])
-        
+
         function_list[-1], constants = extract_constants(function_list[-1], constants)
-        
+
         function_list[-1] = remove_real_ret(function_list[-1])
 
+        write_custom_op(
+            headers,
+            namespace,
+            defined,
+            constants,
+            cpuConstants,
+            function_list,
+            custom_op_list,
+            destination,
+            process_name,
+            "cpu",
+        )
 
-        write_custom_op(headers, namespace, defined, constants, cpuConstants, function_list, custom_op_list, destination, process_name, "cpu")
-
-        write_custom_op(headers, namespace, defined, constants, cpuConstants, function_list, custom_op_list, destination, process_name, "gpu")
-        
+        write_custom_op(
+            headers,
+            namespace,
+            defined,
+            constants,
+            cpuConstants,
+            function_list,
+            custom_op_list,
+            destination,
+            process_name,
+            "gpu",
+        )
 
         temp = ""
         for c in custom_op_list:
