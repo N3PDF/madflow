@@ -86,22 +86,16 @@ def write_function(temp, fun, device):
         for i in range(len(fun.scope)):
             func.scope.append(fun.scope[i])
         if device == "cpu":
-            func = parallelize_function(func, "ThreadPool")
+            func = parallelize_function(func, cpuParallelization)
         else:
             del func.args[-1]
-            func = parallelize_function(func, "CUDA")
+            func = parallelize_function(func, gpuParallelization)
             dev = "__global__ "
     else:
         func = fun
         if device == "gpu":
             dev = "__device__ "
-    """
-    if device == "gpu":
-        if func.name == "matrix":
-            dev = "__global__ "
-        else:
-            dev = "__device__ "
-    """
+
     func.argn = len(func.args)
     templateString = functionTemplate
 
@@ -180,35 +174,12 @@ def write_custom_op(
     customOpCode = write_headers(customOpCode, headers)
     customOpCode = write_namespaces(customOpCode, namespace)
     customOpCode = write_defined(customOpCode, defined, device)
-
     customOpCode = write_constants(customOpCode, constants, device)
 
-    if device == "cpu":
-        customOpCode = write_constants(customOpCode, cpuConstants, device)
+    if device == "cpu":  # write 'using thread::ThreadPool' if using ThreadPool
+        if cpuParallelization == "ThreadPool":
+            customOpCode = write_constants(customOpCode, cpuConstants, device)
 
-    """
-    if device == "gpu":
-        del function_list[-1].args[-1]
-
-        i = 0
-        while i < len(function_list[-1].scope):
-            if function_list[-1].scope[i].startswith("auto thread_pool"):
-                while (
-                    i < len(function_list[-1].scope)
-                    and function_list[-1].scope[i].startswith("for (auto it") == False
-                ):
-                    del function_list[-1].scope[i]
-                function_list[-1].scope[i] = (
-                    "for (int it = blockIdx.x * blockDim.x + threadIdx.x; it < "
-                    + function_list[-1].args[-1].name
-                    + "; it += blockDim.x * gridDim.x) {"
-                )
-            elif function_list[-1].scope[i] == "};":
-                del function_list[-1].scope[i]
-                del function_list[-1].scope[i]
-                break
-            i += 1
-    """
     for f in function_list:
         customOpCode = write_function_definition(customOpCode, f, device)
 

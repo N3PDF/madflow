@@ -225,14 +225,20 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 real_part = True
 
                 br_count = 0
+                # bracketCount = 0
 
                 for letter in value[len(st1) :]:
+
                     if letter == "(":
                         br_count += 1
                     elif letter == ")":
                         br_count -= 1
                     elif letter == "," and br_count == 0:
                         real_part = False
+
+                    # bracketCount = count_brackets_letter(letter, bracketCount)
+                    # if letter == "," and bracketCount == 0:
+                    #    real_part = False
 
                     if real_part == True:
                         comp[0] += letter

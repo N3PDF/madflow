@@ -4,10 +4,15 @@ INT64Type = "int64_t"
 doubleType = "double"
 complexType = "complex128"
 
+# Parallelization
+
+cpuParallelization = "ThreadPool"
+gpuParallelization = "CUDA"
+
 # Libraries (#include <libraryName>)
 # Used in Matrix_1_xxxx.h
 
-libraries = ["iostream", "math.h", "unsupported/Eigen/CXX11/Tensor"]
+libraries = ["math.h", "unsupported/Eigen/CXX11/Tensor"]
 
 # Header files (#include "Header.h")
 

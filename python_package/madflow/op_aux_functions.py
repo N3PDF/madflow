@@ -42,10 +42,13 @@ def clean_pointer(var_type):
 
 def count_brackets(line, brackets_count):
     for letter in line:
+        brackets_count = count_brackets_letter(letter, brackets_count)
+        """
         if letter == "(":
             brackets_count += 1
         elif letter == ")":
             brackets_count -= 1
+        """
     return brackets_count
 
 
@@ -99,3 +102,11 @@ def change_array_into_variable(line):
     else:
         line = re.sub(";", "", line)
         return line
+
+
+def count_brackets_letter(letter, bracketCount):
+    if letter == "(":
+        bracketCount += 1
+    elif letter == ")":
+        bracketCount -= 1
+    return bracketCount
