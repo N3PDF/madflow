@@ -13,6 +13,7 @@ from madflow.op_generation import *
 folder_name = "prov/"
 
 temp = ""
+devices = ["cpu", "gpu"]
 
 
 def translate(destination):
@@ -121,38 +122,29 @@ def translate(destination):
 
         function_list[-1] = remove_real_ret(function_list[-1])
 
-        write_custom_op(
-            headers,
-            namespace,
-            defined,
-            constants,
-            cpuConstants,
-            function_list,
-            custom_op_list,
-            destination,
-            process_name,
-            "cpu",
-        )
+        # write the Op for both CPU and GPU
+        for device in devices:
+            write_custom_op(
+                headers,
+                namespace,
+                defined,
+                constants,
+                cpuConstants,
+                function_list,
+                custom_op_list,
+                destination,
+                process_name,
+                device,
+            )
 
-        write_custom_op(
-            headers,
-            namespace,
-            defined,
-            constants,
-            cpuConstants,
-            function_list,
-            custom_op_list,
-            destination,
-            process_name,
-            "gpu",
-        )
-
+        # write matrix_xxxxx.h
         temp = ""
         for c in custom_op_list:
-            temp = write_header_file(temp, c, function_list[-1])
+            temp += write_header_file(c, function_list[-1])
         with open(destination + "gpu/matrix_" + process_name + ".h", "w") as fh:
             fh.write(temp)
 
+        # write matrix_1_xxxxx.py
         temp = ""
         temp = modify_matrix(matrix_source, process_name, destination)
         with open(destination + matrix_name, "w") as fh:

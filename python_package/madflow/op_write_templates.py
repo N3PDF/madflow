@@ -15,21 +15,23 @@ def template_with_string(templateString, variable):
 
 
 def write_libraries(temp, lib):
+    """Writes libraries (#include <...>)"""
     temp += template_with_string(libraryTemplate, lib)
     return temp
 
 
-def write_headers(temp, head):
-    temp += template_with_string(headerTemplate, head)
-    return temp
+def write_headers(head):
+    """Writes external header files (#include "...")"""
+    return template_with_string(headerTemplate, head)
 
 
-def write_namespaces(temp, name):
-    temp += "using namespace " + name + ";\n"
-    return temp
+def write_namespaces(name):
+    """Writes namespaces (using namespace ...;)"""
+    return "using namespace " + name + ";\n"
 
 
-def write_constants(temp, constVar, device):
+def write_constants(constVar, device):
+    """Writes constants ((__device__) const ...;)"""
 
     dev = ""
     if device == "gpu":
@@ -38,11 +40,11 @@ def write_constants(temp, constVar, device):
     templateString = constantVariableTemplate
 
     template = Template(templateString)
-    temp += template.render(constantVariable=constVar, dev=dev)
-    return temp
+    return template.render(constantVariable=constVar, dev=dev)
 
 
-def write_defined(temp, constants_, device):
+def write_defined(constants_, device):
+    """Writes constants (#define ...)"""
 
     constants = []  # GPU constants are different from CPU constants
     for l in constants_:
@@ -52,11 +54,12 @@ def write_defined(temp, constants_, device):
             constants[i] = re.sub("std::", "", constants[i])
             constants[i] = re.sub("conj", "cconj", constants[i])
 
-    temp += template_with_string(definedConstantTemplate, constants)
-    return temp
+    return template_with_string(definedConstantTemplate, constants)
 
 
-def write_function_definition(temp, func, device):
+def write_function_definition(func, device):
+    """Writes function definitions
+    (void function(..., ..., ...);)"""
 
     dev = ""
     if device == "gpu":
@@ -72,12 +75,14 @@ def write_function_definition(temp, func, device):
     templateString = functionDefinitionTemplate
 
     template = Template(templateString)
-    temp += "\n"
-    temp += template.render(func=func, dev=dev)
-    return temp
+    return "\n" + template.render(func=func, dev=dev)
 
 
-def write_function(temp, fun, device):
+def write_function(fun, device):
+    """Writes function implementations
+    (void function(..., ..., ...) {
+        ...
+    })"""
 
     dev = ""
 
@@ -100,14 +105,12 @@ def write_function(temp, fun, device):
     templateString = functionTemplate
 
     template = Template(templateString)
-    temp += "\n"
-    temp += template.render(func=func, dev=dev)
-
-    return temp
+    return "\n" + template.render(func=func, dev=dev)
 
 
-def write_header_file(temp, custom_op, func):
-    func2 = func
+def write_header_file(custom_op, func):
+    """Writes matrix_xxxxx.h"""
+    # func2 = func
     op_types = []
     for i in range(len(func.args)):
         t = re.sub("const (.*)", "\g<1>", func.args[i].type)
@@ -117,12 +120,10 @@ def write_header_file(temp, custom_op, func):
 
     templateString = headerFileTemplate
     template = Template(templateString)
-    temp += "\n"
-    temp += template.render(custom_op=custom_op, func=func, op_types=op_types)
-    return temp
+    return "\n" + template.render(custom_op=custom_op, func=func, op_types=op_types)
 
 
-def write_matrix_op(temp, custom_op, func, device, process_name):
+def write_matrix_op(custom_op, func, device, process_name):
     # func2 = func
     op_types = []
     for i in range(len(func.args)):
@@ -138,9 +139,7 @@ def write_matrix_op(temp, custom_op, func, device, process_name):
         templateString = gpuOpTemplate
 
     template = Template(templateString)
-    temp += "\n"
-    temp += template.render(custom_op=custom_op, func=func, op_types=op_types, process=p)
-    return temp
+    return "\n" + template.render(custom_op=custom_op, func=func, op_types=op_types, process=p)
 
 
 def write_custom_op(
@@ -155,6 +154,13 @@ def write_custom_op(
     process_name,
     device,
 ):
+    """Writes the Custom Operator:
+    - heades and libraries
+    - namespaces
+    - global constants
+    - function definitions
+    - function implementations
+    - "wrapper function" called by matrix_1_xxxxx.py"""
 
     extension = ""
     customOpCode = ""
@@ -171,17 +177,17 @@ def write_custom_op(
     else:
         return
 
-    customOpCode = write_headers(customOpCode, headers)
-    customOpCode = write_namespaces(customOpCode, namespace)
-    customOpCode = write_defined(customOpCode, defined, device)
-    customOpCode = write_constants(customOpCode, constants, device)
+    customOpCode += write_headers(headers)
+    customOpCode += write_namespaces(namespace)
+    customOpCode += write_defined(defined, device)
+    customOpCode += write_constants(constants, device)
 
     if device == "cpu":  # write 'using thread::ThreadPool' if using ThreadPool
         if cpuParallelization == "ThreadPool":
-            customOpCode = write_constants(customOpCode, cpuConstants, device)
+            customOpCode += write_constants(cpuConstants, device)
 
     for f in function_list:
-        customOpCode = write_function_definition(customOpCode, f, device)
+        customOpCode += write_function_definition(f, device)
 
     if device == "gpu":
         customOpCode += "\n"
@@ -189,13 +195,13 @@ def write_custom_op(
 
     for f in function_list:
         customOpCode += "\n"
-        customOpCode = write_function(customOpCode, f, device)
+        customOpCode += write_function(f, device)
 
     if device == "gpu":
         function_list[-1].args.append(argument("context", "const OpKernelContext*", 0, False, []))
 
     for c in custom_op_list:
-        customOpCode = write_matrix_op(customOpCode, c, function_list[-1], device, process_name)
+        customOpCode += write_matrix_op(c, function_list[-1], device, process_name)
 
     if device == "gpu":
         customOpCode = re.sub("([ ,+\-*/]+)sign([ (;]+)", "\g<1>signn\g<2>", customOpCode)

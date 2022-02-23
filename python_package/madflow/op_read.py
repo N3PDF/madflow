@@ -60,30 +60,6 @@ def grab_function_return(line, f, f_name, f_type, args):
     args.append(argument("ret", doubleType, -1, False, []))
     return args, f_type
 
-    split_types = []
-    l = f.readline()
-    comment_count = 0
-    while l != "" and comment_count < 1:
-        if clean_spaces(l) == '"""':
-            comment_count += 1
-        if l.startswith("    -------"):
-            l = f.readline()
-            if "shape=(" not in l:
-                l = l[:-1]
-                l += f.readline()
-            splitted = l.split("shape=(")
-            splitted[1] = clean_spaces(splitted[1])
-            new_type = "T"
-            if splitted[1].startswith(")") == False and splitted[1].startswith("None)") == False:
-                new_type += "*"
-            else:
-                new_type += "&"
-            split_types.append(new_type)
-            break
-        l = f.readline()
-    args.append(argument("ret", split_types[0], -1))
-    return args, f_type
-
 
 def grab_function_scope(f, scope, scope_args, args, f_type):
 

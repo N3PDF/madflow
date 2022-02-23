@@ -5,6 +5,7 @@ from madflow.op_classes import *
 
 
 def generate_auxiliary_functions(auxiliary_functions, function_list_):
+    """generates sign functions"""
     aux_args = []
     aux_arg = argument("x", doubleType, 0, False, [])
     aux_args.append(aux_arg)
@@ -28,19 +29,23 @@ def generate_auxiliary_functions(auxiliary_functions, function_list_):
 
 
 def clean_spaces(a):
+    """remove spaces or endlines within a string"""
     return a.translate({ord(c): None for c in "\n "})
 
 
 def clean_index(a):
+    """return the index of an array element"""
     return a.split("[")[0]
 
 
 def clean_pointer(var_type):
+    """remove * from a variable type"""
     var_type = re.sub("[&*]*", "", var_type)
     return var_type
 
 
 def count_brackets(line, brackets_count):
+    """remove the count of brackets () in a string"""
     for letter in line:
         brackets_count = count_brackets_letter(letter, brackets_count)
         """
@@ -52,8 +57,9 @@ def count_brackets(line, brackets_count):
     return brackets_count
 
 
-def convert_grammar(value):
-    value = re.sub("tf.reshape", "", value)
+def convert_grammar(oldValue):
+    """converts the grammar from Python to C++"""
+    value = re.sub("tf.reshape", "", oldValue)
     value = re.sub("\[:,[ :]*(\d+)\]", "[\g<1>]", value)
     value = re.sub("float_me\(([a-zA-Z0-9[\]+\-*/. ]*)\)", "\g<1>", value)
     value = re.sub("int_me", "(int)", value)
@@ -81,6 +87,7 @@ def convert_grammar(value):
 
 
 def convert_type(t):
+    """converts TensorFlow types into C++ types"""
     t = clean_spaces(t)
 
     result = ""
@@ -94,6 +101,8 @@ def convert_type(t):
 
 
 def change_array_into_variable(line):
+    """specific to denom
+    chenges denom from denom[i] into denom"""
     match = re.search("denom", line)
     if match != None:
         line = re.sub("\[\]", "", line)
