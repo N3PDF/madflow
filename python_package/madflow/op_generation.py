@@ -5,6 +5,7 @@ forLoopString = "for (int it = 0; it < " + n_events.name + "; it += 1) {"
 
 
 def serialize_function(f):
+    """Create a loop over the total number of events"""
     forLoop = False
     spacing = "    "
     s = 0
@@ -32,6 +33,7 @@ def serialize_function(f):
 
 
 def parallelize_function(f, parallelizationType):
+    """Parallelize the loop over the total number of events"""
     s = 0
     if parallelizationType == "OpenMP":
         while s < len(f.scope):
@@ -92,12 +94,16 @@ def parallelize_function(f, parallelizationType):
 
 
 def prepare_custom_op(f, nevents):
+    """Few changes to the structure of the Op"""
 
+    # momenta, masses, widths and coupling constants are const
+    # pass them by pointer
     for i in range(len(f.args) - 1):
         f.args[i].type = "const " + f.args[i].type
         if f.args[i].type.endswith("*") == False:
             f.args[i].type += "*"
             if f.args[i].tensor == True:
+                # Tensors are arrays
                 for j in range(len(f.scope)):
                     f.scope[j] = re.sub(
                         "([()[\]{} ,+\-*/]*)" + f.args[i].name + "([()[\]{} ,+\-*/]*)",
@@ -105,6 +111,7 @@ def prepare_custom_op(f, nevents):
                         f.scope[j],
                     )
             else:
+                # Non-Tensors are array with only one component
                 for j in range(len(f.scope)):
                     f.scope[j] = re.sub(
                         "([()[\]{} ,+\-*/]*)" + f.args[i].name + "([()[\]{} ,+\-*/]*)",
@@ -112,6 +119,7 @@ def prepare_custom_op(f, nevents):
                         f.scope[j],
                     )
 
+    # The polarized Matrix Element is an array of double
     f.args[-1].type = doubleType + "*"
 
     for j in range(len(f.scope)):
@@ -139,12 +147,14 @@ def prepare_custom_op(f, nevents):
                 f.scope[j],
             )
 
+    # Add the number events as a function argument
     f.args.append(nevents)
 
     return f
 
 
 def define_custom_op(custom_op_list, func):
+    """Generates a custom_operator object"""
     s = []
 
     inputTensorsNumber = len(func.args) - 3
@@ -203,6 +213,7 @@ def define_custom_op(custom_op_list, func):
 
 
 def modify_matrix(infile, process_name, destination):
+    """add the ability to execute the Op from MadFlow"""
     f = open(infile, "r")
     line = f.readline()
     previousLine = ""
@@ -267,6 +278,8 @@ def modify_matrix(infile, process_name, destination):
 
 
 def extract_constants(func, constants):
+    """cf and denom are constant (event-independent)
+    this function moves them to global scope"""
 
     count = 0
     for i in range(len(func.scope)):
@@ -290,6 +303,8 @@ def extract_constants(func, constants):
 
 
 def remove_real_ret(func):
+    """In the Op the return variable is already declared as double,
+    therefore .real() must be removed"""
 
     for i in range(len(func.scope)):  # This loop can be reversed
         if clean_spaces(func.scope[len(func.scope) - i - 1]).startswith(func.args[-3].name):
