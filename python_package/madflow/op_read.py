@@ -75,7 +75,7 @@ def grab_function_arguments(line, f_name, signature_variables, signature_line):
 
 def grab_function_return(line, f_name, args):
     """Read function return value and type
-    line: a line of text containing the return line.
+    line: a line of text containing the return line
     f_name: function name
     args: list of argument objects containing
           any previously defined variable.
@@ -90,9 +90,19 @@ def grab_function_return(line, f_name, args):
     return args, f_type
 
 
-def grab_function_scope(f, scope, scope_args, args, f_type):
+def grab_function_scope(f, args, f_type):
+    """Read function scope
+    f: file stream
+    args: list of argument objects containing
+          function arguments.
+    f_type: function type
+
+    return: an updated list of argument objects containing
+            the return variable"""
 
     line = f.readline()
+    scope = []
+    scope_args = []
     function_scope = []
     function_return = ""
 
@@ -113,6 +123,11 @@ def grab_function_scope(f, scope, scope_args, args, f_type):
 
 
 def grab_return_variable_name(function_return):
+    """Read the name of the return variable, if defined
+    otherwise, default to 'out_final'
+    function_return: a line of text containing the return line
+
+    return: string representing the name of the return variable"""
     ret_name = "out_final"
     function_return = clean_spaces(function_return)[len("return") :]
     st1 = "tf.stack("
@@ -131,6 +146,15 @@ def grab_return_variable_name(function_return):
 
 
 def read_file_from_source(function_list, file_source, signatures, signature_variables):
+    """Read a file, looking for functions
+    function_list: list of function objects containing
+                   previously defined functions
+    file_source: complete path to the file we need to read
+    signatures: defined function signatures
+    signature_variables: defined signature variables
+
+    return: list containing previously defined functions and functions
+            found in file_source"""
     f = open(file_source, "r")
     line = f.readline()
     while line != "":
@@ -160,7 +184,7 @@ def read_file_from_source(function_list, file_source, signatures, signature_vari
                 scope_args = []
                 args = grab_function_arguments(line, f_name, signature_variables, signature_line)
                 args, f_type = grab_function_return(line, f_name, args)
-                scope, scope_args = grab_function_scope(f, scope, scope_args, args, f_type)
+                scope, scope_args = grab_function_scope(f, args, f_type)
                 new_function = function(
                     f_type, f_name, args, scope, scope_args, "template <typename T>"
                 )
@@ -171,6 +195,16 @@ def read_file_from_source(function_list, file_source, signatures, signature_vari
 
 
 def extract_matrix_from_file(function_list, file_source, signatures, signature_variables):
+    """Read the matrix element file, looking for the polarized
+       matrix element function
+    function_list: list of function objects containing
+                   previously defined functions
+    file_source: complete path to the file we need to read
+    signatures: defined function signatures
+    signature_variables: defined signature variables
+
+    return: list containing previously defined functions and functions
+            found in file_source"""
     f = open(file_source, "r")
     line = f.readline()
     while line != "":
@@ -200,7 +234,7 @@ def extract_matrix_from_file(function_list, file_source, signatures, signature_v
                 scope_args = []
                 args = grab_function_arguments(line, f_name, signature_variables, signature_line)
                 args, f_type = grab_function_return(line, f_name, args)
-                scope, scope_args = grab_function_scope(f, scope, scope_args, args, f_type)
+                scope, scope_args = grab_function_scope(f, args, f_type)
                 new_function = function(
                     f_type, f_name, args, scope, scope_args, "template <typename T>"
                 )
@@ -211,6 +245,12 @@ def extract_matrix_from_file(function_list, file_source, signatures, signature_v
 
 
 def read_signatures(signatures, signature_variables, file_source):
+    """Read signatures from file
+    signatures: previously defined signatures
+    signature_variables: previously defined signature variables
+    file_source: complete path to the file we need to read
+
+    return: updated signatures and signature_variables"""
     f = open(file_source, "r")
     line = f.readline()
     while line != "":
