@@ -2,14 +2,31 @@ from madflow.op_parser import *
 
 
 def grab_function_name(line):
+    """Read function name
+    line: a line of text that defines the function.
+          i.e.: def function_name(args):
+
+    return: function name"""
     return line.split("(", 1)[0]
 
 
-def grab_function_arguments(line, f, f_name, args, signatures, signature_variables, signature_line):
+def grab_function_arguments(line, f_name, signature_variables, signature_line):
+    """Read function arguments
+    line: a line of text that defines the function.
+          i.e.: def function_name(args):
+    f_name: function name
+    signature_variables: list of signature objects containing
+                         any previously defined signature
+    signature_line: a line of text defining function signature.
+                    (@tf.function ...)
+
+    return: a list of argument objects containing all function arguments"""
     line = line.split(")", 1)[0]
     line = line[len(f_name) + 1 :]
+    # create a list of names of function arguments
     split_args = clean_spaces(line).split(",")
 
+    # delete self if the function is a class method
     j = -1
     for i in range(len(split_args)):
         if split_args[i] == "self":
@@ -18,6 +35,7 @@ def grab_function_arguments(line, f, f_name, args, signatures, signature_variabl
     if j != -1:
         del split_args[j]
 
+    args = []
     split_types = []
     split_sizes = []
     split_tensors = []
@@ -55,8 +73,19 @@ def grab_function_arguments(line, f, f_name, args, signatures, signature_variabl
     return args
 
 
-def grab_function_return(line, f, f_name, f_type, args):
+def grab_function_return(line, f_name, args):
+    """Read function return value and type
+    line: a line of text containing the return line.
+    f_name: function name
+    args: list of argument objects containing
+          any previously defined variable.
 
+    return: an updated list of argument objects containing
+            the return variable"""
+
+    # Currently all functions are void
+    f_type = "void"
+    # The return value is passed by pointer
     args.append(argument("ret", doubleType, -1, False, []))
     return args, f_type
 
@@ -129,10 +158,8 @@ def read_file_from_source(function_list, file_source, signatures, signature_vari
                 args = []
                 scope = []
                 scope_args = []
-                args = grab_function_arguments(
-                    line, f, f_name, args, signatures, signature_variables, signature_line
-                )
-                args, f_type = grab_function_return(line, f, f_name, f_type, args)
+                args = grab_function_arguments(line, f_name, signature_variables, signature_line)
+                args, f_type = grab_function_return(line, f_name, args)
                 scope, scope_args = grab_function_scope(f, scope, scope_args, args, f_type)
                 new_function = function(
                     f_type, f_name, args, scope, scope_args, "template <typename T>"
@@ -171,10 +198,8 @@ def extract_matrix_from_file(function_list, file_source, signatures, signature_v
                 args = []
                 scope = []
                 scope_args = []
-                args = grab_function_arguments(
-                    line, f, f_name, args, signatures, signature_variables, signature_line
-                )
-                args, f_type = grab_function_return(line, f, f_name, f_type, args)
+                args = grab_function_arguments(line, f_name, signature_variables, signature_line)
+                args, f_type = grab_function_return(line, f_name, args)
                 scope, scope_args = grab_function_scope(f, scope, scope_args, args, f_type)
                 new_function = function(
                     f_type, f_name, args, scope, scope_args, "template <typename T>"

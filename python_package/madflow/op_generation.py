@@ -111,7 +111,7 @@ def prepare_custom_op(f, nevents):
                         f.scope[j],
                     )
             else:
-                # Non-Tensors are array with only one component
+                # Non-Tensors are arrays with only one component
                 for j in range(len(f.scope)):
                     f.scope[j] = re.sub(
                         "([()[\]{} ,+\-*/]*)" + f.args[i].name + "([()[\]{} ,+\-*/]*)",
