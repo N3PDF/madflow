@@ -10,7 +10,7 @@ cpuParallelization = "ThreadPool"
 gpuParallelization = "CUDA"
 
 # Libraries (#include <libraryName>)
-# Used in Matrix_1_xxxx.h
+# Used in Matrix_xxxx.h
 
 libraries = ["math.h", "unsupported/Eigen/CXX11/Tensor"]
 

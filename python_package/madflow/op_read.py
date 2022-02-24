@@ -90,15 +90,14 @@ def grab_function_return(line, f_name, args):
     return args, f_type
 
 
-def grab_function_scope(f, args, f_type):
+def grab_function_scope(f, args):
     """Read function scope
     f: file stream
     args: list of argument objects containing
           function arguments.
-    f_type: function type
 
-    return: an updated list of argument objects containing
-            the return variable"""
+    return: an updated list of strings containing
+            the function scope and scope variables"""
 
     line = f.readline()
     scope = []
@@ -116,8 +115,8 @@ def grab_function_scope(f, args, f_type):
         line = f.readline()
 
     args[-1].name = grab_return_variable_name(function_return)
-    scope, scope_args = parse_function_scope(function_scope, scope, scope_args, args, f_type)
-    scope, scope_args = parse_function_return(function_return, scope, scope_args, args, f_type)
+    scope, scope_args = parse_function_scope(function_scope, scope, scope_args, args)
+    scope, scope_args = parse_function_return(function_return, scope, scope_args, args)
 
     return scope, scope_args
 
@@ -184,7 +183,7 @@ def read_file_from_source(function_list, file_source, signatures, signature_vari
                 scope_args = []
                 args = grab_function_arguments(line, f_name, signature_variables, signature_line)
                 args, f_type = grab_function_return(line, f_name, args)
-                scope, scope_args = grab_function_scope(f, args, f_type)
+                scope, scope_args = grab_function_scope(f, args)
                 new_function = function(
                     f_type, f_name, args, scope, scope_args, "template <typename T>"
                 )
@@ -234,7 +233,7 @@ def extract_matrix_from_file(function_list, file_source, signatures, signature_v
                 scope_args = []
                 args = grab_function_arguments(line, f_name, signature_variables, signature_line)
                 args, f_type = grab_function_return(line, f_name, args)
-                scope, scope_args = grab_function_scope(f, args, f_type)
+                scope, scope_args = grab_function_scope(f, args)
                 new_function = function(
                     f_type, f_name, args, scope, scope_args, "template <typename T>"
                 )

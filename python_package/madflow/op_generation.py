@@ -5,7 +5,10 @@ forLoopString = "for (int it = 0; it < " + n_events.name + "; it += 1) {"
 
 
 def serialize_function(f):
-    """Create a loop over the total number of events"""
+    """Create a loop over the total number of events
+    f: function object
+
+    return: updated function object"""
     forLoop = False
     spacing = "    "
     s = 0
@@ -33,7 +36,11 @@ def serialize_function(f):
 
 
 def parallelize_function(f, parallelizationType):
-    """Parallelize the loop over the total number of events"""
+    """Parallelize the loop over the total number of events
+    f: function object
+    parallelizationType: OpenMP/ThreadPool/CUDA
+
+    return: updated function object"""
     s = 0
     if parallelizationType == "OpenMP":
         while s < len(f.scope):
@@ -94,7 +101,11 @@ def parallelize_function(f, parallelizationType):
 
 
 def prepare_custom_op(f, nevents):
-    """Few changes to the structure of the Op"""
+    """Few changes to the structure of the Op
+    f: function object
+    nevents: number of MC events
+
+    return: updated function object"""
 
     # momenta, masses, widths and coupling constants are const
     # pass them by pointer
@@ -153,8 +164,11 @@ def prepare_custom_op(f, nevents):
     return f
 
 
-def define_custom_op(custom_op_list, func):
-    """Generates a custom_operator object"""
+def define_custom_op(func):
+    """Generates a custom_operator object
+    func: function object
+
+    return: custom_operator object"""
     s = []
 
     inputTensorsNumber = len(func.args) - 3
@@ -207,13 +221,17 @@ def define_custom_op(custom_op_list, func):
     line += ", " + func.args[-1].name + ");"
     s.append(line)
 
-    c_op = custom_operator("MatrixOp", s, functor_name)
-    custom_op_list.append(c_op)
-    return custom_op_list
+    return custom_operator("MatrixOp", s, functor_name)
 
 
 def modify_matrix(infile, process_name, destination):
-    """add the ability to execute the Op from MadFlow"""
+    """add the ability to execute the Op from MadFlow
+    infile: complete path to matrix_1_xxxxx.py
+    process_name: process name
+                  (read from matrix_1_xxxxx.py)
+    destination: directory of the Custom Operator
+
+    return: custom_operator object"""
     f = open(infile, "r")
     line = f.readline()
     previousLine = ""
@@ -264,12 +282,6 @@ def modify_matrix(infile, process_name, destination):
         if clean_spaces(line) != "":  # not checking if it is inside a comment !!!
             previousLine = line
         line = f.readline()
-    # new_matrix = re.sub("smatrix\(", "cusmatrix(", new_matrix)
-    # new_matrix = re.sub("self\.matrix\(", "matrixOp.matrix" + p + "(", new_matrix)
-    # temp += new_matrix
-    # while line != "":
-    #    temp += line
-    #    line = f.readline()
 
     for line in matrixSourceCodeArray:
         matrixSourceCode += line
@@ -279,7 +291,11 @@ def modify_matrix(infile, process_name, destination):
 
 def extract_constants(func, constants):
     """cf and denom are constant (event-independent)
-    this function moves them to global scope"""
+    this function moves them to global scope
+    func: function object
+    constants: list of constants
+
+    return: updated function object and constants"""
 
     count = 0
     for i in range(len(func.scope)):
@@ -304,7 +320,10 @@ def extract_constants(func, constants):
 
 def remove_real_ret(func):
     """In the Op the return variable is already declared as double,
-    therefore .real() must be removed"""
+    therefore .real() must be removed
+    func: function object
+
+    return: updated function object"""
 
     for i in range(len(func.scope)):  # This loop can be reversed
         if clean_spaces(func.scope[len(func.scope) - i - 1]).startswith(func.args[-3].name):

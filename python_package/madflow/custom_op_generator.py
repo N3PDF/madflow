@@ -116,7 +116,7 @@ def translate(destination):
 
         function_list[-1] = serialize_function(function_list[-1])
 
-        custom_op_list = define_custom_op(custom_op_list, function_list[-1])
+        custom_op_list.append(define_custom_op(function_list[-1]))
 
         function_list[-1], constants = extract_constants(function_list[-1], constants)
 
