@@ -4,6 +4,16 @@ from madflow.op_aux_functions import *
 
 
 def parse_line(line, args, scope_variables, scope, inside_comment):
+    """Translate a single line into C++ source code
+    line: python source code (string)
+    args: function arguments
+    scope_variables: variables defined within the scope
+    scope: list of strings with previous transpiled lines
+    inside_comment: boolean -> true if the line is inside
+                               a comment block
+
+    return: transpiled line,
+            updated scope_variables, scope, inside_comment"""
     return_line = ""
 
     if inside_comment == True:

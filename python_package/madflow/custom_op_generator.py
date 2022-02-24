@@ -17,6 +17,8 @@ devices = ["cpu", "gpu"]
 
 
 def translate(destination):
+    """Translates Python code into a C++/CUDA Custom Operator
+    destination: directory of madflow output"""
 
     if destination[-1] != "/":  # Avoid weird behaviours if destination does not end with '/'
         destination += "/"
@@ -154,6 +156,8 @@ def translate(destination):
 
 
 def compile(destination):
+    """Compiles the Custom Operator
+    destination: directory of madflow output"""
     subprocess.check_output(["/bin/sh", "-c", "cd " + destination + "; make"])
 
 

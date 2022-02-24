@@ -2,6 +2,12 @@ from madflow.op_aux_functions import *
 
 
 def check_variables(counter, function_list):
+    """Check if all variables of i-th function are
+    correctly defined
+    counter: index of the i-th function (i)
+    function_list: list of all function objects
+
+    return: updated function_list"""
     all_sizes_defined = True
     found = False
     i = 0
@@ -89,6 +95,12 @@ def check_variables(counter, function_list):
 
 
 def check_lines(counter, function_list):
+    """Check if all lines of the i-th function have
+    correct grammar and syntax
+    counter: index of the i-th function (i)
+    function_list: list of all function objects
+
+    return: updated function_list"""
     it = 0
     while it < len(function_list[counter].scope):
         line = function_list[counter].scope[it]
