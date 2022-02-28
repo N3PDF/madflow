@@ -12,6 +12,7 @@ def check_variables(counter, function_list):
     found = False
     i = 0
 
+    # Check if all function arguments have a defined size
     for i in range(len(function_list[counter].args)):
         if (function_list[counter].args)[i].size == -1:
             all_sizes_defined = False
@@ -27,8 +28,6 @@ def check_variables(counter, function_list):
                 )
                 if match != None:
                     function_list = check_variables(k, function_list)
-                    # print(function_list[k].args[-1].size)
-                    # print(line, match, k, function_list[k].name)
                     (function_list[counter].args)[i].size = function_list[k].args[-1].size
                     (function_list[counter].args)[i].type = clean_pointer(
                         function_list[k].args[-1].type
