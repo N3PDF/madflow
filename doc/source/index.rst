@@ -2,7 +2,7 @@
     madflow's documentation!
 
 =================================================================
-MadFlow: parton-level monte carlo simulations directly to you GPU
+MadFlow: parton-level monte carlo simulations directly to your GPU
 =================================================================
 
 .. 
