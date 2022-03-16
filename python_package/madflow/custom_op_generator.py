@@ -19,15 +19,21 @@ devices = ["cpu", "gpu"]
 def translate(destination):
     """Translates Python code into a C++/CUDA Custom Operator
     destination: directory of madflow output"""
+    
+    #destination = str(destination)
 
+    """
     if destination[-1] != "/":  # Avoid weird behaviours if destination does not end with '/'
         destination += "/"
+    """
     file_sources = [madflow.wavefunctions_flow.__file__]  # path to wavefunctions_flow.py
 
     # Create the directory for the Op source code and create the makefile
 
-    subprocess.check_output(["/bin/sh", "-c", "mkdir -p " + destination + "gpu/"])
+    #subprocess.check_output(["/bin/sh", "-c", "mkdir -p " + destination + "gpu/"])
+    subprocess.run("mkdir -p gpu/", cwd=destination, check=True, shell=True)
     write_makefile(destination)
+    
 
     # Generate sign functions
     auxiliary_functions = []
@@ -53,7 +59,7 @@ def translate(destination):
 
     # Find all generated matrix_1_xxxxx.py (one for each subprocess)
     files_list = (
-        subprocess.check_output(["/bin/sh", "-c", "ls " + destination + " | grep matrix_1_"])
+        subprocess.check_output(["/bin/sh", "-c", "ls " + destination.as_posix() + " | grep matrix_1_"])
         .decode("utf-8")
         .split("\n")[:-1]
     )
@@ -68,23 +74,23 @@ def translate(destination):
         process_name = re.sub("matrix_1_", "", _file_)
         process_name = re.sub("\.py", "", process_name)
 
-        matrix_source = destination + "matrix_1_" + process_name + ".py"
-        process_source = destination + "aloha_1_" + process_name + ".py"
-
-        #_file_ = process_source
-
-        signatures = []
-        for s in signatures_:
-            signatures.append(s)
-        signature_variables = []
-        for s in signature_variables_:
-            signature_variables.append(s)
+        matrix_source = destination / ("matrix_1_" + process_name + ".py")
+        process_source = destination / ("aloha_1_" + process_name + ".py")
+        
+        signatures = signatures_
+        signature_variables = signature_variables_
+        #function_list = function_list_
+        #"""
         function_list = []
         for f in function_list_:
             function_list.append(f)
+        #"""
+        headers = headers_
+        """
         headers = []
         for h in headers_:
             headers.append(h)
+        """
         headers.append("matrix_" + process_name + ".h")
 
         custom_op_list = []
@@ -143,13 +149,13 @@ def translate(destination):
         temp = ""
         for c in custom_op_list:
             temp += write_header_file(c, function_list[-1])
-        with open(destination + "gpu/matrix_" + process_name + ".h", "w") as fh:
+        with open(destination / ("gpu/matrix_" + process_name + ".h"), "w") as fh:
             fh.write(temp)
 
         # write matrix_1_xxxxx.py
         temp = ""
         temp = modify_matrix(matrix_source, process_name, destination)
-        with open(destination + matrix_name, "w") as fh:
+        with open(destination / matrix_name, "w") as fh:
             fh.write(temp)
 
         # --------------------------------------------------------------------------------------
@@ -158,7 +164,7 @@ def translate(destination):
 def compile_op(destination):
     """Compiles the Custom Operator
     destination: directory of madflow output"""
-    subprocess.check_output(["/bin/sh", "-c", "cd " + destination + "; make"])
+    subprocess.run("make", cwd=destination, check=True)
 
 
 if __name__ == "__main__":

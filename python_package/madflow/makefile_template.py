@@ -1,13 +1,13 @@
-makefile_name = "makefile"
-cpp_compiler = "g++"
-cpp_version = "c++14"
-cuda_path = ""
-# example: cuda_path = "/usr/local/cuda"
+MAKEFILE = "makefile"
+CPPCOMPILER = "g++"
+CPPVERSION = "c++14"
+CUDAPATH = ""
+# example: CUDAPATH = "/usr/local/cuda"
 
 
 def write_compilers():
     """Adds C++ and CUDA compilers"""
-    text = f"""CXX := {cpp_compiler}
+    text = f"""CXX := {CPPCOMPILER}
 NVCC := $(shell which nvcc)
 
 """
@@ -58,10 +58,10 @@ ifeq ($(CUDA_PATH),)
 
 """
     """If the path for CUDA libraries isn't explicitly stated at the beginning of this file, find it from ${PATH}"""
-    if cuda_path == "":
+    if CUDAPATH == "":
         text += 'CUDA_PATH = $(shell echo ${PATH} | sed -e "s&.*:\([^:]*cuda[^/]*\).*&\\1&g")\n'
     else:
-        text += "CUDA_PATH = " + cuda_path + "\n"
+        text += "CUDA_PATH = " + CUDAPATH + "\n"
     text += f"""endif
 
 """
@@ -82,7 +82,7 @@ endif
 
 def write_cflags():
     """Adds C-Flags. C++ version is defined at the beginning of this file"""
-    text = f"""CFLAGS = ${{TF_CFLAGS}} ${{OMP_CFLAGS}} -fPIC -O2 -std={cpp_version}
+    text = f"""CFLAGS = ${{TF_CFLAGS}} ${{OMP_CFLAGS}} -fPIC -O2 -std={CPPVERSION}
 LDFLAGS = -shared ${{TF_LFLAGS}}
 
 """
@@ -102,7 +102,7 @@ LDFLAGS_CUDA = $(LDFLAGS)
 NVCC = $(CXX)
 else
 CFLAGS_CUDA = $(CFLAGS) -D GOOGLE_CUDA=1 -I$(CUDA_PATH)/include
-CFLAGS_NVCC = ${{TF_CFLAGS}} -O2 -std={cpp_version} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC -DNDEBUG --expt-relaxed-constexpr
+CFLAGS_NVCC = ${{TF_CFLAGS}} -O2 -std={CPPVERSION} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC -DNDEBUG --expt-relaxed-constexpr
 LDFLAGS_CUDA = $(LDFLAGS) -L$(CUDA_PATH)/lib64 -lcudart
 endif
 
@@ -190,7 +190,7 @@ def write_makefile(destination):
     makefile_content += write_commands()
 
     # write the makefile
-    with open(destination + makefile_name, "w") as fh:
+    with open(destination / MAKEFILE, "w") as fh:
         fh.write(makefile_content)
 
 

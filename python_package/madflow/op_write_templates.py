@@ -209,5 +209,5 @@ def write_custom_op(
 
         custom_op_code += "\n#endif\n"
 
-    with open(destination + "gpu/matrix_" + process_name + extension, "w") as fh:
+    with open(destination / ("gpu/matrix_" + process_name + extension), "w") as fh:
         fh.write(custom_op_code)

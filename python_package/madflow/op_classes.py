@@ -69,8 +69,8 @@ class Signature:
 class SignatureVariable:
     """tf.function signature
     name: signature_name
-    signature_name_list: list of strings containing signature.name
-    signature_list: list of Signature objects"""
+    signature_list: list of Signature objects
+    signature_name_list: list of strings containing signature.name"""
     
     name: str
     signature_list: list[Signature]
