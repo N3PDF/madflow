@@ -32,7 +32,7 @@ from pathlib import Path
 import logging
 import numpy as np
 
-from madflow.custom_op_generator import translate, compile
+from madflow.custom_op_generator import translate, compile_op
 
 from madflow.config import (
     get_madgraph_path,
@@ -306,7 +306,7 @@ def madflow_main(args=None, quick_return=False):
     _generate_madgraph_process(args.madgraph_process, output_path)
     if args.custom_op:
         translate(str(output_path))
-        compile(str(output_path))
+        compile_op(str(output_path))
     if args.dry_run:
         return None, None, None
     matrices, models = _import_matrices(output_path)
