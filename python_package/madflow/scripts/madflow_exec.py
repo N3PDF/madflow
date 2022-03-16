@@ -305,8 +305,8 @@ def madflow_main(args=None, quick_return=False):
 
     _generate_madgraph_process(args.madgraph_process, output_path)
     if args.custom_op:
-        translate(str(output_path))
-        compile_op(str(output_path))
+        translate(output_path)
+        compile_op(output_path)
     if args.dry_run:
         return None, None, None
     matrices, models = _import_matrices(output_path)
