@@ -31,7 +31,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
     line = s[0]
     is_arrayy = ""
     is_array = False
-    variable_type = doubleType  # not needed
+    variable_type = double_type  # not needed
     comment = ""
     defined_in_args = False
     defined_in_scope = False
@@ -76,7 +76,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
         value = split_line[2]
         square_brackets = 0
         assigned = split_line[2]
-        custom_type = doubleType
+        custom_type = double_type
         custom_size = -1
         while clean_spaces(value).startswith("["):
             value = value[1:]
@@ -174,7 +174,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     if v.type.startswith("T"):
                         custom_type = "T"
                         break
-                    elif v.type.startswith(doubleType):
+                    elif v.type.startswith(double_type):
                         type_value += 1
         if custom_type != "T":
             for v in args:
@@ -191,7 +191,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     if v.type.startswith("T"):
                         custom_type = "T"
                         break
-                    elif v.type.startswith(doubleType):
+                    elif v.type.startswith(double_type):
                         type_value += 1
             reassignment = re.search("float_me\(", value)
             if reassignment != None:
@@ -387,7 +387,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 else:
                     custom_size = -1
                 scope_variables.append(
-                    argument(assigned_variable, custom_type, custom_size, False, [])
+                    Argument(assigned_variable, custom_type, custom_size, False, [])
                 )  # need to define size
                 scope.append(custom_type + is_arrayy + " " + split_line[0] + ";")
 
@@ -520,7 +520,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                             unknown = True
                         if args[i].type.startswith("T"):
                             conc_type = "T"
-                        elif args[i].type.startswith(doubleType):
+                        elif args[i].type.startswith(double_type):
                             type_value += 1
                         conc_size += c_size
                         var_length.append(c_size)
@@ -537,7 +537,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                             unknown = True
                         if scope_variables[i].type.startswith("T"):
                             conc_type = "T"
-                        elif scope_variables[i].type.startswith(doubleType):
+                        elif scope_variables[i].type.startswith(double_type):
                             type_value += 1
                         conc_size += c_size
                         var_length.append(c_size)
@@ -545,7 +545,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
 
             if conc_type != "T":
                 if type_value > 0:
-                    conc_type = doubleType
+                    conc_type = double_type
 
             if unknown == False:
 
@@ -585,7 +585,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
             value = re.sub(", *dtype.*", "", value)
             value = re.sub("tf.constant\(", "", value)
             sp = clean_spaces(value).split(",")
-            custom_type = doubleType
+            custom_type = double_type
 
             custom_size = len(sp)
             is_array = True
@@ -673,7 +673,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
 
             value = convert_grammar(value)
 
-            custom_type = doubleType
+            custom_type = double_type
             scope.append(custom_type + " " + assigned_variable + " = 0;")
             spacing = ""
 
@@ -789,7 +789,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                         custom_size += 1
                 comment = "array of size " + str(custom_size)
             scope_variables.append(
-                argument(assigned_variable, custom_type, custom_size, False, [])
+                Argument(assigned_variable, custom_type, custom_size, False, [])
             )  # need to define size
             return_line += custom_type + is_arrayy + " "
         return_line += split_line[0] + " = " + clean_spaces(assigned)

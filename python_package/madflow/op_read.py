@@ -15,7 +15,7 @@ def grab_function_arguments(line, f_name, signature_variables, signature_line):
     line: a line of text that defines the function.
           i.e.: def function_name(args):
     f_name: function name
-    signature_variables: list of signature objects containing
+    signature_variables: list of Signature objects containing
                          any previously defined signature
     signature_line: a line of text defining function signature.
                     (@tf.function ...)
@@ -65,7 +65,7 @@ def grab_function_arguments(line, f_name, signature_variables, signature_line):
     for i in range(len(split_args)):
         split_args[i] = clean_spaces(split_args[i])
         args.append(
-            argument(
+            Argument(
                 split_args[i], split_types[i], split_sizes[i], split_tensors[i], split_slices[i]
             )
         )
@@ -86,7 +86,7 @@ def grab_function_return(line, f_name, args):
     # Currently all functions are void
     f_type = "void"
     # The return value is passed by pointer
-    args.append(argument("ret", doubleType, -1, False, []))
+    args.append(Argument("ret", double_type, -1, False, []))
     return args, f_type
 
 
@@ -184,7 +184,7 @@ def read_file_from_source(function_list, file_source, signatures, signature_vari
                 args = grab_function_arguments(line, f_name, signature_variables, signature_line)
                 args, f_type = grab_function_return(line, f_name, args)
                 scope, scope_args = grab_function_scope(f, args)
-                new_function = function(
+                new_function = Function(
                     f_type, f_name, args, scope, scope_args, "template <typename T>"
                 )
                 function_list.append(new_function)
@@ -234,7 +234,7 @@ def extract_matrix_from_file(function_list, file_source, signatures, signature_v
                 args = grab_function_arguments(line, f_name, signature_variables, signature_line)
                 args, f_type = grab_function_return(line, f_name, args)
                 scope, scope_args = grab_function_scope(f, args)
-                new_function = function(
+                new_function = Function(
                     f_type, f_name, args, scope, scope_args, "template <typename T>"
                 )
                 function_list.append(new_function)
@@ -286,7 +286,7 @@ def read_signatures(signatures, signature_variables, file_source):
                 if match != None:
                     var = re.sub(".*[\n]*.*(tf.TensorSpec\([^)]*\)).*", "\g<1>", var)
                     s_list.append(
-                        signature(
+                        Signature(
                             var,
                             get_signature(var).type,
                             get_signature(var).size,
@@ -303,10 +303,10 @@ def read_signatures(signatures, signature_variables, file_source):
                     sig_list.append(sig_name)
 
             if len(s_list) > 0:
-                s = signature_variable(name, s_list, [])
+                s = SignatureVariable(name, s_list, [])
                 signature_variables.append(s)
             elif len(sig_list) > 0:
-                s = signature_variable(name, [], sig_list)
+                s = SignatureVariable(name, [], sig_list)
                 signature_variables.append(s)
         line = f.readline()
     f.close()

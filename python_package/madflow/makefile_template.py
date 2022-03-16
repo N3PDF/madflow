@@ -1,81 +1,91 @@
-makefileName = "makefile"
-cppCompiler = "g++"
-cppVersion = "c++14"
-cudaPath = ""
-# example: cudaPath = "/usr/local/cuda"
+makefile_name = "makefile"
+cpp_compiler = "g++"
+cpp_version = "c++14"
+cuda_path = ""
+# example: cuda_path = "/usr/local/cuda"
 
 
 def write_compilers():
     """Adds C++ and CUDA compilers"""
-    text = "CXX := " + cppCompiler + "\n"
-    text += "NVCC := $(shell which nvcc)\n"
-    text += "\n"
+    text = f"""CXX := {cpp_compiler}
+NVCC := $(shell which nvcc)
+
+"""
     return text
 
 
 def write_shell_name():
     """Adds a line for the kernel name"""
-    text = "UNAME_S := $(shell uname -s)\n"
-    text += "\n"
+    text = f"""UNAME_S := $(shell uname -s)
+
+"""
     return text
 
 
 def write_multithreading():
-    """Find the number of processors and use as many threads as possible"""
-    text = "ifeq ($(UNAME_S), Darwin)\n"
-    text += "NPROCS = $(shell sysctl -n hw.ncpu)\n"
-    text += "else\n"
-    text += "NPROCS = $(shell grep -c 'processor' /proc/cpuinfo)\n"
-    text += "endif\n"
-    # if the number of processors isn't found, default to 1
-    text += "ifeq ($(NPROCS),)\n"
-    text += "NPROCS = 1\n"
-    text += "endif\n"
-    text += "MAKEFLAGS += -j$(NPROCS)\n"
-    text += "\n"
+    """Find the number of processors and use as many threads as possible
+    if the number of processors isn't found, default to 1"""
+    text = f"""ifeq ($(UNAME_S), Darwin)
+NPROCS = $(shell sysctl -n hw.ncpu)
+else
+NPROCS = $(shell grep -c 'processor' /proc/cpuinfo)
+endif
+ifeq ($(NPROCS),)
+NPROCS = 1
+endif
+MAKEFLAGS += -j$(NPROCS)
+
+"""
     return text
 
 
 def write_tf_generic_flags():
     """Adds TensorFlow flags"""
-    text = "TF_CFLAGS = $(shell python3 -c 'import tensorflow as tf; print(\" \".join(tf.sysconfig.get_compile_flags()))')\n"
-    text += "TF_LFLAGS = $(shell python3 -c 'import tensorflow as tf; print(\" \".join(tf.sysconfig.get_link_flags()))')\n"
-    text += "\n"
+    text = f"""TF_CFLAGS = $(shell python3 -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_compile_flags()))')
+TF_LFLAGS = $(shell python3 -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_link_flags()))')
+
+"""
     return text
 
 
 def write_tf_cuda_flags():
     """Adds TansorFlow CUDA flags and the path to CUDA libraries.
     If the environment variable ${CUDA_PATH} isn't defined, use a default path"""
-    text = "CUDA_LFLAGS = -x cu -Xcompiler -fPIC\n"
-    text += "CUDA_PATH := $(shell echo ${CUDA_PATH})\n"
-    text += "ifeq ($(CUDA_PATH),)\n"
+    #"""
+    text = f"""CUDA_LFLAGS = -x cu -Xcompiler -fPIC
+CUDA_PATH := $(shell echo ${{CUDA_PATH}})
+ifeq ($(CUDA_PATH),)
+
+"""
     """If the path for CUDA libraries isn't explicitly stated at the beginning of this file, find it from ${PATH}"""
-    if cudaPath == "":
+    if cuda_path == "":
         text += 'CUDA_PATH = $(shell echo ${PATH} | sed -e "s&.*:\([^:]*cuda[^/]*\).*&\\1&g")\n'
     else:
-        text += "CUDA_PATH = " + cudaPath + "\n"
-    text += "endif\n"
-    text += "\n"
+        text += "CUDA_PATH = " + cuda_path + "\n"
+    text += f"""endif
+
+"""
     return text
 
 
 def write_omp_flags():
     """Adds flags for OpenMP parallelization"""
-    text = "ifeq ($(UNAME_S), Darwin)\n"
-    text += "OMP_CFLAGS = -Xpreprocessor -fopenmp -lomp\n"
-    text += "else\n"
-    text += "OMP_CFLAGS = -fopenmp\n"
-    text += "endif\n"
-    text += "\n"
+    text = f"""ifeq ($(UNAME_S), Darwin)
+OMP_CFLAGS = -Xpreprocessor -fopenmp -lomp
+else
+OMP_CFLAGS = -fopenmp
+endif
+
+"""
     return text
 
 
 def write_cflags():
     """Adds C-Flags. C++ version is defined at the beginning of this file"""
-    text = "CFLAGS = ${TF_CFLAGS} ${OMP_CFLAGS} -fPIC -O2 -std=" + cppVersion + "\n"
-    text += "LDFLAGS = -shared ${TF_LFLAGS}\n"
-    text += "\n"
+    text = f"""CFLAGS = ${{TF_CFLAGS}} ${{OMP_CFLAGS}} -fPIC -O2 -std={cpp_version}
+LDFLAGS = -shared ${{TF_LFLAGS}}
+
+"""
 
     text += write_cflags_cuda()
 
@@ -84,28 +94,27 @@ def write_cflags():
 
 def write_cflags_cuda():
     """Adds C-Flags for CUDA (only if nvcc is found)"""
-    text = "ifeq ($(NVCC),)\n"
-    text += "CFLAGS_CUDA = $(CFLAGS)\n"
-    text += "CFLAGS_NVCC = ${TF_CFLAGS}\n"
-    text += "LDFLAGS_CUDA = $(LDFLAGS)\n"
-    text += "NVCC = $(CXX)\n"  # fallback in case nvcc is not installed
-    text += "else\n"
-    text += "CFLAGS_CUDA = $(CFLAGS) -D GOOGLE_CUDA=1 -I$(CUDA_PATH)/include\n"
-    text += (
-        "CFLAGS_NVCC = ${TF_CFLAGS} -O2 -std="
-        + cppVersion
-        + " -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC -DNDEBUG --expt-relaxed-constexpr\n"
-    )
-    text += "LDFLAGS_CUDA = $(LDFLAGS) -L$(CUDA_PATH)/lib64 -lcudart\n"
-    text += "endif\n"
-    text += "\n"
+    # fallback in case nvcc is not installed => use CXX
+    text = f"""ifeq ($(NVCC),)
+CFLAGS_CUDA = $(CFLAGS)
+CFLAGS_NVCC = ${{TF_CFLAGS}}
+LDFLAGS_CUDA = $(LDFLAGS)
+NVCC = $(CXX)
+else
+CFLAGS_CUDA = $(CFLAGS) -D GOOGLE_CUDA=1 -I$(CUDA_PATH)/include
+CFLAGS_NVCC = ${{TF_CFLAGS}} -O2 -std={cpp_version} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC -DNDEBUG --expt-relaxed-constexpr
+LDFLAGS_CUDA = $(LDFLAGS) -L$(CUDA_PATH)/lib64 -lcudart
+endif
+
+"""
     return text
 
 
 def write_target():
     """Adds the name of the generated library (matrix_processName_cu.so)"""
-    text = "TARGETS = $(shell ls gpu/ | grep \".h\" | sed 's/\.h/_cu.so/g')\n"
-    text += "\n"
+    text = f"""TARGETS = $(shell ls gpu/ | grep ".h" | sed 's/\.h/_cu.so/g')
+
+"""
     return text
 
 
@@ -121,64 +130,68 @@ def write_commands():
 
 def write_generic_commands():
     """all compiles all target libraries (one for each subprocess, i.e.: qq~ -> X + gg -> X"""
-    text = "all: $(TARGETS)\n"
-    text += "\n"
+    text = f"""all: $(TARGETS)
+
+"""
     return text
 
 
 def write_library_commands():
     """Compile each library from object files"""
-    text = "%_cu.so: gpu/%.cudao gpu/%.cu.cudao\n"
-    text += "\t$(CXX) -o $@ $(CFLAGS_CUDA) $^ $(LDFLAGS_CUDA)\n"
-    text += "\n"
+    text = f"""%_cu.so: gpu/%.cudao gpu/%.cu.cudao
+\t$(CXX) -o $@ $(CFLAGS_CUDA) $^ $(LDFLAGS_CUDA)
+
+"""
     return text
 
 
 def write_source_commands():
     """Generate object files"""
-    text = "%.o: %.cc\n"
-    text += "\t$(CXX) -c $(CFLAGS) $^ -o $@\n"
-    text += "\n"
-    text += "%.cu.cudao: %.cu.cc\n"
-    text += "\t$(NVCC) -c $(CFLAGS_NVCC) $^ -o $@\n"
-    text += "\n"
-    text += "%.cudao: %.cc\n"
-    text += "\t$(CXX) -c $(CFLAGS_CUDA) $^ -o $@\n"
-    text += "\n"
+    text = f"""%.o: %.cc
+\t$(CXX) -c $(CFLAGS) $^ -o $@
+
+%.cu.cudao: %.cu.cc
+\t$(NVCC) -c $(CFLAGS_NVCC) $^ -o $@
+
+%.cudao: %.cc
+\t$(CXX) -c $(CFLAGS_CUDA) $^ -o $@
+
+"""
     return text
 
 
 def write_cleanup_commands():
     """Adds commmand for cleanup"""
     # remove generated libraries
-    text = "clean:\n"
-    text += "\trm -f $(TARGETS) $(OBJECT_SRCS_CUDA)\n"
-    text += "\n"
     # remove generated libraries and source code
-    text += "clean_all:\n"
-    text += "\trm -f $(TARGETS) $(OBJECT_SRCS_CUDA)\n"
-    text += "\trm -f gpu/*\n"
-    text += "\n"
+    text = f"""clean:
+\trm -f $(TARGETS) $(OBJECT_SRCS_CUDA)
+
+clean_all:
+\trm -f $(TARGETS) $(OBJECT_SRCS_CUDA)
+\trm -f gpu/*
+
+"""
     return text
 
 
 def write_makefile(destination):
 
-    makefileContent = ""
+    makefile_content = ""
 
-    makefileContent += write_compilers()
-    makefileContent += write_shell_name()
-    makefileContent += write_multithreading()
-    makefileContent += write_tf_generic_flags()
-    makefileContent += write_tf_cuda_flags()
-    # makefileContent += write_omp_flags()
-    makefileContent += write_cflags()
-    makefileContent += write_target()
-    makefileContent += write_commands()
+    makefile_content += write_compilers()
+    makefile_content += write_shell_name()
+    makefile_content += write_multithreading()
+    makefile_content += write_tf_generic_flags()
+    makefile_content += write_tf_cuda_flags()
+    # makefile_content += write_omp_flags()
+    makefile_content += write_cflags()
+    makefile_content += write_target()
+    makefile_content += write_commands()
 
     # write the makefile
-    with open(destination + makefileName, "w") as fh:
-        fh.write(makefileContent)
+    with open(destination + makefile_name, "w") as fh:
+        fh.write(makefile_content)
 
 
 if __name__ == "__main__":

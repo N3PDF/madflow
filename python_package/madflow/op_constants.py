@@ -1,8 +1,10 @@
-from madflow.op_global_constants import doubleType, complexType
+"""Jinja templates for the generation of custom operators"""
+
+from madflow.op_global_constants import double_type, complex_type
 
 # Templates ----------------------
 
-libraryTemplate = (
+library_template = (
     "{% for lib in variableName %}\
 "
     "#include <{{ lib }}>\n\
@@ -10,7 +12,7 @@ libraryTemplate = (
     "{% endfor %}"
 )
 
-headerTemplate = (
+header_template = (
     "{% for head in variableName %}\
 "
     '#include "{{ head }}"\n\
@@ -18,7 +20,7 @@ headerTemplate = (
     "{% endfor %}"
 )
 
-constantVariableTemplate = (
+constant_variable_template = (
     "{% for var in constantVariable %}\
 "
     "{{ dev }}{{ var}};\n\
@@ -26,7 +28,7 @@ constantVariableTemplate = (
     "{% endfor %}"
 )
 
-definedConstantTemplate = (
+defined_constant_template = (
     "{% for var in variableName %}\
 "
     "#define {{ var }}\n\
@@ -34,7 +36,7 @@ definedConstantTemplate = (
     "{% endfor %}"
 )
 
-functionDefinitionTemplate = "\
+function_definition_template = "\
 {{ func.template }}\n\
 {{ dev }}{{ func.type }} {{ func.name }} (\
 {% for i in range(func.argn - 1) %}\
@@ -43,7 +45,7 @@ functionDefinitionTemplate = "\
 {{ func.args[func.argn - 1].type }} {{ func.args[func.argn - 1].name }}\
 );"
 
-functionTemplate = "\
+function_template = "\
 {{ func.template }}\n\
 {{ dev }}{{ func.type }} {{ func.name }} (\
 {% for i in range(func.argn - 1) %}\
@@ -56,7 +58,7 @@ functionTemplate = "\
 {% endfor %}\
 }"
 
-headerFileTemplate = (
+header_file_template = (
     '#ifndef MATRIX_H_\n\
 #define MATRIX_H_\n\
 \n\
@@ -92,13 +94,13 @@ struct MatrixFunctor<Eigen::GpuDevice, T> {\n\
 \n\
 \n\
 #define COMPLEX_TYPE '
-    + complexType
+    + complex_type
     + "\n\
 \n\
 #endif"
 )
 
-cpuOpTemplate = '\
+cpu_op_template = '\
 REGISTER_OP("Matrix{{ process }}")\n\
     .Attr("T: numbertype")\n\
 {% for i in range(func.argn - 3) %}\
@@ -159,7 +161,7 @@ REGISTER_GPU(COMPLEX_TYPE);\n\
 #endif\n\
 '
 
-gpuOpTemplate = "\
+gpu_op_template = "\
 template <typename T>\n\
 void MatrixFunctor<GPUDevice, T>::operator()(\n\
     const GPUDevice& d,\
@@ -217,7 +219,7 @@ __device__ COMPLEX_TYPE operator*(const COMPLEX_TYPE& a, const COMPLEX_TYPE& b) 
 \n\
 __device__ COMPLEX_TYPE operator/(const COMPLEX_TYPE& a, const COMPLEX_TYPE& b) {\n\
     "
-    + doubleType
+    + double_type
     + " norm = b.real() * b.real() + b.imag() * b.imag();\n\
     return COMPLEX_TYPE((a.real() * b.real() + a.imag() * b.imag())/norm, (a.imag() * b.real() - a.real() * b.imag())/norm);\n\
 }\n\
@@ -227,19 +229,19 @@ __device__ COMPLEX_TYPE operator-(const COMPLEX_TYPE& a) {\n\
 }\n\
 \n\
 __device__ COMPLEX_TYPE operator*(const COMPLEX_TYPE& a, const "
-    + doubleType
+    + double_type
     + "& b) {\n\
     return COMPLEX_TYPE(a.real() * b, a.imag() * b);\n\
 }\n\
 \n\
 __device__ COMPLEX_TYPE operator*(const "
-    + doubleType
+    + double_type
     + "& a, const COMPLEX_TYPE& b) {\n\
     return b * a;\n\
 }\n\
 \n\
 __device__ COMPLEX_TYPE operator/(const COMPLEX_TYPE& a, const "
-    + doubleType
+    + double_type
     + "& b) {\n\
     return COMPLEX_TYPE(a.real() / b, a.imag() / b);\n\
 }\n"

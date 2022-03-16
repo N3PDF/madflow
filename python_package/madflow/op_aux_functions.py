@@ -7,19 +7,19 @@ from madflow.op_classes import *
 def generate_auxiliary_functions(auxiliary_functions, function_list_):
     """generates sign functions"""
     aux_args = []
-    aux_arg = argument("x", doubleType, 0, False, [])
+    aux_arg = Argument("x", double_type, 0, False, [])
     aux_args.append(aux_arg)
-    aux_arg = argument("y", doubleType, 0, False, [])
+    aux_arg = Argument("y", double_type, 0, False, [])
     aux_args.append(aux_arg)
     aux_scope = ["int sign = 0;", "y >= 0 ? sign = 1 : sign = -1;", "return x * sign;"]
-    aux_scope_args = [argument("sign", "int", 0, False, [])]
-    aux_function = function(doubleType, "sign", aux_args, aux_scope, aux_scope_args, "")
+    aux_scope_args = [Argument("sign", "int", 0, False, [])]
+    aux_function = Function(double_type, "sign", aux_args, aux_scope, aux_scope_args, "")
     function_list_.append(aux_function)
     auxiliary_functions.append(aux_function)
 
     aux_scope = ["return sign(x, y);"]
     aux_scope_args = []
-    aux_function = function(doubleType, "signvec", aux_args, aux_scope, aux_scope_args, "")
+    aux_function = Function(double_type, "signvec", aux_args, aux_scope, aux_scope_args, "")
     function_list_.append(aux_function)
     auxiliary_functions.append(aux_function)
     return auxiliary_functions, function_list_
@@ -92,7 +92,7 @@ def convert_type(t):
 
     result = ""
     d = {
-        "DTYPE": doubleType,
+        "DTYPE": double_type,
         "DTYPEINT": "int",
         "DTYPECOMPLEX": "T",
     }
@@ -113,9 +113,9 @@ def change_array_into_variable(line):
         return line
 
 
-def count_brackets_letter(letter, bracketCount):
+def count_brackets_letter(letter, bracket_count):
     if letter == "(":
-        bracketCount += 1
+        bracket_count += 1
     elif letter == ")":
-        bracketCount -= 1
-    return bracketCount
+        bracket_count -= 1
+    return bracket_count

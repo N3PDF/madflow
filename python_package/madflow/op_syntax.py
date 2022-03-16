@@ -126,11 +126,11 @@ def check_lines(counter, function_list):
                             if v.type.startswith("T"):
                                 custom_type = "T"
                                 break
-                            elif v.type.startswith(doubleType):
+                            elif v.type.startswith(double_type):
                                 type_value += 1
 
                     if custom_type != "T" and type_value > 0:
-                        custom_type = doubleType
+                        custom_type = double_type
 
                     function_list[counter].args[-1].type = custom_type + "&"
                     function_list[counter].args[-1].size = 0
@@ -156,7 +156,7 @@ def check_lines(counter, function_list):
                                 if ls[0].startswith(v.name):
                                     function_list[counter].scope[it] = ""
                                     break
-                        elif v.type.startswith(doubleType):
+                        elif v.type.startswith(double_type):
                             match = re.search("T\( *" + v.name + "[0-9[\]]* *\)", value)
                             if match != None:
                                 if ls[0].startswith(v.name):
@@ -180,7 +180,7 @@ def check_lines(counter, function_list):
                                         + ", 0);"
                                     )
                                     function_list[counter].scope_args.append(
-                                        argument(v.name, "T", 0, False, [])
+                                        Argument(v.name, "T", 0, False, [])
                                     )
                                     for it2 in range(len(function_list[counter].args)):
                                         if v.name == function_list[counter].args[it2].name:
@@ -196,7 +196,7 @@ def check_lines(counter, function_list):
                         if f.type == "void":
                             if (
                                 ls[0].startswith("T")
-                                or ls[0].startswith(doubleType)
+                                or ls[0].startswith(double_type)
                                 or ls[0].startswith("int")
                             ):
                                 for v in range(len(function_list[counter].scope_args)):
@@ -263,7 +263,7 @@ def check_lines(counter, function_list):
                             unknown = True
                         if function_list[counter].args[i].type.startswith("T"):
                             conc_type = "T"
-                        elif function_list[counter].args[i].type.startswith(doubleType):
+                        elif function_list[counter].args[i].type.startswith(double_type):
                             type_value += 1
                         conc_size += c_size
                         var_length.append(c_size)
@@ -280,7 +280,7 @@ def check_lines(counter, function_list):
                             unknown = True
                         if function_list[counter].scope_args[i].type.startswith("T"):
                             conc_type = "T"
-                        elif function_list[counter].scope_args[i].type.startswith(doubleType):
+                        elif function_list[counter].scope_args[i].type.startswith(double_type):
                             type_value += 1
                         conc_size += c_size
                         var_length.append(c_size)
@@ -288,7 +288,7 @@ def check_lines(counter, function_list):
 
             if conc_type != "T":
                 if type_value > 0:
-                    conc_type = doubleType
+                    conc_type = double_type
 
             if unknown == False:
 

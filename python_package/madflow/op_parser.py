@@ -67,7 +67,7 @@ def get_signature(line):
     """Read the signature from text
     line: line of text containing the signature
 
-    return: a signature object"""
+    return: a Signature object"""
     type_ = line.split("dtype=")[1]
     type_ = type_.split(")")[0]
     type_ = convert_type(type_)
@@ -95,14 +95,14 @@ def get_signature(line):
 
     name = clean_spaces(line.split("=")[0])
 
-    return signature(name, type_, shape, is_tensor, slice_)
+    return Signature(name, type_, shape, is_tensor, slice_)
 
 
 def convert_signatures(signatures, signature_variables):
     """Read the signature from text
     line: line of text containing the signature
 
-    return: a signature object"""
+    return: a Signature object"""
     for i in range(len(signature_variables)):
         for v in signature_variables[i].signature_name_list:
             for s in signatures:

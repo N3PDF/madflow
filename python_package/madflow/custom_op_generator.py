@@ -60,9 +60,9 @@ def translate(destination):
 
     for _file_ in files_list:
 
-        constants = []  # globalConstants
+        constants = []  # global_constants
 
-        for e in globalConstants:
+        for e in global_constants:
             constants.append(e)
 
         process_name = re.sub("matrix_1_", "", _file_)
@@ -71,7 +71,7 @@ def translate(destination):
         matrix_source = destination + "matrix_1_" + process_name + ".py"
         process_source = destination + "aloha_1_" + process_name + ".py"
 
-        _file_ = process_source
+        #_file_ = process_source
 
         signatures = []
         for s in signatures_:
@@ -89,12 +89,12 @@ def translate(destination):
 
         custom_op_list = []
 
-        signatures, signature_variables = read_signatures(signatures, signature_variables, _file_)
+        signatures, signature_variables = read_signatures(signatures, signature_variables, process_source)
 
         signature_variables = convert_signatures(signatures, signature_variables)
 
         function_list = read_file_from_source(
-            function_list, _file_, signatures, signature_variables
+            function_list, process_source, signatures, signature_variables
         )
 
         matrix_name = "matrix_1_" + process_name + ".py"
@@ -131,7 +131,7 @@ def translate(destination):
                 namespace,
                 defined,
                 constants,
-                cpuConstants,
+                cpu_constants,
                 function_list,
                 custom_op_list,
                 destination,
@@ -155,7 +155,7 @@ def translate(destination):
         # --------------------------------------------------------------------------------------
 
 
-def compile(destination):
+def compile_op(destination):
     """Compiles the Custom Operator
     destination: directory of madflow output"""
     subprocess.check_output(["/bin/sh", "-c", "cd " + destination + "; make"])

@@ -1,13 +1,13 @@
 # Types
 
-INT64Type = "int64_t"
-doubleType = "double"
-complexType = "complex128"
+INT64_type = "int64_t"
+double_type = "double"
+complex_type = "complex128"
 
 # Parallelization
 
-cpuParallelization = "ThreadPool"
-gpuParallelization = "CUDA"
+cpu_parallelization = "ThreadPool"
+gpu_parallelization = "CUDA"
 
 # Libraries (#include <libraryName>)
 # Used in Matrix_xxxx.h
@@ -39,8 +39,8 @@ defined = [
     "GPUDevice Eigen::GpuDevice",
     "DEFAULT_BLOCK_SIZE 32",
 ]
-globalConstants = [
-    "const " + doubleType + " SQH = 0.70710676908493",
+global_constants = [
+    "const " + double_type + " SQH = 0.70710676908493",
     "const COMPLEX_TYPE CZERO = COMPLEX_TYPE(0.0, 0.0)",
 ]
-cpuConstants = ["using thread::ThreadPool"]  # Not used for the GPU Op
+cpu_constants = ["using thread::ThreadPool"]  # Not used for the GPU Op
