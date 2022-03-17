@@ -20,17 +20,10 @@ def translate(destination):
     """Translates Python code into a C++/CUDA Custom Operator
     destination: directory of madflow output"""
     
-    #destination = str(destination)
-
-    """
-    if destination[-1] != "/":  # Avoid weird behaviours if destination does not end with '/'
-        destination += "/"
-    """
     file_sources = [madflow.wavefunctions_flow.__file__]  # path to wavefunctions_flow.py
 
     # Create the directory for the Op source code and create the makefile
 
-    #subprocess.check_output(["/bin/sh", "-c", "mkdir -p " + destination + "gpu/"])
     subprocess.run("mkdir -p gpu/", cwd=destination, check=True, shell=True)
     write_makefile(destination)
     
@@ -64,14 +57,14 @@ def translate(destination):
         .split("\n")[:-1]
     )
 
-    for _file_ in files_list:
+    for subprocess_file in files_list:
 
         constants = []  # global_constants
 
         for e in global_constants:
             constants.append(e)
 
-        process_name = re.sub("matrix_1_", "", _file_)
+        process_name = re.sub("matrix_1_", "", subprocess_file)
         process_name = re.sub("\.py", "", process_name)
 
         matrix_source = destination / ("matrix_1_" + process_name + ".py")
@@ -85,12 +78,12 @@ def translate(destination):
         for f in function_list_:
             function_list.append(f)
         #"""
-        headers = headers_
-        """
+        #headers = headers_
+        #"""
         headers = []
         for h in headers_:
             headers.append(h)
-        """
+        #"""
         headers.append("matrix_" + process_name + ".h")
 
         custom_op_list = []

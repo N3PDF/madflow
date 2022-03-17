@@ -15,7 +15,7 @@ class Argument:
     type: str
     size: int
     tensor: bool
-    slice: list[str]
+    slice: list#[str]
 
 @dataclass
 class Function:
@@ -29,9 +29,9 @@ class Function:
     
     type: str
     name: str
-    args: list[Argument]
-    scope: list[str]
-    scope_args: list[str]
+    args: list#[Argument]
+    scope: list#[str]
+    scope_args: list#[str]
     template: str
     argn: int = 0
     
@@ -46,7 +46,7 @@ class CustomOperator:
     functor_name: name of the functor (called by MatrixOp)"""
     
     name: str
-    scope: list[str]
+    scope: list#[str]
     functor_name: str
 
 @dataclass
@@ -62,7 +62,7 @@ class Signature:
     type: str
     size: str
     tensor: bool
-    slice: list[str]
+    slice: list#[str]
 
 
 @dataclass
@@ -73,5 +73,5 @@ class SignatureVariable:
     signature_name_list: list of strings containing signature.name"""
     
     name: str
-    signature_list: list[Signature]
-    signature_name_list: list[str]
+    signature_list: list#[Signature]
+    signature_name_list: list#[str]
