@@ -19,14 +19,15 @@ devices = ["cpu", "gpu"]
 def translate(destination):
     """Translates Python code into a C++/CUDA Custom Operator
     destination: directory of madflow output"""
-    
+
     file_sources = [madflow.wavefunctions_flow.__file__]  # path to wavefunctions_flow.py
 
     # Create the directory for the Op source code and create the makefile
 
-    subprocess.run("mkdir -p gpu/", cwd=destination, check=True, shell=True)
+    # subprocess.run("mkdir -p gpu/", cwd=destination, check=True, shell=True)
+    destination_gpu = destination / "gpu"
+    destination_gpu.mkdir(parents=True, exist_ok=True)
     write_makefile(destination)
-    
 
     # Generate sign functions
     auxiliary_functions = []
@@ -49,46 +50,52 @@ def translate(destination):
         function_list_ = read_file_from_source(
             function_list_, file_source, signatures_, signature_variables_
         )
-
+    """
     # Find all generated matrix_1_xxxxx.py (one for each subprocess)
     files_list = (
         subprocess.check_output(["/bin/sh", "-c", "ls " + destination.as_posix() + " | grep matrix_1_"])
         .decode("utf-8")
         .split("\n")[:-1]
     )
+    """
 
-    for subprocess_file in files_list:
+    # for subprocess_file_name in files_list:
+    for subprocess_file_name in destination.glob("matrix_1_*"):
 
         constants = []  # global_constants
 
         for e in global_constants:
             constants.append(e)
 
-        process_name = re.sub("matrix_1_", "", subprocess_file)
-        process_name = re.sub("\.py", "", process_name)
+        process_name = re.sub("matrix_1_", "", subprocess_file_name.stem)
+        # process_name = re.sub("\.py", "", process_name)
 
-        matrix_source = destination / ("matrix_1_" + process_name + ".py")
-        process_source = destination / ("aloha_1_" + process_name + ".py")
-        
+        matrix_source = subprocess_file_name
+        process_source = subprocess_file_name.parent / (
+            re.sub("matrix_1_", "aloha_1_", subprocess_file_name.stem) + subprocess_file_name.suffix
+        )
+
         signatures = signatures_
         signature_variables = signature_variables_
-        #function_list = function_list_
-        #"""
+        # function_list = function_list_
+        # """
         function_list = []
         for f in function_list_:
             function_list.append(f)
-        #"""
-        #headers = headers_
-        #"""
+        # """
+        # headers = headers_
+        # """
         headers = []
         for h in headers_:
             headers.append(h)
-        #"""
+        # """
         headers.append("matrix_" + process_name + ".h")
 
         custom_op_list = []
 
-        signatures, signature_variables = read_signatures(signatures, signature_variables, process_source)
+        signatures, signature_variables = read_signatures(
+            signatures, signature_variables, process_source
+        )
 
         signature_variables = convert_signatures(signatures, signature_variables)
 
@@ -96,7 +103,7 @@ def translate(destination):
             function_list, process_source, signatures, signature_variables
         )
 
-        matrix_name = "matrix_1_" + process_name + ".py"
+        matrix_name = subprocess_file_name.name
 
         signatures, signature_variables = read_signatures(
             signatures, signature_variables, matrix_source
@@ -133,7 +140,7 @@ def translate(destination):
                 cpu_constants,
                 function_list,
                 custom_op_list,
-                destination,
+                destination_gpu,
                 process_name,
                 device,
             )
@@ -142,14 +149,16 @@ def translate(destination):
         temp = ""
         for c in custom_op_list:
             temp += write_header_file(c, function_list[-1])
-        with open(destination / ("gpu/matrix_" + process_name + ".h"), "w") as fh:
-            fh.write(temp)
+        # with open(destination / ("gpu/matrix_" + process_name + ".h"), "w") as fh:
+        #    fh.write(temp)
+        (destination_gpu / ("matrix_" + process_name + ".h")).write_text(temp)
 
         # write matrix_1_xxxxx.py
         temp = ""
         temp = modify_matrix(matrix_source, process_name, destination)
-        with open(destination / matrix_name, "w") as fh:
-            fh.write(temp)
+        # with open(destination / matrix_name, "w") as fh:
+        #    fh.write(temp)
+        (destination / matrix_name).write_text(temp)
 
         # --------------------------------------------------------------------------------------
 

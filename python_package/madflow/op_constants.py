@@ -200,7 +200,7 @@ template struct MatrixFunctor<GPUDevice, COMPLEX_TYPE>;"
 
 # --------------------------------
 
-gpuArithmeticOperators = (
+gpu_arithmetic_operators = (
     "__device__ COMPLEX_TYPE cconj(COMPLEX_TYPE a) {\n\
     return COMPLEX_TYPE(a.real(), -a.imag());\n\
 }\n\

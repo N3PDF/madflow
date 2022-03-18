@@ -51,7 +51,7 @@ TF_LFLAGS = $(shell python3 -c 'import tensorflow as tf; print(" ".join(tf.sysco
 def write_tf_cuda_flags():
     """Adds TansorFlow CUDA flags and the path to CUDA libraries.
     If the environment variable ${CUDA_PATH} isn't defined, use a default path"""
-    #"""
+    # """
     text = f"""CUDA_LFLAGS = -x cu -Xcompiler -fPIC
 CUDA_PATH := $(shell echo ${{CUDA_PATH}})
 ifeq ($(CUDA_PATH),)
@@ -68,12 +68,12 @@ ifeq ($(CUDA_PATH),)
     return text
 
 
-def write_omp_flags():
+def write_omp_flags(openmp_flag="-fopenmp"):
     """Adds flags for OpenMP parallelization"""
     text = f"""ifeq ($(UNAME_S), Darwin)
-OMP_CFLAGS = -Xpreprocessor -fopenmp -lomp
+OMP_CFLAGS = -Xpreprocessor {openmp_flag} -lomp
 else
-OMP_CFLAGS = -fopenmp
+OMP_CFLAGS = {openmp_flag}
 endif
 
 """
@@ -190,8 +190,9 @@ def write_makefile(destination):
     makefile_content += write_commands()
 
     # write the makefile
-    with open(destination / MAKEFILE, "w") as fh:
-        fh.write(makefile_content)
+    # with open(destination / MAKEFILE, "w") as fh:
+    #    fh.write(makefile_content)
+    (destination / MAKEFILE).write_text(makefile_content)
 
 
 if __name__ == "__main__":

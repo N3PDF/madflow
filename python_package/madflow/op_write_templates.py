@@ -191,7 +191,7 @@ def write_custom_op(
 
     if device == "gpu":
         custom_op_code += "\n"
-        custom_op_code += gpuArithmeticOperators
+        custom_op_code += gpu_arithmetic_operators
 
     for f in function_list:
         custom_op_code += "\n"
@@ -209,5 +209,6 @@ def write_custom_op(
 
         custom_op_code += "\n#endif\n"
 
-    with open(destination / ("gpu/matrix_" + process_name + extension), "w") as fh:
-        fh.write(custom_op_code)
+    # with open(destination / ("gpu/matrix_" + process_name + extension), "w") as fh:
+    #    fh.write(custom_op_code)
+    (destination / ("matrix_" + process_name + extension)).write_text(custom_op_code)

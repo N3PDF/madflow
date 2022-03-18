@@ -266,9 +266,8 @@ def modify_matrix(infile, process_name, destination):
                 new_matrix += (
                     space
                     + "matrixOp = tf.load_op_library('"
-                    + (destination / ("matrix_"
-                    + process_name
-                    + "_cu.so'")).as_posix() + ")\n"
+                    + (destination / ("matrix_" + process_name + "_cu.so'")).as_posix()
+                    + ")\n"
                 )
             new_matrix += line
             if clean_spaces(line).startswith("return"):
