@@ -6,8 +6,8 @@ import madflow.op_aux_functions as op_af
 import madflow.op_classes as op_cl
 import madflow.op_global_constants as op_gc
 
-n_events = op_cl.Argument("nevents", "const int", 0, False, [])
-for_loop_string = "for (int it = 0; it < " + n_events.name + "; it += 1) {"
+N_EVENTS = op_cl.Argument("nevents", "const int", 0, False, [])
+FOR_LOOP_STRING = "for (int it = 0; it < " + N_EVENTS.name + "; it += 1) {"
 
 
 def serialize_function(f):
@@ -27,14 +27,14 @@ def serialize_function(f):
             while op_af.clean_spaces(f.scope[s]).startswith("//") == True:
                 s += 1
 
-            f.scope.insert(s, for_loop_string)
+            f.scope.insert(s, FOR_LOOP_STRING)
 
         s += 1
 
     f.scope.insert(s, "}")
     s += 1
 
-    f = prepare_custom_op(f, n_events)
+    f = prepare_custom_op(f, N_EVENTS)
 
     f.args.append(op_cl.Argument("context", "const OpKernelContext*", 0, False, []))
 
@@ -50,13 +50,13 @@ def parallelize_function(f, parallelization_type):
     s = 0
     if parallelization_type == "OpenMP":
         while s < len(f.scope):
-            if op_af.clean_spaces(f.scope[s]).startswith(clean_spaces(for_loop_string)):
+            if op_af.clean_spaces(f.scope[s]).startswith(op_af.clean_spaces(FOR_LOOP_STRING)):
                 f.scope.insert(s, "#pragma omp parallel for")
                 break
             s += 1
     elif parallelization_type == "ThreadPool":
         while s < len(f.scope):
-            if op_af.clean_spaces(f.scope[s]).startswith(op_af.clean_spaces(for_loop_string)):
+            if op_af.clean_spaces(f.scope[s]).startswith(op_af.clean_spaces(FOR_LOOP_STRING)):
                 f.scope.insert(
                     s,
                     "auto thread_pool = context->device()->tensorflow_cpu_worker_threads()->workers;",
@@ -69,7 +69,7 @@ def parallelize_function(f, parallelization_type):
                 f.scope.insert(s, "if (ncores > 1) {")
                 s += 1
                 f.scope.insert(
-                    s, "    nreps = (" + op_gc.INT64_TYPE + ")" + n_events.name + " / ncores;"
+                    s, "    nreps = (" + op_gc.INT64_TYPE + ")" + N_EVENTS.name + " / ncores;"
                 )
                 s += 1
                 f.scope.insert(s, "} else {")
@@ -95,10 +95,10 @@ def parallelize_function(f, parallelization_type):
         s = len(f.scope)
         f.scope.insert(s, "};")
         s += 1
-        f.scope.insert(s, "thread_pool->ParallelFor(" + n_events.name + ", p, DoWork);")
+        f.scope.insert(s, "thread_pool->ParallelFor(" + N_EVENTS.name + ", p, DoWork);")
     elif parallelization_type == "CUDA":
         while s < len(f.scope):
-            if op_af.clean_spaces(f.scope[s]).startswith(op_af.clean_spaces(for_loop_string)):
+            if op_af.clean_spaces(f.scope[s]).startswith(op_af.clean_spaces(FOR_LOOP_STRING)):
                 f.scope[s] = (
                     "for (int it = blockIdx.x * blockDim.x + threadIdx.x; it < "
                     + f.args[-1].name

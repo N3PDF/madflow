@@ -15,17 +15,14 @@ import madflow.op_parser as op_pa
 import madflow.op_read as op_re
 
 
-folder_name = "prov/"
-
-temp = ""
-devices = ["cpu", "gpu"]
+DEVICES = ["cpu", "gpu"]
 
 
 def translate(destination):
     """Translates Python code into a C++/CUDA Custom Operator
     destination: directory of madflow output"""
 
-    file_sources = [madflow.wavefunctions_flow.__file__]  # path to wavefunctions_flow.py
+    FILE_SOURCES = [madflow.wavefunctions_flow.__file__]  # path to wavefunctions_flow.py
 
     # Create the directory for the Op source code and create the makefile
 
@@ -41,25 +38,25 @@ def translate(destination):
     )
 
     # Read wavefunctions_flow.py
-    for file_source in file_sources:
-        signatures_ = []
-        signature_variables_ = []
+    for file_source in FILE_SOURCES:
+        signatures = []
+        signature_variables = []
 
-        signatures_, signature_variables_ = op_re.read_signatures(
-            signatures_, signature_variables_, file_source
+        signatures, signature_variables = op_re.read_signatures(
+            signatures, signature_variables, file_source
         )
 
-        signature_variables_ = op_pa.convert_signatures(signatures_, signature_variables_)
+        signature_variables = op_pa.convert_signatures(signatures, signature_variables)
 
         function_list_ = op_re.read_file_from_source(
-            function_list_, file_source, signatures_, signature_variables_
+            function_list_, file_source, signatures, signature_variables
         )
 
     for subprocess_file_name in destination.glob("matrix_1_*"):
 
         constants = []  # global_constants
 
-        for e in op_gc.global_constants:
+        for e in op_gc.GLOBAL_CONSTANTS:
             constants.append(e)
 
         process_name = re.sub("matrix_1_", "", subprocess_file_name.stem)
@@ -69,13 +66,11 @@ def translate(destination):
             re.sub("matrix_1_", "aloha_1_", subprocess_file_name.stem) + subprocess_file_name.suffix
         )
 
-        signatures = signatures_
-        signature_variables = signature_variables_
         function_list = []
         for f in function_list_:
             function_list.append(f)
         headers = []
-        for h in op_gc.headers_:
+        for h in op_gc.HEADERS_:
             headers.append(h)
         headers.append("matrix_" + process_name + ".h")
 
@@ -119,13 +114,13 @@ def translate(destination):
         function_list[-1] = op_gen.remove_real_ret(function_list[-1])
 
         # write the Op for both CPU and GPU
-        for device in devices:
+        for device in DEVICES:
             op_wt.write_custom_op(
                 headers,
-                op_gc.namespace,
-                op_gc.defined,
+                op_gc.NAMESPACE,
+                op_gc.DEFINED,
                 constants,
-                op_gc.cpu_constants,
+                op_gc.CPU_CONSTANTS,
                 function_list,
                 custom_op_list,
                 destination_gpu,
@@ -151,7 +146,3 @@ def compile_op(destination):
     """Compiles the Custom Operator
     destination: directory of madflow output"""
     subprocess.run("make", cwd=destination, check=True)
-
-
-if __name__ == "__main__":
-    translate(folder_name)

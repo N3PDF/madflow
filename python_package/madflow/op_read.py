@@ -306,7 +306,7 @@ def read_signatures(signatures, signature_variables, file_source):
                 times = 1
                 if match != None:
                     times = int(
-                        op_af.clean_spaces(re.sub("\[[a-zA-Z0-9_]+] *\*(\d+)", "\g<1>", var))
+                        op_af.clean_spaces(re.sub("\[[a-zA-Z0-9_]+] *\* *(\d+)", "\g<1>", var))
                     )
                 for i in range(times):
                     sig_list.append(sig_name)

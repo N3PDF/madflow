@@ -94,10 +94,10 @@ def write_function(fun, device):
         for i in range(len(fun.scope)):
             func.scope.append(fun.scope[i])
         if device == "cpu":
-            func = op_gen.parallelize_function(func, op_gc.cpu_parallelization)
+            func = op_gen.parallelize_function(func, op_gc.CPU_PARALLELIZATION)
         else:
             del func.args[-1]
-            func = op_gen.parallelize_function(func, op_gc.gpu_parallelization)
+            func = op_gen.parallelize_function(func, op_gc.GPU_PARALLELIZATION)
             dev = "__global__ "
     else:
         func = fun
@@ -158,7 +158,7 @@ def write_custom_op(
     device,
 ):
     """Writes the Custom Operator:
-    - heades and libraries
+    - headers and libraries
     - namespaces
     - global constants
     - function definitions
@@ -186,7 +186,7 @@ def write_custom_op(
     custom_op_code += write_constants(constants, device)
 
     if device == "cpu":  # write 'using thread::ThreadPool' if using ThreadPool
-        if op_gc.cpu_parallelization == "ThreadPool":
+        if op_gc.CPU_PARALLELIZATION == "ThreadPool":
             custom_op_code += write_constants(cpu_constants, device)
 
     for f in function_list:

@@ -8,17 +8,17 @@ COMPLEX_TYPE = "complex128"
 
 # Parallelization
 
-cpu_parallelization = "ThreadPool"
-gpu_parallelization = "CUDA"
+CPU_PARALLELIZATION = "ThreadPool"
+GPU_PARALLELIZATION = "CUDA"
 
 # Libraries (#include <libraryName>)
 # Used in Matrix_xxxx.h
 
-libraries = ["math.h", "unsupported/Eigen/CXX11/Tensor"]
+LIBRARIES = ["math.h", "unsupported/Eigen/CXX11/Tensor"]
 
 # Header files (#include "Header.h")
 
-headers_ = [
+HEADERS_ = [
     "tensorflow/core/framework/op.h",
     "tensorflow/core/framework/op_kernel.h",
     "tensorflow/core/util/work_sharder.h",
@@ -29,11 +29,11 @@ headers_ = [
 
 # Namespaces
 
-namespace = "tensorflow"
+NAMESPACE = "tensorflow"
 
 # Constants
 
-defined = [
+DEFINED = [
     "COMPLEX_CONJUGATE std::conj",
     "MAXIMUM std::max",
     "MINIMUM std::min",
@@ -41,8 +41,8 @@ defined = [
     "GPUDevice Eigen::GpuDevice",
     "DEFAULT_BLOCK_SIZE 32",
 ]
-global_constants = [
+GLOBAL_CONSTANTS = [
     "const " + DOUBLE_TYPE + " SQH = 0.70710676908493",
     "const COMPLEX_TYPE CZERO = COMPLEX_TYPE(0.0, 0.0)",
 ]
-cpu_constants = ["using thread::ThreadPool"]  # Not used for the GPU Op
+CPU_CONSTANTS = ["using thread::ThreadPool"]  # Not used for the GPU Op
