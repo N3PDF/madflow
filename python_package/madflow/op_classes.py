@@ -1,3 +1,5 @@
+"""Classes used by the transpiler"""
+
 from dataclasses import dataclass
 
 

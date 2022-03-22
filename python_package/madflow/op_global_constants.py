@@ -1,8 +1,10 @@
+"""Global constants and libraries used by the Custom Operator"""
+
 # Types
 
-INT64_type = "int64_t"
-double_type = "double"
-complex_type = "complex128"
+INT64_TYPE = "int64_t"
+DOUBLE_TYPE = "double"
+COMPLEX_TYPE = "complex128"
 
 # Parallelization
 
@@ -40,7 +42,7 @@ defined = [
     "DEFAULT_BLOCK_SIZE 32",
 ]
 global_constants = [
-    "const " + double_type + " SQH = 0.70710676908493",
+    "const " + DOUBLE_TYPE + " SQH = 0.70710676908493",
     "const COMPLEX_TYPE CZERO = COMPLEX_TYPE(0.0, 0.0)",
 ]
 cpu_constants = ["using thread::ThreadPool"]  # Not used for the GPU Op

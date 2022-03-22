@@ -1,4 +1,10 @@
-from madflow.op_transpiler import *
+"""Extraction of features from python code (function scope / signature)"""
+
+import re
+
+import madflow.op_aux_functions as op_af
+import madflow.op_classes as op_cl
+import madflow.op_transpiler as op_tp
 
 
 # Function parsing
@@ -16,7 +22,7 @@ def parse_function_return(function_return, scope, scope_args, args):
     function_return = re.sub("return", args[-1].name + " =", function_return)
     function_return = re.sub("#[^\n]*\n", "", function_return)
     inside_comment = False
-    new_line, scope_args, scope, inside_comment = parse_line(
+    new_line, scope_args, scope, inside_comment = op_tp.parse_line(
         function_return, args, scope_args, scope, inside_comment
     )
 
@@ -43,18 +49,18 @@ def parse_function_scope(function_scope, scope, scope_args, args):
     while i < len(function_scope):
         line = function_scope[i]  # read i-th line
         brackets_count = 0
-        brackets_count = count_brackets(line, brackets_count)
+        brackets_count = op_af.count_brackets(line, brackets_count)
         # if there are more '(' than ')', read more lines
         # (but don't go beyond len(function_scope)
         while brackets_count > 0 and i < len(function_scope) - 1:
             i += 1
             l = function_scope[i]
-            brackets_count = count_brackets(l, brackets_count)
+            brackets_count = op_af.count_brackets(l, brackets_count)
             line += l  # create a single line
         # parse (and transpile) the line
         # read also any variables defined in the scope
         # append those variables to scope_args
-        new_line, scope_args, scope, inside_comment = parse_line(
+        new_line, scope_args, scope, inside_comment = op_tp.parse_line(
             line, args, scope_args, scope, inside_comment
         )
         scope.append(new_line)  # add the line to the function scope
@@ -70,7 +76,7 @@ def get_signature(line):
     return: a Signature object"""
     type_ = line.split("dtype=")[1]
     type_ = type_.split(")")[0]
-    type_ = convert_type(type_)
+    type_ = op_af.convert_type(type_)
     is_tensor = False
 
     shape = line.split("shape=[")[1]
@@ -84,7 +90,7 @@ def get_signature(line):
         is_tensor = True
     else:
         s = shape.split(",", 1)[-1]
-        shape = clean_spaces(shape.split(",")[-1])
+        shape = op_af.clean_spaces(shape.split(",")[-1])
         s = s.split(",")
         prod = 1
         for a in s:
@@ -93,9 +99,9 @@ def get_signature(line):
                 prod *= int(a)
         slice_.append(str(prod))
 
-    name = clean_spaces(line.split("=")[0])
+    name = op_af.clean_spaces(line.split("=")[0])
 
-    return Signature(name, type_, shape, is_tensor, slice_)
+    return op_cl.Signature(name, type_, shape, is_tensor, slice_)
 
 
 def convert_signatures(signatures, signature_variables):

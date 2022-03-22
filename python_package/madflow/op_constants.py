@@ -1,6 +1,6 @@
 """Jinja templates for the generation of custom operators"""
 
-from madflow.op_global_constants import double_type, complex_type
+import madflow.op_global_constants as op_gc
 
 # Templates ----------------------
 
@@ -94,7 +94,7 @@ struct MatrixFunctor<Eigen::GpuDevice, T> {\n\
 \n\
 \n\
 #define COMPLEX_TYPE '
-    + complex_type
+    + op_gc.COMPLEX_TYPE
     + "\n\
 \n\
 #endif"
@@ -219,7 +219,7 @@ __device__ COMPLEX_TYPE operator*(const COMPLEX_TYPE& a, const COMPLEX_TYPE& b) 
 \n\
 __device__ COMPLEX_TYPE operator/(const COMPLEX_TYPE& a, const COMPLEX_TYPE& b) {\n\
     "
-    + double_type
+    + op_gc.DOUBLE_TYPE
     + " norm = b.real() * b.real() + b.imag() * b.imag();\n\
     return COMPLEX_TYPE((a.real() * b.real() + a.imag() * b.imag())/norm, (a.imag() * b.real() - a.real() * b.imag())/norm);\n\
 }\n\
@@ -229,19 +229,19 @@ __device__ COMPLEX_TYPE operator-(const COMPLEX_TYPE& a) {\n\
 }\n\
 \n\
 __device__ COMPLEX_TYPE operator*(const COMPLEX_TYPE& a, const "
-    + double_type
+    + op_gc.DOUBLE_TYPE
     + "& b) {\n\
     return COMPLEX_TYPE(a.real() * b, a.imag() * b);\n\
 }\n\
 \n\
 __device__ COMPLEX_TYPE operator*(const "
-    + double_type
+    + op_gc.DOUBLE_TYPE
     + "& a, const COMPLEX_TYPE& b) {\n\
     return b * a;\n\
 }\n\
 \n\
 __device__ COMPLEX_TYPE operator/(const COMPLEX_TYPE& a, const "
-    + double_type
+    + op_gc.DOUBLE_TYPE
     + "& b) {\n\
     return COMPLEX_TYPE(a.real() / b, a.imag() / b);\n\
 }\n"

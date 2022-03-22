@@ -1,25 +1,31 @@
+"""Sign functions used by the Custom Operator and functions used by the transpiler"""
+
 import re
 
-from madflow.op_global_constants import *
-from madflow.op_classes import *
+import madflow.op_global_constants as op_gc
+import madflow.op_classes as op_cl
 
 
 def generate_auxiliary_functions(auxiliary_functions, function_list_):
     """generates sign functions"""
     aux_args = []
-    aux_arg = Argument("x", double_type, 0, False, [])
+    aux_arg = op_cl.Argument("x", op_gc.DOUBLE_TYPE, 0, False, [])
     aux_args.append(aux_arg)
-    aux_arg = Argument("y", double_type, 0, False, [])
+    aux_arg = op_cl.Argument("y", op_gc.DOUBLE_TYPE, 0, False, [])
     aux_args.append(aux_arg)
     aux_scope = ["int sign = 0;", "y >= 0 ? sign = 1 : sign = -1;", "return x * sign;"]
-    aux_scope_args = [Argument("sign", "int", 0, False, [])]
-    aux_function = Function(double_type, "sign", aux_args, aux_scope, aux_scope_args, "")
+    aux_scope_args = [op_cl.Argument("sign", "int", 0, False, [])]
+    aux_function = op_cl.Function(
+        op_gc.DOUBLE_TYPE, "sign", aux_args, aux_scope, aux_scope_args, ""
+    )
     function_list_.append(aux_function)
     auxiliary_functions.append(aux_function)
 
     aux_scope = ["return sign(x, y);"]
     aux_scope_args = []
-    aux_function = Function(double_type, "signvec", aux_args, aux_scope, aux_scope_args, "")
+    aux_function = op_cl.Function(
+        op_gc.DOUBLE_TYPE, "signvec", aux_args, aux_scope, aux_scope_args, ""
+    )
     function_list_.append(aux_function)
     auxiliary_functions.append(aux_function)
     return auxiliary_functions, function_list_
@@ -48,12 +54,6 @@ def count_brackets(line, brackets_count):
     """remove the count of brackets () in a string"""
     for letter in line:
         brackets_count = count_brackets_letter(letter, brackets_count)
-        """
-        if letter == "(":
-            brackets_count += 1
-        elif letter == ")":
-            brackets_count -= 1
-        """
     return brackets_count
 
 
@@ -92,7 +92,7 @@ def convert_type(t):
 
     result = ""
     d = {
-        "DTYPE": double_type,
+        "DTYPE": op_gc.DOUBLE_TYPE,
         "DTYPEINT": "int",
         "DTYPECOMPLEX": "T",
     }

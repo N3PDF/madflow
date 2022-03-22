@@ -1,4 +1,11 @@
-from madflow.op_parser import *
+"""Reads functions and signatures line by line"""
+
+import re
+
+import madflow.op_aux_functions as op_af
+import madflow.op_global_constants as op_gc
+import madflow.op_classes as op_cl
+import madflow.op_parser as op_pa
 
 
 def grab_function_name(line):
@@ -24,7 +31,7 @@ def grab_function_arguments(line, f_name, signature_variables, signature_line):
     line = line.split(")", 1)[0]
     line = line[len(f_name) + 1 :]
     # create a list of names of function arguments
-    split_args = clean_spaces(line).split(",")
+    split_args = op_af.clean_spaces(line).split(",")
 
     # delete self if the function is a class method
     j = -1
@@ -43,9 +50,9 @@ def grab_function_arguments(line, f_name, signature_variables, signature_line):
     sig_list = []
     signature_line = signature_line.split("@tf.function(")[1]
     signature_line = signature_line.split(")")[0]
-    signature_line = clean_spaces(signature_line).split("input_signature=")[1]
+    signature_line = op_af.clean_spaces(signature_line).split("input_signature=")[1]
     if signature_line.startswith("["):
-        s = get_signature(signature_line)
+        s = op_pa.get_signature(signature_line)
         sig_list.append(s)
     else:
         for sv in signature_variables:
@@ -63,9 +70,9 @@ def grab_function_arguments(line, f_name, signature_variables, signature_line):
         split_slices.append(a.slice)
 
     for i in range(len(split_args)):
-        split_args[i] = clean_spaces(split_args[i])
+        split_args[i] = op_af.clean_spaces(split_args[i])
         args.append(
-            Argument(
+            op_cl.Argument(
                 split_args[i], split_types[i], split_sizes[i], split_tensors[i], split_slices[i]
             )
         )
@@ -86,7 +93,7 @@ def grab_function_return(line, f_name, args):
     # Currently all functions are void
     f_type = "void"
     # The return value is passed by pointer
-    args.append(Argument("ret", double_type, -1, False, []))
+    args.append(op_cl.Argument("ret", op_gc.DOUBLE_TYPE, -1, False, []))
     return args, f_type
 
 
@@ -106,17 +113,17 @@ def grab_function_scope(f, args):
     function_return = ""
 
     match = re.search("^ *return[ ]+", line)
-    while clean_spaces(line).startswith("return") == False:
+    while op_af.clean_spaces(line).startswith("return") == False:
         function_scope.append(line)
         match = re.search("^ *return[ ]+", line)
         line = f.readline()
-    while clean_spaces(line) != "":
+    while op_af.clean_spaces(line) != "":
         function_return += line
         line = f.readline()
 
     args[-1].name = grab_return_variable_name(function_return)
-    scope, scope_args = parse_function_scope(function_scope, scope, scope_args, args)
-    scope, scope_args = parse_function_return(function_return, scope, scope_args, args)
+    scope, scope_args = op_pa.parse_function_scope(function_scope, scope, scope_args, args)
+    scope, scope_args = op_pa.parse_function_return(function_return, scope, scope_args, args)
 
     return scope, scope_args
 
@@ -128,7 +135,7 @@ def grab_return_variable_name(function_return):
 
     return: string representing the name of the return variable"""
     ret_name = "out_final"
-    function_return = clean_spaces(function_return)[len("return") :]
+    function_return = op_af.clean_spaces(function_return)[len("return") :]
     st1 = "tf.stack("
     st2 = "tf.transpose("
     st3 = "tf.reshape(tf.stack("
@@ -157,7 +164,7 @@ def read_file_from_source(function_list, file_source, signatures, signature_vari
     f = open(file_source, "r")
     line = f.readline()
     while line != "":
-        if clean_spaces(line).startswith("@tf.function"):
+        if op_af.clean_spaces(line).startswith("@tf.function"):
             signature_line = line
             line = f.readline()
             l = line
@@ -184,7 +191,7 @@ def read_file_from_source(function_list, file_source, signatures, signature_vari
                 args = grab_function_arguments(line, f_name, signature_variables, signature_line)
                 args, f_type = grab_function_return(line, f_name, args)
                 scope, scope_args = grab_function_scope(f, args)
-                new_function = Function(
+                new_function = op_cl.Function(
                     f_type, f_name, args, scope, scope_args, "template <typename T>"
                 )
                 function_list.append(new_function)
@@ -207,7 +214,7 @@ def extract_matrix_from_file(function_list, file_source, signatures, signature_v
     f = open(file_source, "r")
     line = f.readline()
     while line != "":
-        if clean_spaces(line).startswith("@tf.function"):
+        if op_af.clean_spaces(line).startswith("@tf.function"):
             signature_line = line
             line = f.readline()
             l = line
@@ -234,7 +241,7 @@ def extract_matrix_from_file(function_list, file_source, signatures, signature_v
                 args = grab_function_arguments(line, f_name, signature_variables, signature_line)
                 args, f_type = grab_function_return(line, f_name, args)
                 scope, scope_args = grab_function_scope(f, args)
-                new_function = Function(
+                new_function = op_cl.Function(
                     f_type, f_name, args, scope, scope_args, "template <typename T>"
                 )
                 function_list.append(new_function)
@@ -255,10 +262,10 @@ def read_signatures(signatures, signature_variables, file_source):
     while line != "":
         match = re.search("tf.TensorSpec", line)
         match2 = re.search("signature", line)
-        if match != None and clean_spaces(line).startswith("@tf.function") == False:
-            s = get_signature(line)
+        if match != None and op_af.clean_spaces(line).startswith("@tf.function") == False:
+            s = op_pa.get_signature(line)
             signatures.append(s)
-        elif match2 != None and clean_spaces(line).startswith("@tf.function") == False:
+        elif match2 != None and op_af.clean_spaces(line).startswith("@tf.function") == False:
             br_count = 0
             for letter in line:
                 if letter == "[":
@@ -274,7 +281,7 @@ def read_signatures(signatures, signature_variables, file_source):
                         br_count -= 1
                 line += l
             line = re.sub("(TensorSpec\([^)]*\) *),", "\g<1>?", line)
-            name = clean_spaces(line.split("=")[0])
+            name = op_af.clean_spaces(line.split("=")[0])
             line = line.split(" = ")[1]
             var_list = line.split("+")
             if len(var_list) == 1:
@@ -286,27 +293,29 @@ def read_signatures(signatures, signature_variables, file_source):
                 if match != None:
                     var = re.sub(".*[\n]*.*(tf.TensorSpec\([^)]*\)).*", "\g<1>", var)
                     s_list.append(
-                        Signature(
+                        op_cl.Signature(
                             var,
-                            get_signature(var).type,
-                            get_signature(var).size,
-                            get_signature(var).tensor,
-                            get_signature(var).slice,
+                            op_pa.get_signature(var).type,
+                            op_pa.get_signature(var).size,
+                            op_pa.get_signature(var).tensor,
+                            op_pa.get_signature(var).slice,
                         )
                     )
                 match = re.search("\[[a-zA-Z0-9_]+] *\*", var)
-                sig_name = clean_spaces(re.sub("\[([a-zA-Z0-9_]+)].*", "\g<1>", var))
+                sig_name = op_af.clean_spaces(re.sub("\[([a-zA-Z0-9_]+)].*", "\g<1>", var))
                 times = 1
                 if match != None:
-                    times = int(clean_spaces(re.sub("\[[a-zA-Z0-9_]+] *\*(\d+)", "\g<1>", var)))
+                    times = int(
+                        op_af.clean_spaces(re.sub("\[[a-zA-Z0-9_]+] *\*(\d+)", "\g<1>", var))
+                    )
                 for i in range(times):
                     sig_list.append(sig_name)
 
             if len(s_list) > 0:
-                s = SignatureVariable(name, s_list, [])
+                s = op_cl.SignatureVariable(name, s_list, [])
                 signature_variables.append(s)
             elif len(sig_list) > 0:
-                s = SignatureVariable(name, [], sig_list)
+                s = op_cl.SignatureVariable(name, [], sig_list)
                 signature_variables.append(s)
         line = f.readline()
     f.close()

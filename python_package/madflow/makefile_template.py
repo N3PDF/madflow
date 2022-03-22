@@ -1,3 +1,5 @@
+"""Makefile generation for compiling the Custom Operator"""
+
 MAKEFILE = "makefile"
 CPPCOMPILER = "g++"
 CPPVERSION = "c++14"
@@ -190,8 +192,6 @@ def write_makefile(destination):
     makefile_content += write_commands()
 
     # write the makefile
-    # with open(destination / MAKEFILE, "w") as fh:
-    #    fh.write(makefile_content)
     (destination / MAKEFILE).write_text(makefile_content)
 
 

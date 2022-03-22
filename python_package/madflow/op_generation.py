@@ -1,6 +1,12 @@
-from madflow.op_aux_functions import *
+"""Optimization of the Custom Operator (parallelization / memory optimizations)"""
 
-n_events = Argument("nevents", "const int", 0, False, [])
+import re
+
+import madflow.op_aux_functions as op_af
+import madflow.op_classes as op_cl
+import madflow.op_global_constants as op_gc
+
+n_events = op_cl.Argument("nevents", "const int", 0, False, [])
 for_loop_string = "for (int it = 0; it < " + n_events.name + "; it += 1) {"
 
 
@@ -15,10 +21,10 @@ def serialize_function(f):
     while s < len(f.scope):
         if for_loop == True:
             f.scope[s] = spacing + f.scope[s]
-        elif clean_spaces(f.scope[s]).startswith("//Begin"):
+        elif op_af.clean_spaces(f.scope[s]).startswith("//Begin"):
             for_loop = True
             s += 1
-            while clean_spaces(f.scope[s]).startswith("//") == True:
+            while op_af.clean_spaces(f.scope[s]).startswith("//") == True:
                 s += 1
 
             f.scope.insert(s, for_loop_string)
@@ -30,7 +36,7 @@ def serialize_function(f):
 
     f = prepare_custom_op(f, n_events)
 
-    f.args.append(Argument("context", "const OpKernelContext*", 0, False, []))
+    f.args.append(op_cl.Argument("context", "const OpKernelContext*", 0, False, []))
 
     return f
 
@@ -44,13 +50,13 @@ def parallelize_function(f, parallelization_type):
     s = 0
     if parallelization_type == "OpenMP":
         while s < len(f.scope):
-            if clean_spaces(f.scope[s]).startswith(clean_spaces(for_loop_string)):
+            if op_af.clean_spaces(f.scope[s]).startswith(clean_spaces(for_loop_string)):
                 f.scope.insert(s, "#pragma omp parallel for")
                 break
             s += 1
     elif parallelization_type == "ThreadPool":
         while s < len(f.scope):
-            if clean_spaces(f.scope[s]).startswith(clean_spaces(for_loop_string)):
+            if op_af.clean_spaces(f.scope[s]).startswith(op_af.clean_spaces(for_loop_string)):
                 f.scope.insert(
                     s,
                     "auto thread_pool = context->device()->tensorflow_cpu_worker_threads()->workers;",
@@ -58,11 +64,13 @@ def parallelize_function(f, parallelization_type):
                 s += 1
                 f.scope.insert(s, "const int ncores = (int)thread_pool->NumThreads();")
                 s += 1
-                f.scope.insert(s, INT64_type + " nreps;")
+                f.scope.insert(s, op_gc.INT64_TYPE + " nreps;")
                 s += 1
                 f.scope.insert(s, "if (ncores > 1) {")
                 s += 1
-                f.scope.insert(s, "    nreps = (" + INT64_type + ")" + n_events.name + " / ncores;")
+                f.scope.insert(
+                    s, "    nreps = (" + op_gc.INT64_TYPE + ")" + n_events.name + " / ncores;"
+                )
                 s += 1
                 f.scope.insert(s, "} else {")
                 s += 1
@@ -75,7 +83,9 @@ def parallelize_function(f, parallelization_type):
                     "const ThreadPool::SchedulingParams p(ThreadPool::SchedulingStrategy::kFixedBlockSize, absl::nullopt, nreps);",
                 )
                 s += 1
-                f.scope.insert(s, "auto DoWork = [&](" + INT64_type + " t, " + INT64_type + " w) {")
+                f.scope.insert(
+                    s, "auto DoWork = [&](" + op_gc.INT64_TYPE + " t, " + op_gc.INT64_TYPE + " w) {"
+                )
                 s += 1
                 del f.scope[s]
                 f.scope.insert(s, "for (auto it = t; it < w; it += 1) {")
@@ -88,7 +98,7 @@ def parallelize_function(f, parallelization_type):
         f.scope.insert(s, "thread_pool->ParallelFor(" + n_events.name + ", p, DoWork);")
     elif parallelization_type == "CUDA":
         while s < len(f.scope):
-            if clean_spaces(f.scope[s]).startswith(clean_spaces(for_loop_string)):
+            if op_af.clean_spaces(f.scope[s]).startswith(op_af.clean_spaces(for_loop_string)):
                 f.scope[s] = (
                     "for (int it = blockIdx.x * blockDim.x + threadIdx.x; it < "
                     + f.args[-1].name
@@ -131,7 +141,7 @@ def prepare_custom_op(f, nevents):
                     )
 
     # The polarized Matrix Element is an array of double
-    f.args[-1].type = double_type + "*"
+    f.args[-1].type = op_gc.DOUBLE_TYPE + "*"
 
     for j in range(len(f.scope)):
         f.scope[j] = re.sub(
@@ -221,7 +231,7 @@ def define_custom_op(func):
     line += ", " + func.args[-1].name + ");"
     s.append(line)
 
-    return CustomOperator("MatrixOp", s, functor_name)
+    return op_cl.CustomOperator("MatrixOp", s, functor_name)
 
 
 def modify_matrix(infile, process_name, destination):
@@ -243,25 +253,25 @@ def modify_matrix(infile, process_name, destination):
     p = re.sub("_", "", process_name)
     while line != "":
         if skip_lines == True:
-            if clean_spaces(line).startswith("return"):
+            if op_af.clean_spaces(line).startswith("return"):
                 skip_lines = False
         else:
             # temp += line
             matrix_source_code_array.append(line)
-        if clean_spaces(line).startswith(
+        if op_af.clean_spaces(line).startswith(
             "defcusmatrix("
         ):  # I can re-run the script without creating duplicates of cusmatrix()
             skip_lines = True
             matrix_source_code_array.pop()
             matrix_source_code_array.pop()
-        if clean_spaces(line).startswith("defsmatrix("):
+        if op_af.clean_spaces(line).startswith("defsmatrix("):
             inside_matrix = True
             new_matrix += "\n"  # add empty line
             new_matrix += (
                 previous_line  # add @tf.function() with the same input signature as smatrix
             )
         if inside_matrix == True:
-            if clean_spaces(line).startswith("for"):
+            if op_af.clean_spaces(line).startswith("for"):
                 space = line.split("for")[0]
                 new_matrix += (
                     space
@@ -270,14 +280,14 @@ def modify_matrix(infile, process_name, destination):
                     + ")\n"
                 )
             new_matrix += line
-            if clean_spaces(line).startswith("return"):
+            if op_af.clean_spaces(line).startswith("return"):
                 inside_matrix = False
                 new_matrix = re.sub("smatrix\(", "cusmatrix(", new_matrix)
                 new_matrix = re.sub("self\.matrix\(", "matrixOp.matrix" + p + "(", new_matrix)
                 # temp += new_matrix
                 matrix_source_code_array.append(new_matrix)
                 # break
-        if clean_spaces(line) != "":  # not checking if it is inside a comment !!!
+        if op_af.clean_spaces(line) != "":  # not checking if it is inside a comment !!!
             previous_line = line
         line = f.readline()
 
@@ -298,7 +308,7 @@ def extract_constants(func, constants):
     count = 0
     for i in range(len(func.scope)):
         if func.scope[i].startswith("const double "):
-            constants.append(change_array_into_variable(func.scope[i]))
+            constants.append(op_af.change_array_into_variable(func.scope[i]))
             del func.scope[i]
             i -= 1
             count += 1
@@ -324,7 +334,7 @@ def remove_real_ret(func):
     return: updated Function object"""
 
     for i in range(len(func.scope)):  # This loop can be reversed
-        if clean_spaces(func.scope[len(func.scope) - i - 1]).startswith(func.args[-3].name):
+        if op_af.clean_spaces(func.scope[len(func.scope) - i - 1]).startswith(func.args[-3].name):
             func.scope[len(func.scope) - i - 1] = re.sub(
                 ".real\(\)", "", func.scope[len(func.scope) - i - 1]
             )

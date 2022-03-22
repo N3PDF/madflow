@@ -1,13 +1,18 @@
-import subprocess
+"""Generation of the custom operator from existing python code"""
 
+import subprocess
+import re
 
 import madflow.wavefunctions_flow
-from madflow.makefile_template import write_makefile
+import madflow.makefile_template as mf_tmp
 
-from madflow.op_write_templates import *
-from madflow.op_syntax import *
-from madflow.op_read import *
-from madflow.op_generation import *
+import madflow.op_aux_functions as op_af
+import madflow.op_generation as op_gen
+import madflow.op_global_constants as op_gc
+import madflow.op_write_templates as op_wt
+import madflow.op_syntax as op_sy
+import madflow.op_parser as op_pa
+import madflow.op_read as op_re
 
 
 folder_name = "prov/"
@@ -24,15 +29,14 @@ def translate(destination):
 
     # Create the directory for the Op source code and create the makefile
 
-    # subprocess.run("mkdir -p gpu/", cwd=destination, check=True, shell=True)
     destination_gpu = destination / "gpu"
     destination_gpu.mkdir(parents=True, exist_ok=True)
-    write_makefile(destination)
+    mf_tmp.write_makefile(destination)
 
     # Generate sign functions
     auxiliary_functions = []
     function_list_ = []
-    auxiliary_functions, function_list_ = generate_auxiliary_functions(
+    auxiliary_functions, function_list_ = op_af.generate_auxiliary_functions(
         auxiliary_functions, function_list_
     )
 
@@ -41,34 +45,24 @@ def translate(destination):
         signatures_ = []
         signature_variables_ = []
 
-        signatures_, signature_variables_ = read_signatures(
+        signatures_, signature_variables_ = op_re.read_signatures(
             signatures_, signature_variables_, file_source
         )
 
-        signature_variables_ = convert_signatures(signatures_, signature_variables_)
+        signature_variables_ = op_pa.convert_signatures(signatures_, signature_variables_)
 
-        function_list_ = read_file_from_source(
+        function_list_ = op_re.read_file_from_source(
             function_list_, file_source, signatures_, signature_variables_
         )
-    """
-    # Find all generated matrix_1_xxxxx.py (one for each subprocess)
-    files_list = (
-        subprocess.check_output(["/bin/sh", "-c", "ls " + destination.as_posix() + " | grep matrix_1_"])
-        .decode("utf-8")
-        .split("\n")[:-1]
-    )
-    """
 
-    # for subprocess_file_name in files_list:
     for subprocess_file_name in destination.glob("matrix_1_*"):
 
         constants = []  # global_constants
 
-        for e in global_constants:
+        for e in op_gc.global_constants:
             constants.append(e)
 
         process_name = re.sub("matrix_1_", "", subprocess_file_name.stem)
-        # process_name = re.sub("\.py", "", process_name)
 
         matrix_source = subprocess_file_name
         process_source = subprocess_file_name.parent / (
@@ -77,67 +71,61 @@ def translate(destination):
 
         signatures = signatures_
         signature_variables = signature_variables_
-        # function_list = function_list_
-        # """
         function_list = []
         for f in function_list_:
             function_list.append(f)
-        # """
-        # headers = headers_
-        # """
         headers = []
-        for h in headers_:
+        for h in op_gc.headers_:
             headers.append(h)
-        # """
         headers.append("matrix_" + process_name + ".h")
 
         custom_op_list = []
 
-        signatures, signature_variables = read_signatures(
+        signatures, signature_variables = op_re.read_signatures(
             signatures, signature_variables, process_source
         )
 
-        signature_variables = convert_signatures(signatures, signature_variables)
+        signature_variables = op_pa.convert_signatures(signatures, signature_variables)
 
-        function_list = read_file_from_source(
+        function_list = op_re.read_file_from_source(
             function_list, process_source, signatures, signature_variables
         )
 
         matrix_name = subprocess_file_name.name
 
-        signatures, signature_variables = read_signatures(
+        signatures, signature_variables = op_re.read_signatures(
             signatures, signature_variables, matrix_source
         )
-        signature_variables = convert_signatures(signatures, signature_variables)
+        signature_variables = op_pa.convert_signatures(signatures, signature_variables)
 
-        function_list = extract_matrix_from_file(
+        function_list = op_re.extract_matrix_from_file(
             function_list, matrix_source, signatures, signature_variables
         )
 
         for i in range(len(function_list)):
-            function_list = check_variables(i, function_list)
+            function_list = op_sy.check_variables(i, function_list)
 
         for i in range(len(function_list)):
-            function_list = check_lines(i, function_list)
+            function_list = op_sy.check_lines(i, function_list)
         for i in range(len(function_list)):
-            function_list = check_variables(i, function_list)
+            function_list = op_sy.check_variables(i, function_list)
 
-        function_list[-1] = serialize_function(function_list[-1])
+        function_list[-1] = op_gen.serialize_function(function_list[-1])
 
-        custom_op_list.append(define_custom_op(function_list[-1]))
+        custom_op_list.append(op_gen.define_custom_op(function_list[-1]))
 
-        function_list[-1], constants = extract_constants(function_list[-1], constants)
+        function_list[-1], constants = op_gen.extract_constants(function_list[-1], constants)
 
-        function_list[-1] = remove_real_ret(function_list[-1])
+        function_list[-1] = op_gen.remove_real_ret(function_list[-1])
 
         # write the Op for both CPU and GPU
         for device in devices:
-            write_custom_op(
+            op_wt.write_custom_op(
                 headers,
-                namespace,
-                defined,
+                op_gc.namespace,
+                op_gc.defined,
                 constants,
-                cpu_constants,
+                op_gc.cpu_constants,
                 function_list,
                 custom_op_list,
                 destination_gpu,
@@ -148,16 +136,12 @@ def translate(destination):
         # write matrix_xxxxx.h
         temp = ""
         for c in custom_op_list:
-            temp += write_header_file(c, function_list[-1])
-        # with open(destination / ("gpu/matrix_" + process_name + ".h"), "w") as fh:
-        #    fh.write(temp)
+            temp += op_wt.write_header_file(c, function_list[-1])
         (destination_gpu / ("matrix_" + process_name + ".h")).write_text(temp)
 
         # write matrix_1_xxxxx.py
         temp = ""
-        temp = modify_matrix(matrix_source, process_name, destination)
-        # with open(destination / matrix_name, "w") as fh:
-        #    fh.write(temp)
+        temp = op_gen.modify_matrix(matrix_source, process_name, destination)
         (destination / matrix_name).write_text(temp)
 
         # --------------------------------------------------------------------------------------

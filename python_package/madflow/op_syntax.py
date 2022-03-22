@@ -1,4 +1,10 @@
-from madflow.op_aux_functions import *
+"""Control of C++/CUDA syntax robustness"""
+
+import re
+
+import madflow.op_aux_functions as op_af
+import madflow.op_global_constants as op_gc
+import madflow.op_classes as op_cl
 
 
 def check_variables(counter, function_list):
@@ -29,7 +35,7 @@ def check_variables(counter, function_list):
                 if match != None:
                     function_list = check_variables(k, function_list)
                     (function_list[counter].args)[i].size = function_list[k].args[-1].size
-                    (function_list[counter].args)[i].type = clean_pointer(
+                    (function_list[counter].args)[i].type = op_af.clean_pointer(
                         function_list[k].args[-1].type
                     )
                     if function_list[k].args[-1].size != 0:
@@ -126,11 +132,11 @@ def check_lines(counter, function_list):
                             if v.type.startswith("T"):
                                 custom_type = "T"
                                 break
-                            elif v.type.startswith(double_type):
+                            elif v.type.startswith(op_gc.DOUBLE_TYPE):
                                 type_value += 1
 
                     if custom_type != "T" and type_value > 0:
-                        custom_type = double_type
+                        custom_type = op_gc.DOUBLE_TYPE
 
                     function_list[counter].args[-1].type = custom_type + "&"
                     function_list[counter].args[-1].size = 0
@@ -156,7 +162,7 @@ def check_lines(counter, function_list):
                                 if ls[0].startswith(v.name):
                                     function_list[counter].scope[it] = ""
                                     break
-                        elif v.type.startswith(double_type):
+                        elif v.type.startswith(op_gc.DOUBLE_TYPE):
                             match = re.search("T\( *" + v.name + "[0-9[\]]* *\)", value)
                             if match != None:
                                 if ls[0].startswith(v.name):
@@ -180,7 +186,7 @@ def check_lines(counter, function_list):
                                         + ", 0);"
                                     )
                                     function_list[counter].scope_args.append(
-                                        Argument(v.name, "T", 0, False, [])
+                                        op_cl.Argument(v.name, "T", 0, False, [])
                                     )
                                     for it2 in range(len(function_list[counter].args)):
                                         if v.name == function_list[counter].args[it2].name:
@@ -196,7 +202,7 @@ def check_lines(counter, function_list):
                         if f.type == "void":
                             if (
                                 ls[0].startswith("T")
-                                or ls[0].startswith(double_type)
+                                or ls[0].startswith(op_gc.DOUBLE_TYPE)
                                 or ls[0].startswith("int")
                             ):
                                 for v in range(len(function_list[counter].scope_args)):
@@ -242,8 +248,8 @@ def check_lines(counter, function_list):
         if match != None:
             function_list[counter].scope.remove(line)
             line = re.sub("(.*)tf.concat\( *\[(.*) *] *, *axis.*", "\g<1>\g<2>", line)
-            assigned = clean_spaces(line.split("=")[1])
-            assigned_variable = clean_spaces(line.split("=")[0])
+            assigned = op_af.clean_spaces(line.split("=")[1])
+            assigned_variable = op_af.clean_spaces(line.split("=")[0])
             var_list = assigned.split(",")
             var_length = []
             conc_size = 0
@@ -263,7 +269,7 @@ def check_lines(counter, function_list):
                             unknown = True
                         if function_list[counter].args[i].type.startswith("T"):
                             conc_type = "T"
-                        elif function_list[counter].args[i].type.startswith(double_type):
+                        elif function_list[counter].args[i].type.startswith(op_gc.DOUBLE_TYPE):
                             type_value += 1
                         conc_size += c_size
                         var_length.append(c_size)
@@ -280,7 +286,9 @@ def check_lines(counter, function_list):
                             unknown = True
                         if function_list[counter].scope_args[i].type.startswith("T"):
                             conc_type = "T"
-                        elif function_list[counter].scope_args[i].type.startswith(double_type):
+                        elif (
+                            function_list[counter].scope_args[i].type.startswith(op_gc.DOUBLE_TYPE)
+                        ):
                             type_value += 1
                         conc_size += c_size
                         var_length.append(c_size)
@@ -288,7 +296,7 @@ def check_lines(counter, function_list):
 
             if conc_type != "T":
                 if type_value > 0:
-                    conc_type = double_type
+                    conc_type = op_gc.DOUBLE_TYPE
 
             if unknown == False:
 
