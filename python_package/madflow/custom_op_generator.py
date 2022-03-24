@@ -2,6 +2,7 @@
 
 import subprocess
 import re
+import copy
 
 import madflow.wavefunctions_flow
 import madflow.makefile_template as mf_tmp
@@ -54,10 +55,7 @@ def translate(destination):
 
     for subprocess_file_name in destination.glob("matrix_1_*"):
 
-        constants = []  # global_constants
-
-        for e in op_gc.GLOBAL_CONSTANTS:
-            constants.append(e)
+        constants = copy.copy(op_gc.GLOBAL_CONSTANTS)  # global_constants
 
         process_name = re.sub("matrix_1_", "", subprocess_file_name.stem)
 
@@ -65,13 +63,8 @@ def translate(destination):
         process_source = subprocess_file_name.parent / (
             re.sub("matrix_1_", "aloha_1_", subprocess_file_name.stem) + subprocess_file_name.suffix
         )
-
-        function_list = []
-        for f in function_list_:
-            function_list.append(f)
-        headers = []
-        for h in op_gc.HEADERS_:
-            headers.append(h)
+        function_list = copy.copy(function_list_)
+        headers = copy.copy(op_gc.HEADERS_)
         headers.append("matrix_" + process_name + ".h")
 
         custom_op_list = []

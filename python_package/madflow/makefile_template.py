@@ -18,7 +18,7 @@ NVCC := $(shell which nvcc)
 
 def write_shell_name():
     """Adds a line for the kernel name"""
-    text = f"""UNAME_S := $(shell uname -s)
+    text = """UNAME_S := $(shell uname -s)
 
 """
     return text
@@ -27,7 +27,7 @@ def write_shell_name():
 def write_multithreading():
     """Find the number of processors and use as many threads as possible
     if the number of processors isn't found, default to 1"""
-    text = f"""ifeq ($(UNAME_S), Darwin)
+    text = """ifeq ($(UNAME_S), Darwin)
 NPROCS = $(shell sysctl -n hw.ncpu)
 else
 NPROCS = $(shell grep -c 'processor' /proc/cpuinfo)
@@ -43,7 +43,7 @@ MAKEFLAGS += -j$(NPROCS)
 
 def write_tf_generic_flags():
     """Adds TensorFlow flags"""
-    text = f"""TF_CFLAGS = $(shell python3 -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_compile_flags()))')
+    text = """TF_CFLAGS = $(shell python3 -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_compile_flags()))')
 TF_LFLAGS = $(shell python3 -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_link_flags()))')
 
 """
@@ -54,8 +54,8 @@ def write_tf_cuda_flags():
     """Adds TansorFlow CUDA flags and the path to CUDA libraries.
     If the environment variable ${CUDA_PATH} isn't defined, use a default path"""
     # """
-    text = f"""CUDA_LFLAGS = -x cu -Xcompiler -fPIC
-CUDA_PATH := $(shell echo ${{CUDA_PATH}})
+    text = """CUDA_LFLAGS = -x cu -Xcompiler -fPIC
+CUDA_PATH := $(shell echo ${CUDA_PATH})
 ifeq ($(CUDA_PATH),)
 
 """
@@ -64,7 +64,7 @@ ifeq ($(CUDA_PATH),)
         text += 'CUDA_PATH = $(shell echo ${PATH} | sed -e "s&.*:\([^:]*cuda[^/]*\).*&\\1&g")\n'
     else:
         text += "CUDA_PATH = " + CUDAPATH + "\n"
-    text += f"""endif
+    text += """endif
 
 """
     return text
@@ -114,7 +114,7 @@ endif
 
 def write_target():
     """Adds the name of the generated library (matrix_processName_cu.so)"""
-    text = f"""TARGETS = $(shell ls gpu/ | grep ".h" | sed 's/\.h/_cu.so/g')
+    text = """TARGETS = $(shell ls gpu/ | grep ".h" | sed 's/\.h/_cu.so/g')
 
 """
     return text
@@ -132,7 +132,7 @@ def write_commands():
 
 def write_generic_commands():
     """all compiles all target libraries (one for each subprocess, i.e.: qq~ -> X + gg -> X"""
-    text = f"""all: $(TARGETS)
+    text = """all: $(TARGETS)
 
 """
     return text
@@ -140,7 +140,7 @@ def write_generic_commands():
 
 def write_library_commands():
     """Compile each library from object files"""
-    text = f"""%_cu.so: gpu/%.cudao gpu/%.cu.cudao
+    text = """%_cu.so: gpu/%.cudao gpu/%.cu.cudao
 \t$(CXX) -o $@ $(CFLAGS_CUDA) $^ $(LDFLAGS_CUDA)
 
 """
@@ -149,7 +149,7 @@ def write_library_commands():
 
 def write_source_commands():
     """Generate object files"""
-    text = f"""%.o: %.cc
+    text = """%.o: %.cc
 \t$(CXX) -c $(CFLAGS) $^ -o $@
 
 %.cu.cudao: %.cu.cc
@@ -166,7 +166,7 @@ def write_cleanup_commands():
     """Adds commmand for cleanup"""
     # remove generated libraries
     # remove generated libraries and source code
-    text = f"""clean:
+    text = """clean:
 \trm -f $(TARGETS) $(OBJECT_SRCS_CUDA)
 
 clean_all:
