@@ -105,13 +105,11 @@ def get_signature(line):
 
 
 def convert_signatures(signatures, signature_variables):
-    """Read the signature from text
-    line: line of text containing the signature
-
-    return: a Signature object"""
+    """Read the signature from text and update signature_variables
+    signatures: list of text Signature objects
+    signature_variables: list of tf.function signatures"""
     for i in range(len(signature_variables)):
         for v in signature_variables[i].signature_name_list:
             for s in signatures:
                 if s.name == v:
                     signature_variables[i].signature_list.append(s)
-    return signature_variables

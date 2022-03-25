@@ -32,26 +32,19 @@ def translate(destination):
     mf_tmp.write_makefile(destination)
 
     # Generate sign functions
-    auxiliary_functions = []
     function_list_ = []
-    auxiliary_functions, function_list_ = op_af.generate_auxiliary_functions(
-        auxiliary_functions, function_list_
-    )
+    op_af.generate_auxiliary_functions(function_list_)
 
     # Read wavefunctions_flow.py
     for file_source in FILE_SOURCES:
         signatures = []
         signature_variables = []
 
-        signatures, signature_variables = op_re.read_signatures(
-            signatures, signature_variables, file_source
-        )
+        op_re.read_signatures(signatures, signature_variables, file_source)
 
-        signature_variables = op_pa.convert_signatures(signatures, signature_variables)
+        op_pa.convert_signatures(signatures, signature_variables)
 
-        function_list_ = op_re.read_file_from_source(
-            function_list_, file_source, signatures, signature_variables
-        )
+        op_re.read_file_from_source(function_list_, file_source, signatures, signature_variables)
 
     for subprocess_file_name in destination.glob("matrix_1_*"):
 
@@ -69,42 +62,36 @@ def translate(destination):
 
         custom_op_list = []
 
-        signatures, signature_variables = op_re.read_signatures(
-            signatures, signature_variables, process_source
-        )
+        op_re.read_signatures(signatures, signature_variables, process_source)
 
-        signature_variables = op_pa.convert_signatures(signatures, signature_variables)
+        op_pa.convert_signatures(signatures, signature_variables)
 
-        function_list = op_re.read_file_from_source(
-            function_list, process_source, signatures, signature_variables
-        )
+        op_re.read_file_from_source(function_list, process_source, signatures, signature_variables)
 
         matrix_name = subprocess_file_name.name
 
-        signatures, signature_variables = op_re.read_signatures(
-            signatures, signature_variables, matrix_source
-        )
-        signature_variables = op_pa.convert_signatures(signatures, signature_variables)
+        op_re.read_signatures(signatures, signature_variables, matrix_source)
+        op_pa.convert_signatures(signatures, signature_variables)
 
-        function_list = op_re.extract_matrix_from_file(
+        op_re.extract_matrix_from_file(
             function_list, matrix_source, signatures, signature_variables
         )
 
         for i in range(len(function_list)):
-            function_list = op_sy.check_variables(i, function_list)
+            op_sy.check_variables(i, function_list)
 
         for i in range(len(function_list)):
-            function_list = op_sy.check_lines(i, function_list)
+            op_sy.check_lines(i, function_list)
         for i in range(len(function_list)):
-            function_list = op_sy.check_variables(i, function_list)
+            op_sy.check_variables(i, function_list)
 
-        function_list[-1] = op_gen.serialize_function(function_list[-1])
+        op_gen.serialize_function(function_list[-1])
 
         custom_op_list.append(op_gen.define_custom_op(function_list[-1]))
 
-        function_list[-1], constants = op_gen.extract_constants(function_list[-1], constants)
+        op_gen.extract_constants(function_list[-1], constants)
 
-        function_list[-1] = op_gen.remove_real_ret(function_list[-1])
+        op_gen.remove_real_ret(function_list[-1])
 
         # write the Op for both CPU and GPU
         for device in DEVICES:

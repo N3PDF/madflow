@@ -154,13 +154,10 @@ def grab_return_variable_name(function_return):
 def read_file_from_source(function_list, file_source, signatures, signature_variables):
     """Read a file, looking for functions
     function_list: list of function objects containing
-                   previously defined functions
+                   previously defined functions (updated)
     file_source: complete path to the file we need to read
     signatures: defined function signatures
-    signature_variables: defined signature variables
-
-    return: list containing previously defined functions and functions
-            found in file_source"""
+    signature_variables: defined signature variables"""
     f = open(file_source, "r")
     line = f.readline()
     while line != "":
@@ -197,20 +194,16 @@ def read_file_from_source(function_list, file_source, signatures, signature_vari
                 function_list.append(new_function)
 
         line = f.readline()
-    return function_list
 
 
 def extract_matrix_from_file(function_list, file_source, signatures, signature_variables):
     """Read the matrix element file, looking for the polarized
        matrix element function
     function_list: list of function objects containing
-                   previously defined functions
+                   previously defined functions (updated)
     file_source: complete path to the file we need to read
     signatures: defined function signatures
-    signature_variables: defined signature variables
-
-    return: list containing previously defined functions and functions
-            found in file_source"""
+    signature_variables: defined signature variables"""
     f = open(file_source, "r")
     line = f.readline()
     while line != "":
@@ -247,16 +240,13 @@ def extract_matrix_from_file(function_list, file_source, signatures, signature_v
                 function_list.append(new_function)
 
         line = f.readline()
-    return function_list
 
 
 def read_signatures(signatures, signature_variables, file_source):
     """Read signatures from file
-    signatures: previously defined signatures
-    signature_variables: previously defined signature variables
-    file_source: complete path to the file we need to read
-
-    return: updated signatures and signature_variables"""
+    signatures: previously defined signatures (updated)
+    signature_variables: previously defined signature variables (updated)
+    file_source: complete path to the file we need to read"""
     f = open(file_source, "r")
     line = f.readline()
     while line != "":
@@ -319,4 +309,3 @@ def read_signatures(signatures, signature_variables, file_source):
                 signature_variables.append(s)
         line = f.readline()
     f.close()
-    return signatures, signature_variables

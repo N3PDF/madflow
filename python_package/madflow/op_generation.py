@@ -12,9 +12,8 @@ FOR_LOOP_STRING = "for (int it = 0; it < " + N_EVENTS.name + "; it += 1) {"
 
 def serialize_function(f):
     """Create a loop over the total number of events
-    f: function object
+    f: function object (updated)"""
 
-    return: updated function object"""
     for_loop = False
     spacing = "    "
     s = 0
@@ -37,8 +36,6 @@ def serialize_function(f):
     f = prepare_custom_op(f, N_EVENTS)
 
     f.args.append(op_cl.Argument("context", "const OpKernelContext*", 0, False, []))
-
-    return f
 
 
 def parallelize_function(f, parallelization_type):
@@ -300,10 +297,8 @@ def modify_matrix(infile, process_name, destination):
 def extract_constants(func, constants):
     """cf and denom are constant (event-independent)
     this function moves them to global scope
-    func: Function object
-    constants: list of constants
-
-    return: updated Function object and constants"""
+    func: Function object (updated)
+    constants: list of constants (updated)"""
 
     count = 0
     for i in range(len(func.scope)):
@@ -323,15 +318,11 @@ def extract_constants(func, constants):
             )
             break
 
-    return func, constants
-
 
 def remove_real_ret(func):
     """In the Op the return variable is already declared as double,
     therefore .real() must be removed
-    func: Function object
-
-    return: updated Function object"""
+    func: Function object (updated)"""
 
     for i in range(len(func.scope)):  # This loop can be reversed
         if op_af.clean_spaces(func.scope[len(func.scope) - i - 1]).startswith(func.args[-3].name):
@@ -339,5 +330,3 @@ def remove_real_ret(func):
                 ".real\(\)", "", func.scope[len(func.scope) - i - 1]
             )
             break  # Only one occurrence
-
-    return func

@@ -6,8 +6,10 @@ import madflow.op_global_constants as op_gc
 import madflow.op_classes as op_cl
 
 
-def generate_auxiliary_functions(auxiliary_functions, function_list_):
-    """generates sign functions"""
+def generate_auxiliary_functions(function_list_):
+    """generates sign functions
+
+    function_list_: list of functions used by the Custom Operator (updated)"""
     aux_args = []
     aux_arg = op_cl.Argument("x", op_gc.DOUBLE_TYPE, 0, False, [])
     aux_args.append(aux_arg)
@@ -19,7 +21,6 @@ def generate_auxiliary_functions(auxiliary_functions, function_list_):
         op_gc.DOUBLE_TYPE, "sign", aux_args, aux_scope, aux_scope_args, ""
     )
     function_list_.append(aux_function)
-    auxiliary_functions.append(aux_function)
 
     aux_scope = ["return sign(x, y);"]
     aux_scope_args = []
@@ -27,8 +28,6 @@ def generate_auxiliary_functions(auxiliary_functions, function_list_):
         op_gc.DOUBLE_TYPE, "signvec", aux_args, aux_scope, aux_scope_args, ""
     )
     function_list_.append(aux_function)
-    auxiliary_functions.append(aux_function)
-    return auxiliary_functions, function_list_
 
 
 # Support functions
@@ -57,9 +56,9 @@ def count_brackets(line, brackets_count):
     return brackets_count
 
 
-def convert_grammar(oldValue):
+def convert_grammar(old_value):
     """converts the grammar from Python to C++"""
-    value = re.sub("tf.reshape", "", oldValue)
+    value = re.sub("tf.reshape", "", old_value)
     value = re.sub("\[:,[ :]*(\d+)\]", "[\g<1>]", value)
     value = re.sub("float_me\(([a-zA-Z0-9[\]+\-*/. ]*)\)", "\g<1>", value)
     value = re.sub("int_me", "(int)", value)

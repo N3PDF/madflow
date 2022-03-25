@@ -11,9 +11,7 @@ def check_variables(counter, function_list):
     """Check if all variables of i-th function are
     correctly defined
     counter: index of the i-th function (i)
-    function_list: list of all function objects
-
-    return: updated function_list"""
+    function_list: list of all function objects (updated)"""
     all_sizes_defined = True
     found = False
     i = 0
@@ -33,7 +31,7 @@ def check_variables(counter, function_list):
                     function_list[k].name + "\(.*" + (function_list[counter].args)[i].name, line
                 )
                 if match != None:
-                    function_list = check_variables(k, function_list)
+                    check_variables(k, function_list)
                     (function_list[counter].args)[i].size = function_list[k].args[-1].size
                     (function_list[counter].args)[i].type = op_af.clean_pointer(
                         function_list[k].args[-1].type
@@ -78,7 +76,7 @@ def check_variables(counter, function_list):
                         line,
                     )
                     if match != None:
-                        function_list = check_variables(k, function_list)
+                        check_variables(k, function_list)
                         new_size = function_list[k].args[-1].size
                         (function_list[counter].scope_args)[i].size = new_size
                         variabe_type = re.sub("[&\*]*", "", function_list[k].args[-1].type)
@@ -96,14 +94,12 @@ def check_variables(counter, function_list):
                 ";", "[" + str(new_size) + "];", (function_list[counter].scope)[line_of_definition]
             )
 
-    return function_list
-
 
 def check_lines(counter, function_list):
     """Check if all lines of the i-th function have
     correct grammar and syntax
     counter: index of the i-th function (i)
-    function_list: list of all function objects
+    function_list: list of all function objects (updated)
 
     return: updated function_list"""
     it = 0
@@ -347,4 +343,3 @@ def check_lines(counter, function_list):
                             it2 += 1
                         i += int(var_length[j])
         it += 1
-    return function_list
