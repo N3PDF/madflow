@@ -32,8 +32,6 @@ def check_variables(counter, function_list):
                 )
                 if match != None:
                     check_variables(k, function_list)
-                    print(function_list[counter].name, function_list[k].name)
-                    print("\t", (function_list[counter].args)[i].name, function_list[k].args[-1].size)
                     if function_list[k].args[-1].size != -1:
                         (function_list[counter].args)[i].size = function_list[k].args[-1].size
                         (function_list[counter].args)[i].type = op_af.clean_pointer(
