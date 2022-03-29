@@ -3,10 +3,10 @@
 from jinja2 import Template
 import re
 
-import madflow.op_constants as op_co
-import madflow.op_classes as op_cl
-import madflow.op_generation as op_gen
-import madflow.op_global_constants as op_gc
+import madflow.custom_op.constants as op_co
+import madflow.custom_op.classes as op_cl
+import madflow.custom_op.generation as op_gen
+import madflow.custom_op.global_constants as op_gc
 
 
 def template_with_string(template_string, variable):

@@ -2,9 +2,9 @@
 
 import re
 
-import madflow.op_aux_functions as op_af
-import madflow.op_classes as op_cl
-import madflow.op_transpiler as op_tp
+import madflow.custom_op.aux_functions as op_af
+import madflow.custom_op.classes as op_cl
+import madflow.custom_op.transpiler as op_tp
 
 
 # Function parsing

@@ -2,8 +2,8 @@
 
 import re
 
-import madflow.op_global_constants as op_gc
-import madflow.op_classes as op_cl
+import madflow.custom_op.global_constants as op_gc
+import madflow.custom_op.classes as op_cl
 
 
 def generate_auxiliary_functions(function_list_):

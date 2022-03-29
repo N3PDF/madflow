@@ -2,9 +2,9 @@
 
 import re
 
-import madflow.op_aux_functions as op_af
-import madflow.op_classes as op_cl
-import madflow.op_global_constants as op_gc
+import madflow.custom_op.aux_functions as op_af
+import madflow.custom_op.classes as op_cl
+import madflow.custom_op.global_constants as op_gc
 
 N_EVENTS = op_cl.Argument("nevents", "const int", 0, False, [])
 FOR_LOOP_STRING = "for (int it = 0; it < " + N_EVENTS.name + "; it += 1) {"

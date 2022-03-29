@@ -1,6 +1,6 @@
 """Jinja templates for the generation of custom operators"""
 
-import madflow.op_global_constants as op_gc
+import madflow.custom_op.global_constants as op_gc
 
 # Templates ----------------------
 

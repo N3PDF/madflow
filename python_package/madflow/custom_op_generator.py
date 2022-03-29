@@ -7,13 +7,13 @@ import copy
 import madflow.wavefunctions_flow
 import madflow.makefile_template as mf_tmp
 
-import madflow.op_aux_functions as op_af
-import madflow.op_generation as op_gen
-import madflow.op_global_constants as op_gc
-import madflow.op_write_templates as op_wt
-import madflow.op_syntax as op_sy
-import madflow.op_parser as op_pa
-import madflow.op_read as op_re
+import madflow.custom_op.aux_functions as op_af
+import madflow.custom_op.generation as op_gen
+import madflow.custom_op.global_constants as op_gc
+import madflow.custom_op.write_templates as op_wt
+import madflow.custom_op.syntax as op_sy
+import madflow.custom_op.parser as op_pa
+import madflow.custom_op.read as op_re
 
 
 DEVICES = ["cpu", "gpu"]

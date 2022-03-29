@@ -2,9 +2,9 @@
 
 import re
 
-import madflow.op_aux_functions as op_af
-import madflow.op_global_constants as op_gc
-import madflow.op_classes as op_cl
+import madflow.custom_op.aux_functions as op_af
+import madflow.custom_op.global_constants as op_gc
+import madflow.custom_op.classes as op_cl
 
 # Parse line
 
