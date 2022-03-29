@@ -82,8 +82,6 @@ def translate(destination):
 
         for i in range(len(function_list)):
             op_sy.check_lines(i, function_list)
-        for i in range(len(function_list)):
-            op_sy.check_variables(i, function_list)
 
         op_gen.serialize_function(function_list[-1])
 

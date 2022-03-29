@@ -32,15 +32,18 @@ def check_variables(counter, function_list):
                 )
                 if match != None:
                     check_variables(k, function_list)
-                    (function_list[counter].args)[i].size = function_list[k].args[-1].size
-                    (function_list[counter].args)[i].type = op_af.clean_pointer(
-                        function_list[k].args[-1].type
-                    )
-                    if function_list[k].args[-1].size != 0:
-                        (function_list[counter].args)[i].type += "*"
-                    else:
-                        (function_list[counter].args)[i].type += "&"
-                    # found = False # to avoid counting multiple times
+                    print(function_list[counter].name, function_list[k].name)
+                    print("\t", (function_list[counter].args)[i].name, function_list[k].args[-1].size)
+                    if function_list[k].args[-1].size != -1:
+                        (function_list[counter].args)[i].size = function_list[k].args[-1].size
+                        (function_list[counter].args)[i].type = op_af.clean_pointer(
+                            function_list[k].args[-1].type
+                        )
+                        if function_list[k].args[-1].size != 0:
+                            (function_list[counter].args)[i].type += "*"
+                        else:
+                            (function_list[counter].args)[i].type += "&"
+                        #found = False # to avoid counting multiple times
 
     i = 0
     all_sizes_defined = True
