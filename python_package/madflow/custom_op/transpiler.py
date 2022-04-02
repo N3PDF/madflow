@@ -516,36 +516,36 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
             type_value = 0
             conc_type = "int"
             for var in var_list:
-                for i in range(len(args)):
-                    if var == args[i].name:
+                for arg in args:
+                    if var == arg.name:
                         c_size = 0
-                        if args[i].size > 0:
-                            c_size += args[i].size
-                        elif args[i].size == 0:
+                        if arg.size > 0:
+                            c_size += arg.size
+                        elif arg.size == 0:
                             c_size += 1
                         else:
                             c_size = 0
                             unknown = True
-                        if args[i].type.startswith("T"):
+                        if arg.type.startswith("T"):
                             conc_type = "T"
-                        elif args[i].type.startswith(op_gc.DOUBLE_TYPE):
+                        elif arg.type.startswith(op_gc.DOUBLE_TYPE):
                             type_value += 1
                         conc_size += c_size
                         var_length.append(c_size)
                         break
-                for i in range(len(scope_variables)):
-                    if var == scope_variables[i].name:
+                for scope_var in scope_variables:
+                    if var == scope_var.name:
                         c_size = 0
-                        if scope_variables[i].size > 0:
-                            c_size += scope_variables[i].size
-                        elif scope_variables[i].size == 0:
+                        if scope_var.size > 0:
+                            c_size += scope_var.size
+                        elif scope_var.size == 0:
                             c_size += 1
                         else:
                             c_size = 0
                             unknown = True
-                        if scope_variables[i].type.startswith("T"):
+                        if scope_var.type.startswith("T"):
                             conc_type = "T"
-                        elif scope_variables[i].type.startswith(op_gc.DOUBLE_TYPE):
+                        elif scope_var.type.startswith(op_gc.DOUBLE_TYPE):
                             type_value += 1
                         conc_size += c_size
                         var_length.append(c_size)
@@ -557,22 +557,22 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
 
             if unknown == False:
 
-                for i in range(len(args)):
-                    if assigned_variable == args[i].name:
-                        args[i].type = conc_type
+                for arg in args:
+                    if assigned_variable == arg.name:
+                        arg.type = conc_type
                         if conc_size > 1:
-                            args[i].size = conc_size
-                            args[i].type += "*"
-                        elif args[i].size == 1:
-                            args[i].size = 0
+                            arg.size = conc_size
+                            arg.type += "*"
+                        elif arg.size == 1:
+                            arg.size = 0
                         break
-                for i in range(len(scope_variables)):
-                    if assigned_variable == scope_variables[i].name:
-                        scope_variables[i].type = conc_type
+                for scope_var in scope_variables:
+                    if assigned_variable == scope_var.name:
+                        scope_var.type = conc_type
                         if conc_size > 1:
-                            scope_variables[i].size = conc_size
-                        elif scope_variables[i].size == 1:
-                            scope_variables[i].size = 0
+                            scope_var.size = conc_size
+                        elif scope_var.size == 1:
+                            scope_var.size = 0
                         break
                 i = 0
                 while i < conc_size:
@@ -685,17 +685,17 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
             scope.append(custom_type + " " + assigned_variable + " = 0;")
             spacing = ""
 
-            for x in range(len(distinct_indices)):
+            for distinct_index in distinct_indices:
                 scope.append(
                     spacing
                     + "for (int "
-                    + distinct_indices[x]
+                    + distinct_index
                     + " = 0; "
-                    + distinct_indices[x]
+                    + distinct_index
                     + " < "
                     + prov_len
                     + "; "
-                    + distinct_indices[x]
+                    + distinct_index
                     + "++) {"
                 )
                 spacing += "    "

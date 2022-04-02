@@ -91,8 +91,8 @@ def write_function(fun, device):
 
     if fun.name == "matrix":
         func = op_cl.Function(fun.type, fun.name, fun.args, [], fun.scope_args, fun.template)
-        for i in range(len(fun.scope)):
-            func.scope.append(fun.scope[i])
+        for func_scope_line in fun.scope:
+            func.scope.append(func_scope_line)
         if device == "cpu":
             func = op_gen.parallelize_function(func, op_gc.CPU_PARALLELIZATION)
         else:
@@ -129,8 +129,8 @@ def write_header_file(custom_op, func):
 def write_matrix_op(custom_op, func, device, process_name):
     # func2 = func
     op_types = []
-    for i in range(len(func.args)):
-        t = re.sub("const (.*)", "\g<1>", func.args[i].type)
+    for func_arg in func.args:
+        t = re.sub("const (.*)", "\g<1>", func_arg.type)
         t = re.sub("([^&*]*)[&*]*", "\g<1>", t)
         op_types.append(t)
     func.argn = len(func.args)
