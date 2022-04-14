@@ -99,22 +99,20 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 definition = ""
                 if already_defined == False:
                     scope.append(
-                        op_af.convert_grammar(custom_type + " " + split_line[0] + "[" + sz + "];")
+                        op_af.convert_grammar(f"{ custom_type } { split_line[0] }[{ sz }];")
                     )
-                scope.append("for (int it1 = 0; it1 < " + str(sz) + "; it1++) {")
-                scope.append(
-                    "    " + op_af.convert_grammar(split_line[0] + "[it1] = " + value + ";")
-                )
+                scope.append(f"for (int it1 = 0; it1 < { str(sz) }; it1++) " + "{")
+                scope.append("    " + op_af.convert_grammar(f"{ split_line[0] }[it1] = { value };"))
                 scope.append("}")
             else:
-                scope.append(op_af.convert_grammar(split_line[0] + " = " + value + ";"))
+                scope.append(op_af.convert_grammar(f"{ split_line[0] } = { value };"))
 
             comparison_string = "complex_tf("
             if value.startswith(comparison_string):
                 custom_type = "T"
-                assigned = "T(" + (value.split("("))[1].split(")")[0] + ")"
+                assigned = f"T({ (value.split('('))[1].split(')')[0] })"
 
-            comment = "array of size " + str(custom_size)
+            comment = f"array of size { str(custom_size) }"
             value = ""
 
             if already_defined == True and sz != "":
@@ -254,10 +252,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     elif letter == "," and br_count == 0:
                         real_part = False
 
-                    # bracketCount = count_brackets_letter(letter, bracketCount)
-                    # if letter == "," and bracketCount == 0:
-                    #    real_part = False
-
                     if real_part == True:
                         comp[0] += letter
                     else:
@@ -276,7 +270,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                         size_of_stack = len(el)
 
                 scope.append(
-                    custom_type + is_arrayy + " " + split_line[0] + "[" + str(size_of_stack) + "];"
+                    f"{ custom_type }{ is_arrayy } { split_line[0] }[{ str(size_of_stack) }];"
                 )
 
                 for e in range(len(comp)):
@@ -289,14 +283,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                         comp[e][i] = op_af.convert_grammar(comp[e][i])
                 for e in range(size_of_stack):
                     scope.append(
-                        split_line[0]
-                        + "["
-                        + str(e)
-                        + "] = T("
-                        + comp[0][e]
-                        + ","
-                        + comp[1][e]
-                        + ");"
+                        f"{ split_line[0] }[{ str(e) }] = T({ comp[0][e] },{ comp[1][e] });"
                     )
 
                 value = ""

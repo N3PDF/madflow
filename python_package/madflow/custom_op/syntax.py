@@ -41,7 +41,7 @@ def check_variables(counter, function_list):
                             (function_list[counter].args)[i].type += "*"
                         else:
                             (function_list[counter].args)[i].type += "&"
-                        #found = False # to avoid counting multiple times
+                        # found = False # to avoid counting multiple times
 
     i = 0
     all_sizes_defined = True
