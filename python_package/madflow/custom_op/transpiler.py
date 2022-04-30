@@ -280,9 +280,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     for i in range(size_of_stack):
                         comp[e][i] = op_af.convert_grammar(comp[e][i])
                 for e in range(size_of_stack):
-                    scope.append(
-                        f"{split_line[0]}[{str(e)}] = T({comp[0][e]},{comp[1][e]});"
-                    )
+                    scope.append(f"{split_line[0]}[{str(e)}] = T({comp[0][e]},{comp[1][e]});")
 
                 value = ""
 
