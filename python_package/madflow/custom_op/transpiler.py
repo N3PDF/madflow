@@ -17,7 +17,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
     scope: list of strings with previous transpiled lines
     inside_comment: boolean -> true if the line is inside
                                a comment block
-
     return: transpiled line,
             updated scope_variables, scope, inside_comment"""
     return_line = ""
@@ -241,7 +240,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 real_part = True
 
                 br_count = 0
-                # bracketCount = 0
 
                 for letter in value[len(st1) :]:
 
@@ -283,7 +281,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                         comp[e][i] = op_af.convert_grammar(comp[e][i])
                 for e in range(size_of_stack):
                     scope.append(
-                        f"{ split_line[0] }[{ str(e) }] = T({ comp[0][e] },{ comp[1][e] });"
+                        f"{split_line[0]}[{str(e)}] = T({comp[0][e]},{comp[1][e]});"
                     )
 
                 value = ""
@@ -384,7 +382,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 scope_variables.append(
                     op_cl.Argument(assigned_variable, custom_type, custom_size, False, [])
                 )  # need to define size
-                scope.append(custom_type + is_arrayy + " " + split_line[0] + ";")
+                scope.append(f"{custom_type}{is_arrayy} {split_line[0]};")
 
             for i in range(1, 3):
                 condition[i] = op_af.clean_spaces(condition[i])
@@ -415,7 +413,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                                             + "];"
                                         )
                                         scope.append(
-                                            "for (int it1 = 0; it1 <" + str(var.size) + "; it1++) {"
+                                            f"for (int it1 = 0; it1 <{str(var.size)}; it1++) " + "{"
                                         )
                                         scope.append(
                                             "    _"
@@ -442,14 +440,14 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                                             + " *[+\-*/]+ *"
                                             + var2.name
                                             + "( *[,(){};]+)",
-                                            "\g<1>_" + var.name + "\g<2>",
+                                            f"\g<1>_{var.name}\g<2>",
                                             condition[i],
                                         )
                                         found = True
 
                             if found == False:
                                 scope.append(
-                                    "for (int it1 = 0; it1 <" + str(var.size) + "; it1++) {"
+                                    f"for (int it1 = 0; it1 <{str(var.size)}; it1++) " + "{"
                                 )
                                 scope.append(
                                     "    "
@@ -458,7 +456,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                                     + op_af.clean_spaces(
                                         re.sub(
                                             "([(){}, +-])" + var.name + "( *[+\-*/]+)",
-                                            "\g<1>" + var.name + "[it1]\g<2>",
+                                            f"\g<1>{var.name}[it1]\g<2>",
                                             assigned,
                                         )
                                     )
@@ -472,24 +470,22 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                                         args[v].type = var.type
                                         if args[v].size != 0:
                                             args[v].type += "*"
-                                            print("u")
                                 for v in range(len(scope_variables)):
                                     if assigned_variable == scope_variables[v].name:
                                         scope_variables[v].size = var.size
                                         scope_variables[v].type = var.type
                                         if scope_variables[v].size != 0:
                                             scope_variables[v].type += "*"
-                                            print("v")
 
                 if condition[i].startswith("T("):
-                    condition[i] = split_line[0] + " = " + condition[i]
+                    condition[i] = f"{split_line[0]} = {condition[i]}"
                 else:
-                    condition[i] = re.sub("\)$", ", " + split_line[0] + ")", condition[i])
-            scope.append("if (" + op_af.clean_spaces(condition[0]) + ") {")
-            scope.append("    " + op_af.clean_spaces(condition[1]) + ";")
+                    condition[i] = re.sub("\)$", f", {split_line[0]})", condition[i])
+            scope.append(f"if ({op_af.clean_spaces(condition[0])}) " + "{")
+            scope.append(f"    {op_af.clean_spaces(condition[1])};")
             scope.append(op_af.clean_spaces("}"))
             scope.append(op_af.clean_spaces("else") + " {")
-            scope.append("    " + op_af.clean_spaces(condition[2]) + ";")
+            scope.append(f"    {op_af.clean_spaces(condition[2])};")
             scope.append(op_af.clean_spaces("}"))
 
             return return_line, scope_variables, scope, inside_comment
@@ -566,7 +562,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                     for j in range(len(var_list)):
                         newline = ""
                         if var_length[j] == 1:
-                            newline = assigned_variable + "[" + str(i) + "] = " + var_list[j] + ";"
+                            newline = f"{assigned_variable}[{str(i)}] = {var_list[j]};"
                         scope.append(newline)
                         i += 1
             else:
@@ -584,10 +580,10 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
 
             custom_size = len(sp)
             is_array = True
-            newLine = "const " + custom_type + " " + assigned_variable + "[] = {"
+            newLine = f"const {custom_type} {assigned_variable}[] = " + "{"
 
             for v in range(len(sp) - 1):
-                newLine += sp[v] + ","
+                newLine += f"{sp[v]},"
             newLine += sp[-1] + "};"
 
             scope.append(newLine)
@@ -607,7 +603,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 else:
                     pattern += letter
 
-            value = re.sub('"' + pattern + '" *,', "", value)
+            value = re.sub(f'"{pattern}" *,', "", value)
 
             final_indices = op_af.clean_spaces(pattern.split("->")[1])
             pattern = op_af.clean_spaces(pattern.split("->")[0])
@@ -652,7 +648,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                             if temp_arr[ind] == idx:
                                 index += idx
                                 if prod > 1:
-                                    index += "*" + str(prod) + "+"
+                                    index += f"*{str(prod)}+"
                             prod *= int(prov_len)
                         ind -= 1
 
@@ -669,7 +665,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
             value = op_af.convert_grammar(value)
 
             custom_type = op_gc.DOUBLE_TYPE
-            scope.append(custom_type + " " + assigned_variable + " = 0;")
+            scope.append(f"{custom_type} {assigned_variable} = 0;")
             spacing = ""
 
             for distinct_index in distinct_indices:
@@ -687,7 +683,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                 )
                 spacing += "    "
 
-            scope.append(spacing + assigned_variable + " += (" + value + ").real();")
+            scope.append(f"{spacing}{assigned_variable} += ({value}).real();")
 
             for x in range(len(distinct_indices)):
                 spacing = spacing[:-4]
@@ -715,7 +711,7 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                                 found = True
 
                     if found == False:
-                        scope.append("for (int it1 = 0; it1 <" + str(var.size) + "; it1++) {")
+                        scope.append(f"for (int it1 = 0; it1 <{str(var.size)}; it1++) " + "{")
                         scope.append(
                             "    "
                             + assigned_variable
@@ -739,23 +735,19 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                                     args[v].type = var.type
                                 if args[v].size != 0:
                                     args[v].type += "*"
-                                    # print('u', args[v].name, var.type)
                         for v in range(len(scope_variables)):
                             if assigned_variable == scope_variables[v].name:
                                 scope_variables[v].size = var.size
                                 if op_af.clean_spaces(
                                     re.sub(
                                         "([(){}, +-])" + var.name + "( *[+\-*/]+)",
-                                        "\g<1>" + var.name + "[it1]\g<2>",
+                                        f"\g<1>{var.name}[it1]\g<2>",
                                         assigned,
                                     )
                                 ).startswith("T("):
                                     scope_variables[v].type = "T"
                                 else:
                                     scope_variables[v].type = var.type
-                                if scope_variables[v].size != 0:
-                                    # scope_variables[v].type += '*'
-                                    print("v")
                         assigned = ""
 
         if already_defined == False:
@@ -782,12 +774,12 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
                         br_count -= 1
                     elif letter == "," and br_count == 0 and curly_br_count == 1:
                         custom_size += 1
-                comment = "array of size " + str(custom_size)
+                # comment = "array of size " + str(custom_size)
             scope_variables.append(
                 op_cl.Argument(assigned_variable, custom_type, custom_size, False, [])
             )  # need to define size
-            return_line += custom_type + is_arrayy + " "
-        return_line += split_line[0] + " = " + op_af.clean_spaces(assigned)
+            return_line += f"{custom_type}{is_arrayy} "
+        return_line += f"{split_line[0]} = {op_af.clean_spaces(assigned)}"
 
         if op_af.clean_spaces(assigned) == "":
             return_line = ""
@@ -796,6 +788,6 @@ def parse_line(line, args, scope_variables, scope, inside_comment):
         return_line += ";"
 
     if comment != "":
-        return_line += "//" + comment
+        return_line += f"// {comment}"
 
     return return_line, scope_variables, scope, inside_comment
