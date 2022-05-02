@@ -37,7 +37,7 @@ Phase-Space generator
 For convenience, ``madflow`` offers a :py:class:`PhaseSpaceGenerator <madflow.phasespace.PhaseSpaceGenerator>` class
 which can generate phase space points using different algorithms (for now only RAMBO).
 
-In order ton instantiate a phase-space object the number of particles, the center of mass energies and the
+In order to instantiate a phase-space object the number of particles, the center of mass energies and the
 mass of the final state objects must be given.
 Furthermore, it is possible to ask for the phase-space to be provided in the center of mass frame
 (``com_output=True``) or in the laboratory frame (``com_output=False``).
