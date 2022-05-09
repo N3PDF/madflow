@@ -77,7 +77,7 @@ if __name__ == "__main__":
         default="g g > t t~",
     )
     arger.add_argument(
-        "-m", "--massive_particles", help="Number of massive particles", type=int, default=2
+        "-m", "--massive_particles", help="Number of massive particles to apply cuts differently", type=int, default=2
     )
     arger.add_argument("-g", "--variable_g", help="Use variable g_s", action="store_true")
     arger.add_argument(
