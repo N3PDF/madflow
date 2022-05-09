@@ -32,6 +32,8 @@ from pathlib import Path
 import logging
 import numpy as np
 
+from madflow.custom_op_generator import translate, compile_op
+
 from madflow.config import (
     get_madgraph_path,
     get_madgraph_exe,
@@ -277,6 +279,9 @@ def madflow_main(args=None, quick_return=False):
         type=int,
         default=int(1e6),
     )
+    arger.add_argument(
+        "--custom_op", help="Use a Custom Operator for ME evaluation", action="store_true"
+    )
 
     args = arger.parse_args(args)
 
@@ -299,6 +304,9 @@ def madflow_main(args=None, quick_return=False):
                 sys.exit(0)
 
     _generate_madgraph_process(args.madgraph_process, output_path)
+    if args.custom_op:
+        translate(output_path)
+        compile_op(output_path)
     if args.dry_run:
         return None, None, None
     matrices, models = _import_matrices(output_path)
@@ -342,7 +350,7 @@ def madflow_main(args=None, quick_return=False):
         logger.info("Set variable muF=muR=sum(mT)/2")
     else:
         logger.info("Setting fixed muF=muR=%.2f GeV.", args.fixed_scale)
-        q2 = float_me(args.fixed_scale ** 2)
+        q2 = float_me(args.fixed_scale**2)
         if args.no_pdf:
             alpha_s = 0.118
         else:
@@ -367,7 +375,11 @@ def madflow_main(args=None, quick_return=False):
     test_ps, test_wt, _, _, _ = phasespace(test_xrand)
     test_alpha = float_me([0.118] * len(test_wt))
     for matrix, model in zip(matrices, models):
-        wgts = matrix.smatrix(test_ps, *model.evaluate(test_alpha))
+        if args.custom_op:
+            wgts = matrix.cusmatrix(test_ps, *model.evaluate(test_alpha))
+        else:
+            wgts = matrix.smatrix(test_ps, *model.evaluate(test_alpha))
+
         logger.info("Testing %s: %s", matrix, wgts.numpy())
 
     @tf.function(input_signature=3 * [tf.TensorSpec(shape=[None], dtype=DTYPE)])
@@ -405,7 +417,11 @@ def madflow_main(args=None, quick_return=False):
             # Compute each matrix element
             ret = 0.0
             for i, (matrix, model) in enumerate(zip(matrices, models)):
-                smatrix = matrix.smatrix(all_ps, *model.evaluate(alpha_s))
+                if args.custom_op:
+                    smatrix = matrix.cusmatrix(all_ps, *model.evaluate(alpha_s))
+                else:
+                    smatrix = matrix.smatrix(all_ps, *model.evaluate(alpha_s))
+                # smatrix = matrix.smatrix(all_ps, *model.evaluate(alpha_s))
                 if not args.no_pdf:
                     p1 = tf.gather(proton_1, gather_1[i], axis=1)
                     p2 = tf.gather(proton_2, gather_2[i], axis=1)
