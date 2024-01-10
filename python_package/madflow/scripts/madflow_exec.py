@@ -331,7 +331,10 @@ def madflow_main(args=None, quick_return=False):
         compile_op(output_path)
     if args.dry_run:
         return None, None, None
+
     matrices, models = _import_matrices(output_path)
+    if len(matrices) == 0:
+        raise ValueError("No madgraph process generated, please check your input string")
 
     if args.no_pdf:
         initial_flavours = [None]

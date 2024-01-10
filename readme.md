@@ -60,14 +60,15 @@ tar xfz MG5_aMC_v3.1.0.tar.gz
 export MADGRAPH_PATH=${PWD}/MG5_aMC_v3_1_0
 ```
 
-#### LHAPDF
+#### PDF grids
 
 While `LHAPDF` is not strictly necessary to use the `madflow` library or run any of the scripts,
 having access to the `lhapdf` python wrapper can be convenient in order to manage the different PDFsets.
 Please install the latest version from the LHAPDF [site](https://lhapdf.hepforge.org/).
 
-Otherwise, if your installed version of `pdfflow` is equal or greater than `1.2.1`,
-you can manually install the [PDF sets](https://lhapdf.hepforge.org/pdfsets.html) in a suitable directory
+Otherwise, if your installed version of `pdfflow` is equal or greater than `1.2.2`,
+it includes the [lhapdf-management](https://github.com/scarlehoff/lhapdf_management) scripts suite and LHAPDF should not be needed.
+You can also manually install the [PDF sets](https://lhapdf.hepforge.org/pdfsets.html) in a suitable directory
 and ensure that either the `PDFFLOW_DATA_PATH` or `LHAPDF_DATA_PATH` environment variables are pointing to it.
 
 You can check your installed version of `pdfflow` with: `python -c 'import pdfflow ; print(pdfflow.__version__);'`
